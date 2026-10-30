@@ -1,0 +1,28 @@
+{
+  "name": "hypercerts-sdk-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "prepare": "lefthook install",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check:package": "pnpm build && node scripts/check-package.mjs",
+    "changeset": "changeset"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@changesets/cli": "3.0.3",
+    "@types/node": "24.19.2",
+    "lefthook": "2.2.2",
+    "turbo": "2.11.10",
+    "typescript": "7.0.2",
+    "vite": "8.3.5"
+  }
+}
