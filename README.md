@@ -26,7 +26,7 @@ The package is ESM-only and requires Node.js 24 or later.
 
 Prerequisites:
 
-- Node.js 26 (see `.nvmrc`; Node.js 24 is the lowest supported version)
+- Node.js 24 (see `.nvmrc`; also the lowest supported version)
 - pnpm 12 (the exact version is pinned in `package.json` under `packageManager`)
 
 ```sh
