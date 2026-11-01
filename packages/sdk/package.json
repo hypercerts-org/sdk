@@ -2,6 +2,12 @@
   "name": "@hypercerts-org/sdk",
   "version": "0.0.0",
   "description": "TypeScript SDK for reading and writing Hypercerts records on the AT Protocol.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hypercerts-org/sdk.git",
+    "directory": "packages/sdk"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {
