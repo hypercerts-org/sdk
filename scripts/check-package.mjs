@@ -20,6 +20,16 @@ const pinned = (name) => {
 
 const packages = [{ name: "@hypercerts-org/sdk", dir: join(root, "packages/sdk") }];
 
+// The SDK's @atproto/lex peer is installed in the consumer at the version the SDK is developed
+// against, so the check does not depend on what the registry serves for the peer range.
+const sdkManifest = readJson(join(packages[0].dir, "package.json"));
+const lexVersion = sdkManifest.devDependencies?.["@atproto/lex"];
+if (!lexVersion) {
+  throw new Error(
+    "check-package: @atproto/lex must be an exact-pinned devDependency of packages/sdk; the consumer installs that version as the peer",
+  );
+}
+
 const work = mkdtempSync(join(tmpdir(), "hypercerts-sdk-consumer-"));
 try {
   const tarballs = packages.map((pkg) => packPackage(pkg, work));
@@ -58,7 +68,10 @@ function createConsumer(dir, tarballs) {
     name: "consumer",
     private: true,
     type: "module",
-    dependencies: Object.fromEntries(tarballs.map((t) => [t.name, `file:${t.path}`])),
+    dependencies: {
+      ...Object.fromEntries(tarballs.map((t) => [t.name, `file:${t.path}`])),
+      "@atproto/lex": lexVersion,
+    },
     devDependencies: { typescript: pinned("typescript"), vite: pinned("vite") },
   });
   const imports = packages.map((pkg, i) => `import * as pkg${i} from "${pkg.name}";`).join("\n");
@@ -80,8 +93,12 @@ function createConsumer(dir, tarballs) {
     },
     include: ["src"],
   });
-  // --ignore-workspace keeps pnpm from treating the temp dir as part of this repo.
-  run("pnpm", ["install", "--ignore-workspace", "--no-frozen-lockfile"], consumer);
+  // A workspace file of its own makes the consumer a separate pnpm workspace root, so pnpm does not
+  // treat the temp dir as part of this repo. It also answers pnpm's build-script prompt: pnpm fails
+  // the install if a dependency has an unreviewed build script, and @atproto/lex pulls in
+  // core-js, whose postinstall only prints a banner.
+  writeFileSync(join(consumer, "pnpm-workspace.yaml"), "allowBuilds:\n  core-js: false\n");
+  run("pnpm", ["install", "--no-frozen-lockfile"], consumer);
   return consumer;
 }
 
