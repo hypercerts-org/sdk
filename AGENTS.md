@@ -13,7 +13,7 @@ Keep it to what a developer needs to get started:
 - how to set up the repository and run the common commands
 - where to find further documentation
 
-Put detailed guides, design notes, API reference and decision records in dedicated documentation instead, and link to them from the README when useful. Do not append implementation notes, changelogs or long explanations to the README.
+Put detailed guides, design notes and decision records in dedicated documentation instead (API reference lives in TSDoc, see below), and link to them from the README when useful. Do not append implementation notes, changelogs or long explanations to the README.
 
 ## Package boundaries
 
@@ -28,6 +28,26 @@ Put detailed guides, design notes, API reference and decision records in dedicat
 - The Biome version is pinned exactly. When upgrading it, review changes to the enabled nursery rules (`noFloatingPromises`, `noMisusedPromises`, `useAwaitThenable`).
 - Pin dependency versions exactly (`pnpm add -E`).
 
+## API documentation
+
+TSDoc comments on exported symbols are the SDK's API reference. They ship in the published `.d.ts` files, so editors, TypeDoc and coding agents in consumers' repositories read them. Use standard TSDoc and do not duplicate it in separate per-operation docs.
+
+- Every exported function, type and interface gets a TSDoc comment with a one-line summary, plus `@remarks` when there is something the types do not say.
+- Functions also document `@param`, `@returns`, `@throws` with the condition that triggers it, and at least one `@example`. Examples import only from public entry points. Values the application provides, such as an auth `session`, may be left undeclared with a comment saying where they come from.
+- Use `@remarks` for what a caller cannot tell from the types: what the SDK deliberately does not do, side effects, what is not validated, and the reason for behaviour that looks surprising. Internal comments do not ship, so reasons callers need belong in the public TSDoc.
+- Add an `@example` for a likely mistake when there is one.
+- Link related symbols with `{@link Name}`. Mark examples that use not-yet-implemented operations as such.
+- Keep `docs/` for guides that span several operations.
+
+## Validation
+
+- Validate records with the generated `RecordSchema`s from the `@hypercerts-org/lexicon` package. Never copy, generate or hand-write record schemas in the SDK. Those exports do not exist yet: the planned `@hypercerts-org/lexicon/records` subpath is added by TECH-750 (the published 1.6.0 only exports `.` and `./lexicons`). Add the dependency when the first operation that needs it lands.
+- Validate SDK input data (records, URIs, DIDs, option values) with the `l` schema builder from `@atproto/lex` (a peer dependency, so it adds nothing to consumers' bundles). Build input schemas from the record schemas where they overlap. Use its string formats (`did`, `at-uri`, `datetime`, `record-key`, ...) instead of regexes.
+- Format checks are not always enough: for example `at-uri` accepts handle authorities and URIs without a record key. Add `l.refine` or a small named check when a card needs a stricter rule.
+- Write business rules that span fields or depend on SDK semantics (weight strings, date ranges, MIME and size limits) as `l.refine` or small named checks with specific messages.
+- Live objects such as the `Client` are not data; check them with a small duck-typed guard, not a schema.
+- Do not add Zod or another validation library.
+
 ## Generated files
 
 - `dist/` and `.turbo/` are build output. Never edit or commit them.
@@ -41,6 +61,7 @@ Run and make sure these pass:
 pnpm lint
 pnpm format:check
 pnpm typecheck
+pnpm test
 pnpm check:package
 ```
 

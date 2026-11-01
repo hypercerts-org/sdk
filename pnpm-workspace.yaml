@@ -2,3 +2,4 @@ packages:
   - packages/*
 allowBuilds:
   lefthook: false
+  core-js: false

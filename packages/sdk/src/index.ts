@@ -1,3 +1,5 @@
 // Public entry point for @hypercerts-org/sdk.
-// SDK operations are added by the domain cards; this scaffold intentionally exports nothing yet.
-export {};
+// Operations are added by the domain cards and imported through their own subpath exports.
+// Keep this file free of imports that pull in operations, so the root entry stays tree-shakeable.
+export type { CreateSDKContextOptions, SDKContext } from "./context.js";
+export { createSDKContext } from "./context.js";

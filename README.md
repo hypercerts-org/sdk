@@ -10,14 +10,14 @@ TypeScript SDK for reading and writing [Hypercerts](https://hypercerts.org) reco
 | --------------------------------------- | -------------------------------------------------------------------------------------------- |
 | [`@hypercerts-org/sdk`](./packages/sdk) | Read and write Hypercerts records. Operations are grouped by domain through subpath exports. |
 
-The SDK takes an already-authenticated AT Protocol client. Authentication is the application's responsibility; an optional `@hypercerts-org/auth` package is planned.
+The SDK takes an already-authenticated AT Protocol client. Authentication is the application's responsibility; an optional `@hypercerts-org/auth` package is planned. See the [package README](./packages/sdk/README.md) for setup.
 
 ## Install
 
 Once published:
 
 ```sh
-pnpm add @hypercerts-org/sdk
+pnpm add @hypercerts-org/sdk @atproto/lex
 ```
 
 The package is ESM-only and requires Node.js 24 or later.
@@ -38,6 +38,7 @@ pnpm build
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `pnpm build`         | Build all packages                                                                                                      |
 | `pnpm typecheck`     | Type-check all packages                                                                                                 |
+| `pnpm test`          | Run the tests with Vitest                                                                                               |
 | `pnpm lint`          | Lint with Biome                                                                                                         |
 | `pnpm format`        | Format files with Biome                                                                                                 |
 | `pnpm format:check`  | Check formatting without changing files                                                                                 |
