@@ -15,12 +15,14 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "check:package": "pnpm build && node scripts/check-package.mjs",
+    "check:duplicates": "jscpd --similarity --ignore-identifiers --ignore-literals --max-gap-lines 3 --ignore \"**/*.test.ts,**/test-utils/**\" --pattern \"{packages/sdk/src,scripts}/**\" --exit-code 1 .",
     "changeset": "changeset"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
     "@changesets/cli": "3.0.3",
     "@types/node": "24.19.2",
+    "jscpd": "5.4.2",
     "lefthook": "2.2.2",
     "turbo": "2.11.10",
     "typescript": "7.0.2",
