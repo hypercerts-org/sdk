@@ -2,7 +2,7 @@
 
 TypeScript SDK for reading and writing [Hypercerts](https://hypercerts.org) records on the AT Protocol.
 
-> Work in progress. The package is not published yet and does not expose any operations.
+> Work in progress. The package is not published yet.
 
 ## Packages
 

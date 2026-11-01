@@ -3,7 +3,9 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "types": []
+    "types": [],
+    // Blob is a global in browsers and Node 24 alike; the DOM lib is where TypeScript declares it.
+    "lib": ["es2024", "dom"]
   },
   "include": ["src"]
 }

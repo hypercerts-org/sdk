@@ -74,8 +74,9 @@ function createConsumer(dir, tarballs) {
     },
     devDependencies: { typescript: pinned("typescript"), vite: pinned("vite") },
   });
-  const imports = packages.map((pkg, i) => `import * as pkg${i} from "${pkg.name}";`).join("\n");
-  const uses = packages.map((_, i) => `pkg${i}`).join(", ");
+  const specifiers = packages.flatMap(entryPoints);
+  const imports = specifiers.map((s, i) => `import * as entry${i} from "${s}";`).join("\n");
+  const uses = specifiers.map((_, i) => `entry${i}`).join(", ");
   writeFileSync(join(consumer, "src", "main.ts"), `${imports}\nconsole.log([${uses}]);\n`);
   writeFileSync(
     join(consumer, "index.html"),
@@ -102,8 +103,19 @@ function createConsumer(dir, tarballs) {
   return consumer;
 }
 
+// Every importable subpath in a package's `exports`, as a specifier such as `@hypercerts-org/sdk/blob`.
+function entryPoints(pkg) {
+  const { exports } = readJson(join(pkg.dir, "package.json"));
+  return Object.keys(exports)
+    .filter((subpath) => subpath !== "./package.json")
+    .map((subpath) => pkg.name + subpath.slice(1));
+}
+
 function checkNode(consumer) {
-  const script = packages.map((pkg) => `await import(${JSON.stringify(pkg.name)});`).join("");
+  const script = packages
+    .flatMap(entryPoints)
+    .map((specifier) => `await import(${JSON.stringify(specifier)});`)
+    .join("");
   run("node", ["--input-type=module", "-e", script], consumer);
   console.log("check-package: Node resolves package entry points");
 }
