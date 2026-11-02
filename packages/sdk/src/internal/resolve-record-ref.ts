@@ -1,6 +1,8 @@
 import {
   type AtUriString,
   type CidString,
+  Client,
+  type DidString,
   isDidString,
   isNsidString,
   isRecordKeyString,
@@ -8,6 +10,7 @@ import {
 } from "@atproto/lex";
 import type { SDKContext } from "../context.js";
 import { describeError, isRecordNotFound } from "./describe.js";
+import { resolvePds } from "./resolve-pds.js";
 
 // TODO(TECH-752 follow-up): once @hypercerts-org/lexicon publishes the `/records` subpath
 // (TECH-750), replace this with its `com.atproto.repo.strongRef` type so the SDK does not define
@@ -27,27 +30,30 @@ const cidString = l.string({ format: "cid" });
  * Internal: creation operations call this; it is not part of the public API.
  *
  * Boundaries:
- * - Reads through `context.client` with `com.atproto.repo.getRecord`, so the request goes to the
- *   PDS the client is connected to. For a record in the client's own repo that PDS is
- *   authoritative. For another account's record, the reference PDS implementation forwards the
- *   read to its AppView instead of the record owner's PDS. Resolving the owner's PDS from their DID
- *   is not implemented; revisit when the cross-repository reference policy is agreed.
+ * - Reads with `com.atproto.repo.getRecord` from the PDS that hosts the record, the authoritative
+ *   copy. A record in the client's own repo is read through `context.client`. For another
+ *   account's record the owner's PDS is found from their DID document (plc.directory for
+ *   `did:plc`, `/.well-known/did.json` for `did:web`) and read without authentication, so only
+ *   public records resolve. The client's PDS is not used for those reads because it would forward
+ *   them to its AppView, which may not index the record or may return an outdated CID.
  * - Never falls back to an indexer: a failed read throws.
  * - Does not check the record's type or whether the caller may reference it. That is the calling
  *   operation's decision, and it imposes no same-owner restriction.
  *
  * Throws TypeError for a URI that is not `at://<did>/<collection>/<rkey>` (handle authorities are
  * rejected because a stored reference must not change when the handle does), and Error when the
- * record does not exist, the read fails, or the PDS returns no CID.
+ * owner's PDS cannot be resolved, the record does not exist, the read fails, or the PDS returns
+ * no CID.
  */
 export async function resolveRecordRef(context: SDKContext, uri: string): Promise<StrongRef> {
   const { atUri: requested, did, collection, rkey } = parseRecordUri(uri);
-  let response: Awaited<ReturnType<SDKContext["client"]["getRecord"]>>;
+  let response: Awaited<ReturnType<Client["getRecord"]>>;
   try {
-    response = await context.client.getRecord(collection, rkey, { repo: did });
+    const client = await clientForRepo(context, did);
+    response = await client.getRecord(collection, rkey, { repo: did });
   } catch (error) {
     const reason = isRecordNotFound(error)
-      ? notFoundReason(context, did)
+      ? "the record was not found"
       : `the read failed (${describeError(error)})`;
     throw new Error(`resolveRecordRef: cannot resolve ${uri}: ${reason}.`, { cause: error });
   }
@@ -67,12 +73,9 @@ export async function resolveRecordRef(context: SDKContext, uri: string): Promis
   return { uri: requested, cid };
 }
 
-// For another account's record the read is answered by the AppView, not the owner's PDS (see
-// above), so "not found" may only mean "not visible from here".
-function notFoundReason(context: SDKContext, did: string): string {
-  return context.client.did === did
-    ? "the record was not found"
-    : "the record was not found. Reads go through your client's PDS, which may not see records in other accounts' repositories";
+async function clientForRepo(context: SDKContext, did: DidString): Promise<Client> {
+  if (context.client.did === did) return context.client;
+  return new Client(await resolvePds(did));
 }
 
 function parseRecordUri(uri: string) {
