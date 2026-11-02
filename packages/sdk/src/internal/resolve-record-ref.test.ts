@@ -102,6 +102,7 @@ describe("resolveRecordRef", () => {
 
   // With validation off the client passes the response through as is, so these reach the SDK.
   it.each([
+    ["no body", null, /without a valid CID/],
     ["an invalid CID", { uri: URI, cid: "not-a-cid", value: {} }, /without a valid CID/],
     [
       "a different record",

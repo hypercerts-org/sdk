@@ -27,6 +27,17 @@ describe("uploadBlob", () => {
     expect(ref.ref.toString()).toBe(CID);
   });
 
+  // A view's underlying buffer holds more than the view (Node's Buffer slices work the same way);
+  // uploading `.buffer` would send the extra bytes.
+  it("uploads only the bytes of a Uint8Array view with an offset", async () => {
+    const { context, requests } = fakePds(() => uploaded("text/plain"));
+    const view = new TextEncoder().encode("xxhelloxx").subarray(2, 7);
+
+    await uploadBlob(context, view, { mimeType: "text/plain" });
+
+    expect(requests[0]?.body).toEqual(bytes);
+  });
+
   it("accepts a MIME type with parameters", async () => {
     const { context, requests } = fakePds(() => uploaded("text/plain"));
 

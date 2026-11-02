@@ -59,7 +59,9 @@ export async function resolveRecordRef(context: SDKContext, uri: string): Promis
   }
   // Checked here as well as by the client, because an application can turn off the client's
   // response validation and an unchecked reference would be written into a record.
-  const { cid, uri: returnedUri } = response.body as { cid?: unknown; uri?: unknown };
+  const body: unknown = response.body;
+  const { cid, uri: returnedUri } =
+    typeof body === "object" && body !== null ? (body as { cid?: unknown; uri?: unknown }) : {};
   if (!cidString.matches(cid)) {
     throw new Error(
       `resolveRecordRef: cannot resolve ${uri}: the PDS returned the record without a valid CID.`,
