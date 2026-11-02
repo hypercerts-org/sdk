@@ -25,13 +25,13 @@ describe("resolveRecordRef", () => {
   });
 
   it("reads another account's record from the PDS in their DID document, not the client's", async () => {
-    const owner = "did:plc:someoneelse456";
+    const owner = "did:plc:ewvi7nxzyoun6zhxrhs64oiz";
     const uri = `at://${owner}/org.hypercerts.claim.activity/3k2a4b5c6d7e8`;
     const fetched: string[] = [];
-    vi.stubGlobal("fetch", async (input: string | URL) => {
-      const url = String(input);
+    vi.stubGlobal("fetch", async (input: Request | string | URL) => {
+      const url = input instanceof Request ? input.url : String(input);
       fetched.push(url);
-      if (url === `https://plc.directory/${owner}`) {
+      if (url === `https://plc.directory/${encodeURIComponent(owner)}`) {
         return json(200, {
           id: owner,
           service: [
@@ -59,12 +59,12 @@ describe("resolveRecordRef", () => {
   });
 
   it("fails without asking the client's PDS when the owner's PDS cannot be resolved", async () => {
-    const uri = "at://did:plc:someoneelse456/org.hypercerts.claim.activity/3k2a4b5c6d7e8";
+    const uri = "at://did:plc:ewvi7nxzyoun6zhxrhs64oiz/org.hypercerts.claim.activity/3k2a4b5c6d7e8";
     vi.stubGlobal("fetch", async () => json(404, {}));
     const { context, requests } = fakePds(() => json(200, {}));
 
     await expect(resolveRecordRef(context, uri)).rejects.toThrow(
-      /cannot resolve the PDS of did:plc:someoneelse456: https:\/\/plc\.directory\/did:plc:someoneelse456 responded with HTTP 404/,
+      "cannot resolve the PDS of did:plc:ewvi7nxzyoun6zhxrhs64oiz: did-fetch-error (HTTP 404)",
     );
     expect(requests).toHaveLength(0);
   });
