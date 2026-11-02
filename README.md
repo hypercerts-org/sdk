@@ -2,7 +2,7 @@
 
 TypeScript SDK for reading and writing [Hypercerts](https://hypercerts.org) records on the AT Protocol.
 
-> Work in progress. The package is not published yet and does not expose any operations.
+> Work in progress. The package is not published yet.
 
 ## Packages
 
@@ -34,16 +34,17 @@ pnpm install
 pnpm build
 ```
 
-| Command              | What it does                                                                                                            |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `pnpm build`         | Build all packages                                                                                                      |
-| `pnpm typecheck`     | Type-check all packages                                                                                                 |
-| `pnpm test`          | Run the tests with Vitest                                                                                               |
-| `pnpm lint`          | Lint with Biome                                                                                                         |
-| `pnpm format`        | Format files with Biome                                                                                                 |
-| `pnpm format:check`  | Check formatting without changing files                                                                                 |
-| `pnpm check:package` | Build, pack and install each package in an isolated project, then check it in Node, TypeScript and a Vite browser build |
-| `pnpm changeset`     | Record a change for the next release                                                                                    |
+| Command                 | What it does                                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `pnpm build`            | Build all packages                                                                                                      |
+| `pnpm typecheck`        | Type-check all packages                                                                                                 |
+| `pnpm test`             | Run the tests with Vitest                                                                                               |
+| `pnpm lint`             | Lint with Biome                                                                                                         |
+| `pnpm format`           | Format files with Biome                                                                                                 |
+| `pnpm format:check`     | Check formatting without changing files                                                                                 |
+| `pnpm check:package`    | Build, pack and install each package in an isolated project, then check it in Node, TypeScript and a Vite browser build |
+| `pnpm check:duplicates` | Check for copied code with jscpd                                                                                        |
+| `pnpm changeset`        | Record a change for the next release                                                                                    |
 
 ## Releasing
 

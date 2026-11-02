@@ -1,4 +1,5 @@
 import type { Client } from "@atproto/lex";
+import { describeValue } from "./internal/describe.js";
 
 /**
  * Shared context passed as the first argument to every SDK operation.
@@ -87,17 +88,8 @@ function assertClient(value: unknown): asserts value is Client {
     typeof value.xrpc === "function";
   if (hasXrpcMethod) return;
   throw new TypeError(
-    `createSDKContext: \`client\` must be an @atproto/lex Client (an object with an xrpc() method), but received ${describe(value)}. ` +
+    `createSDKContext: \`client\` must be an @atproto/lex Client (an object with an xrpc() method), but received ${describeValue(value)}. ` +
       "The SDK does not accept sessions or agents because authentication stays in your application. " +
       "Authenticate first, then pass `new Client(session)` (imported from @atproto/lex) as `client`.",
   );
-}
-
-function describe(value: unknown): string {
-  if (value === undefined || value === null) return String(value);
-  if (typeof value !== "object") return `a ${typeof value}`;
-  const name = value.constructor?.name;
-  return name && name !== "Object"
-    ? `an object of type ${name}`
-    : "an object without an xrpc() method";
 }

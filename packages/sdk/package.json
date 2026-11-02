@@ -15,12 +15,17 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./blob": {
+      "types": "./dist/blob/index.d.ts",
+      "default": "./dist/blob/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "src",
-    "!src/**/*.test.ts"
+    "!src/**/*.test.ts",
+    "!src/test-utils"
   ],
   "engines": {
     "node": ">=24"
@@ -38,5 +43,8 @@
   },
   "devDependencies": {
     "@atproto/lex": "0.4.4"
+  },
+  "dependencies": {
+    "@atproto-labs/did-resolver": "0.3.11"
   }
 }

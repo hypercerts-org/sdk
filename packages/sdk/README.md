@@ -2,7 +2,7 @@
 
 TypeScript SDK for reading and writing [Hypercerts](https://hypercerts.org) records on the AT Protocol.
 
-> Work in progress. The package is not published yet and does not expose any operations.
+> Work in progress. The package is not published yet.
 
 ## Install
 
@@ -35,12 +35,11 @@ export const context = createSDKContext({ client: new Client(session) });
 
 Every operation takes this context as its first argument. Create a new context when your application switches client, for example after signing in as another account.
 
-> **Not implemented yet.** The SDK has no operations at the moment; the import below is a placeholder.
-
 ```ts
-import { createAttachment } from "@hypercerts-org/sdk/<domain>"; // placeholder path
+import { uploadBlob } from "@hypercerts-org/sdk/blob";
 
-await createAttachment(context, input);
+// `file` is a Blob or File, for example from an <input type="file">.
+const image = await uploadBlob(context, file);
 ```
 
 Operations are imported individually from subpath exports grouped by domain, so the ones you do not import stay out of your bundle.
