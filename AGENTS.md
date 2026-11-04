@@ -21,7 +21,7 @@ Put detailed guides, design notes and decision records in dedicated documentatio
 - Create a new package only when a domain has its own setup or dependencies (for example the planned `@hypercerts-org/auth`). `@hypercerts-org/sdk` must not depend on auth helpers; it receives an already-authenticated client.
 - Packages are ESM-only. Every public entry point must be listed in the package's `exports` field.
 - Keep packages free of import-time side effects so unused operations can be tree-shaken (`sideEffects: false`).
-- Helpers shared by several operations live in `packages/sdk/src/internal/` and are not exported. Check there, and search the package, before writing a private helper; move a helper there when a second operation needs it. `pnpm check:duplicates` (also run in CI) reports copied code, including renamed copies and functions with the same structure; when it finds one, share the code rather than loosening the check.
+- Helpers shared by several operations live in `packages/sdk/src/internal/` and are not exported. Check there, and search the package, before writing a private helper; move a helper there when a second operation needs it. `pnpm check:duplicates` (also run in CI) reports copied code, including renamed copies and functions with the same structure, and `pnpm check:duplicates:semantic` (also run in CI; downloads a 548 MB model once) reports functions that do the same thing written differently; when either finds one, share the code rather than loosening the check.
 
 ## Tooling
 
@@ -65,6 +65,7 @@ pnpm typecheck
 pnpm test
 pnpm check:package
 pnpm check:duplicates
+pnpm check:duplicates:semantic
 ```
 
 Add a changeset (`pnpm changeset`) for any change that affects a published package. Do not document SDK operations as available until they are implemented.

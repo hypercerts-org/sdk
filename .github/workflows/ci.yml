@@ -61,12 +61,28 @@ jobs:
       # Exact and renamed copies, near-misses with up to 3 differing lines, and functions with the
       # same structure. Test files are skipped: their setup repeats on purpose.
       - run: pnpm check:duplicates --reporters console,sarif --output jscpd-report
+      # The semantic check embeds functions with a 548 MB local model; cache it so only the first
+      # run downloads it. The key changes when the jscpd version (and so its default model) does.
+      - if: ${{ !cancelled() }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/jscpd/models
+          key: jscpd-models-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: jscpd-models-
+      # Functions that do the same thing written differently, which the check above misses.
+      - if: ${{ !cancelled() }}
+        run: pnpm check:duplicates:semantic --reporters console,sarif --output jscpd-semantic-report
       # Upload even when clones fail the step above, which is when the annotations are useful.
       - if: ${{ !cancelled() && hashFiles('jscpd-report/jscpd-report.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: jscpd-report/jscpd-report.sarif
           category: jscpd
+      - if: ${{ !cancelled() && hashFiles('jscpd-semantic-report/jscpd-report.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: jscpd-semantic-report/jscpd-report.sarif
+          category: jscpd-semantic
 
   package:
     name: Package consumer check (Node ${{ matrix.node }})
