@@ -16,6 +16,7 @@
     "format:check": "biome format .",
     "check:package": "pnpm build && node scripts/check-package.mjs",
     "check:duplicates": "jscpd --similarity --ignore-identifiers --ignore-literals --max-gap-lines 3 --ignore \"**/*.test.ts,**/test-utils/**\" --pattern \"{packages/sdk/src,scripts}/**\" --exit-code 1 .",
+    "check:duplicates:semantic": "jscpd --semantic --semantic-download --kind semantic --semantic-same-threshold 0.55 --ignore \"**/*.test.ts,**/test-utils/**\" --pattern \"{packages/sdk/src,scripts}/**\" --exit-code 1 .",
     "changeset": "changeset"
   },
   "devDependencies": {

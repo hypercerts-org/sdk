@@ -3,3 +3,5 @@ packages:
 allowBuilds:
   lefthook: false
   core-js: false
+minimumReleaseAgeExclude:
+  - "@hypercerts-org/lexicon@2.0.1"
