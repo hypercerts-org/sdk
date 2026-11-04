@@ -42,7 +42,7 @@ TSDoc comments on exported symbols are the SDK's API reference. They ship in the
 
 ## Validation
 
-- Validate records with the generated `RecordSchema`s from the `@hypercerts-org/lexicon` package. Never copy, generate or hand-write record schemas in the SDK. Those exports do not exist yet: the planned `@hypercerts-org/lexicon/records` subpath is added by TECH-750 (the published 1.6.0 only exports `.` and `./lexicons`). Add the dependency when the first operation that needs it lands.
+- Validate records with the generated `RecordSchema`s from the `@hypercerts-org/lexicon` package. Never copy, generate or hand-write record schemas in the SDK. Import them from the package's namespace subpaths (for example `@hypercerts-org/lexicon/com/atproto/repo/strongRef`). The package is a peer dependency, like `@atproto/lex`.
 - Validate SDK input data (records, URIs, DIDs, option values) with the `l` schema builder from `@atproto/lex` (a peer dependency, so it adds nothing to consumers' bundles). Build input schemas from the record schemas where they overlap. Use its string formats (`did`, `at-uri`, `datetime`, `record-key`, ...) instead of regexes.
 - Format checks are not always enough: for example `at-uri` accepts handle authorities and URIs without a record key. Add `l.refine` or a small named check when a card needs a stricter rule.
 - Write business rules that span fields or depend on SDK semantics (weight strings, date ranges, MIME and size limits) as `l.refine` or small named checks with specific messages.

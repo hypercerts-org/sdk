@@ -1,6 +1,4 @@
 import {
-  type AtUriString,
-  type CidString,
   Client,
   type DidString,
   isDidString,
@@ -8,21 +6,15 @@ import {
   isRecordKeyString,
   l,
 } from "@atproto/lex";
+import * as strongRef from "@hypercerts-org/lexicon/com/atproto/repo/strongRef";
 import type { SDKContext } from "../context.js";
 import { describeError, isRecordNotFound } from "./describe.js";
 import { resolvePds } from "./resolve-pds.js";
 
-// TODO(TECH-752 follow-up): once @hypercerts-org/lexicon publishes the `/records` subpath
-// (TECH-750), replace this with its `com.atproto.repo.strongRef` type so the SDK does not define
-// its own copy of the shape.
 /** A pinned reference to one version of a record: its URI and the CID of that version. */
-export interface StrongRef {
-  uri: AtUriString;
-  cid: CidString;
-}
+export type StrongRef = strongRef.Main;
 
 const atUri = l.string({ format: "at-uri" });
-const cidString = l.string({ format: "cid" });
 
 /**
  * Reads the record at `uri` and returns its URI and current CID, for a record that references it.
@@ -60,19 +52,17 @@ export async function resolveRecordRef(context: SDKContext, uri: string): Promis
   // Checked here as well as by the client, because an application can turn off the client's
   // response validation and an unchecked reference would be written into a record.
   const body: unknown = response.body;
-  const { cid, uri: returnedUri } =
-    typeof body === "object" && body !== null ? (body as { cid?: unknown; uri?: unknown }) : {};
-  if (!cidString.matches(cid)) {
+  if (!strongRef.main.matches(body)) {
     throw new Error(
-      `resolveRecordRef: cannot resolve ${uri}: the PDS returned the record without a valid CID.`,
+      `resolveRecordRef: cannot resolve ${uri}: the PDS returned the record without a valid URI and CID.`,
     );
   }
-  if (returnedUri !== requested) {
+  if (body.uri !== requested) {
     throw new Error(
-      `resolveRecordRef: cannot resolve ${uri}: the PDS returned a different record (${String(returnedUri)}).`,
+      `resolveRecordRef: cannot resolve ${uri}: the PDS returned a different record (${body.uri}).`,
     );
   }
-  return { uri: requested, cid };
+  return { uri: requested, cid: body.cid };
 }
 
 async function clientForRepo(context: SDKContext, did: DidString): Promise<Client> {

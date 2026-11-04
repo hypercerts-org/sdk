@@ -39,10 +39,12 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "@atproto/lex": "^0.4.4"
+    "@atproto/lex": "^0.4.4",
+    "@hypercerts-org/lexicon": "^2.0.1"
   },
   "devDependencies": {
-    "@atproto/lex": "0.4.4"
+    "@atproto/lex": "0.4.4",
+    "@hypercerts-org/lexicon": "2.0.1"
   },
   "dependencies": {
     "@atproto-labs/did-resolver": "0.3.11"

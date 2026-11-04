@@ -96,14 +96,14 @@ describe("resolveRecordRef", () => {
     const { context } = fakePds(() => json(200, { uri: URI, value: {} }));
 
     await expect(resolveRecordRef(context, URI)).rejects.toThrow(
-      /returned the record without a valid CID/,
+      /returned the record without a valid URI and CID/,
     );
   });
 
   // With validation off the client passes the response through as is, so these reach the SDK.
   it.each([
-    ["no body", null, /without a valid CID/],
-    ["an invalid CID", { uri: URI, cid: "not-a-cid", value: {} }, /without a valid CID/],
+    ["no body", null, /without a valid URI and CID/],
+    ["an invalid CID", { uri: URI, cid: "not-a-cid", value: {} }, /without a valid URI and CID/],
     [
       "a different record",
       { uri: `at://${DID}/org.hypercerts.claim.activity/other`, cid: CID, value: {} },
