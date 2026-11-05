@@ -94,29 +94,44 @@ export interface ActivityInput {
   contributors?: readonly ContributorInput[] | undefined;
 }
 
-/** The supporting records a {@link createActivity} call created, as opposed to reused. */
-export interface CreatedSupportingRecords {
-  /** The new rights record, when `rights` held record data. */
-  rights?: StrongRef;
-  /** The new locations, in the order of the input entries that held record data. */
-  locations: readonly StrongRef[];
-  /** The new contributor-information records, in contributor order. */
-  contributorInformation: readonly StrongRef[];
-  /** The new contribution records, in contributor order. */
-  contributions: readonly StrongRef[];
+/**
+ * A supporting record the Activity references, with whether this call created it.
+ *
+ * @remarks
+ * `created` is `false` for a record passed as `{ uri }`; its CID is the one read before the write.
+ */
+export interface SupportingRecordRef extends StrongRef {
+  /** `true` when this call created the record, `false` when it reused an existing one. */
+  created: boolean;
 }
 
-/** The result of {@link createActivity}. */
+/** What a {@link createActivity} call stored for one contributor, in the order of the input. */
+export interface ContributorResult {
+  /** The contributor-information record, or the inline identity string. */
+  identity: SupportingRecordRef | InlineValue;
+  /** The contribution record, or the inline role. Absent when the input had no `details`. */
+  details?: SupportingRecordRef | InlineValue;
+}
+
+/**
+ * The result of {@link createActivity}.
+ *
+ * @remarks
+ * Every supporting field mirrors the input: `locations[i]` and `contributors[i]` belong to the
+ * input entry at the same index, whether it was created, reused or inline. Filter on `created`
+ * for only the records this call wrote.
+ */
 export interface CreateActivityResult {
   /** The URI of the new Activity. */
   uri: StrongRef["uri"];
   /** The CID of the new Activity. */
   cid: StrongRef["cid"];
-  /**
-   * The supporting records created in the same write. Records that were passed as `{ uri }` are
-   * not listed, because they already existed.
-   */
-  created: CreatedSupportingRecords;
+  /** The rights record, when the input had `rights`. */
+  rights?: SupportingRecordRef;
+  /** The location records, in input order. */
+  locations: readonly SupportingRecordRef[];
+  /** The contributors, in input order. */
+  contributors: readonly ContributorResult[];
 }
 
 const weight = l.refine(l.string(), {
@@ -283,7 +298,7 @@ function allSlots(plan: ActivityPlan): Slot[] {
  *     { identity: { inline: "did:plc:bob456" }, details: { inline: "Volunteer" } }, // stored inline
  *   ],
  * });
- * console.log(result.uri, result.created.locations);
+ * console.log(result.uri, result.locations[0]); // { uri, cid, created: true }
  * ```
  *
  * @example Handling an unknown outcome
@@ -326,14 +341,15 @@ export async function createActivity(
     prepareNew(slots),
   ]);
 
+  const refOf = referenceLookup(existing, created);
   const record = await prepareChecked(
     build,
     "the Activity",
     activity.main,
-    activityRecord(build, parsed, plan, image, referenceLookup(existing, created)),
+    activityRecord(build, parsed, plan, image, refOf),
   );
   await submitWrites(context, build.did, [...created.values(), record], "createActivity");
-  return { ...record.ref, created: summarise(plan, created) };
+  return { ...record.ref, ...summarise(plan, created, refOf) };
 }
 
 type ReferenceOf = (slot: Slot) => StrongRef;
@@ -405,16 +421,23 @@ function inlineOrReference<T>(slot: Slot, refOf: ReferenceOf, inline: (value: st
     : strongRef.main.build(refOf(slot));
 }
 
+// Mirrors the input's shape so callers can match each result to the entry they passed.
 function summarise(
   plan: ActivityPlan,
   created: ReadonlyMap<Slot, PreparedRecord>,
-): CreatedSupportingRecords {
-  const newRef = (slot: Slot | undefined) => (slot ? created.get(slot)?.ref : undefined);
-  const newRefs = (slots: (Slot | undefined)[]) => slots.flatMap((slot) => newRef(slot) ?? []);
+  refOf: ReferenceOf,
+): Omit<CreateActivityResult, "uri" | "cid"> {
+  const recordRef = (slot: Slot): SupportingRecordRef => ({
+    ...refOf(slot),
+    created: created.has(slot),
+  });
+  const entry = (slot: Slot): SupportingRecordRef | InlineValue =>
+    slot.choice.kind === "inline" ? { inline: slot.choice.value } : recordRef(slot);
   return compact({
-    rights: newRef(plan.rights),
-    locations: newRefs(plan.locations),
-    contributorInformation: newRefs(plan.contributors.map((c) => c.identity)),
-    contributions: newRefs(plan.contributors.map((c) => c.details)),
+    rights: plan.rights && recordRef(plan.rights),
+    locations: plan.locations.map(recordRef),
+    contributors: plan.contributors.map(({ identity, details }) =>
+      compact({ identity: entry(identity), details: details && entry(details) }),
+    ),
   });
 }

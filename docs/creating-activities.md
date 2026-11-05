@@ -25,7 +25,8 @@ const result = await createActivity(context, {
     { identity: { inline: "did:plc:bob456" }, details: { inline: "Volunteer" } },
   ],
 });
-// result.uri and result.cid identify the Activity; result.created lists the new supporting records.
+// result.uri and result.cid identify the Activity. result.rights, result.locations[i] and
+// result.contributors[i] mirror the input; each record ref has `created: true` if this call wrote it.
 ```
 
 ## Create, reuse or inline

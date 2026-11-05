@@ -43,7 +43,8 @@ describe("createActivity", () => {
     // format unchanged; it says nothing about what a real PDS commits.
     expect(result).toEqual({
       ...refTo(write),
-      created: { locations: [], contributorInformation: [], contributions: [] },
+      locations: [],
+      contributors: [],
     });
   });
 
@@ -104,11 +105,12 @@ describe("createActivity", () => {
         },
       ],
     });
-    expect(result.created).toEqual({
-      rights,
-      locations: [loc],
-      contributorInformation: [info],
-      contributions: [contribution],
+    expect(result).toMatchObject({
+      rights: { ...rights, created: true },
+      locations: [{ ...loc, created: true }],
+      contributors: [
+        { identity: { ...info, created: true }, details: { ...contribution, created: true } },
+      ],
     });
   });
 
@@ -152,7 +154,7 @@ describe("createActivity", () => {
     expect(writeOf(creates[0] ?? [], ACTIVITY).value.locations).toEqual([
       { uri: locationUri, cid: CID },
     ]);
-    expect(result.created.locations).toEqual([]);
+    expect(result.locations).toEqual([{ uri: locationUri, cid: CID, created: false }]);
   });
 
   it("mixes new, existing and inline supporting values", async () => {
@@ -160,7 +162,7 @@ describe("createActivity", () => {
     const detailsUri = uriOf(CONTRIBUTION);
     const { context, creates } = fakeRepo({ existing: { [rightsUri]: CID, [detailsUri]: CID } });
 
-    await createActivity(context, {
+    const result = await createActivity(context, {
       ...base,
       rights: { uri: rightsUri },
       locations: [location],
@@ -193,6 +195,18 @@ describe("createActivity", () => {
         },
       },
     ]);
+    // The result mirrors the input: one entry per position, whether created, reused or inline.
+    expect(result).toMatchObject({
+      rights: { uri: rightsUri, cid: CID, created: false },
+      locations: [{ ...refTo(writeOf(writes, LOCATION)), created: true }],
+      contributors: [
+        {
+          identity: { ...refTo(writeOf(writes, CONTRIBUTOR_INFORMATION)), created: true },
+          details: { uri: detailsUri, cid: CID, created: false },
+        },
+        { identity: { inline: "did:plc:bob456" }, details: { inline: "Volunteer" } },
+      ],
+    });
   });
 
   it.each<[string, Record<string, unknown>, RegExp]>([

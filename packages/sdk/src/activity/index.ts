@@ -9,10 +9,11 @@ export {
 export type {
   ActivityInput,
   ContributorInput,
+  ContributorResult,
   CreateActivityResult,
-  CreatedSupportingRecords,
   ExistingRecord,
   InlineValue,
+  SupportingRecordRef,
 } from "./build-activity.js";
 export { createActivity } from "./build-activity.js";
 export type { ContributionInput } from "./build-contribution.js";
