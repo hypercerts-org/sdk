@@ -199,7 +199,7 @@ describe("createActivity", () => {
     [
       "a URI of the wrong record type",
       { ...base, rights: { uri: uriOf(LOCATION) } },
-      /rights points at a app\.certified\.location record, but this field holds org\.hypercerts\.claim\.rights/,
+      /rights points at a record of type app\.certified\.location, but this field holds org\.hypercerts\.claim\.rights/,
     ],
     [
       "a URI mixed with record fields",

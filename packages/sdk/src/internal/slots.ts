@@ -103,7 +103,8 @@ function existing(
   // rest.
   const actual = uri.split("/")[3];
   if (actual !== collection) {
-    const target = actual === undefined ? "something that is not a record" : `a ${actual} record`;
+    const target =
+      actual === undefined ? "something that is not a record" : `a record of type ${actual}`;
     throw new TypeError(
       `${build.operation}: ${field} points at ${target}, but this field holds ${collection}: ${uri}. Expected at://<did>/${collection}/<rkey>.`,
     );
