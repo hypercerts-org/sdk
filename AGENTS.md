@@ -22,6 +22,7 @@ Put detailed guides, design notes and decision records in dedicated documentatio
 - Packages are ESM-only. Every public entry point must be listed in the package's `exports` field.
 - Keep packages free of import-time side effects so unused operations can be tree-shaken (`sideEffects: false`).
 - Helpers shared by several operations live in `packages/sdk/src/internal/` and are not exported. Check there, and search the package, before writing a private helper; move a helper there when a second operation needs it. `pnpm check:duplicates` (also run in CI) reports copied code, including renamed copies and functions with the same structure, and `pnpm check:duplicates:semantic` (report-only in CI because it has false matches; downloads a 548 MB model once) reports functions that do the same thing written differently. When `check:duplicates` finds a clone, share the code rather than loosening the check; review each semantic match and share the code when it is a real duplicate.
+- A helper only one domain uses lives in that domain's folder (for example `src/activity/`) and moves to `internal/` when a second domain needs it. When `internal/` grows too large to scan, group it into subfolders by concern (for example `internal/records/`, `internal/writes/`) rather than by domain.
 
 ## Tooling
 
