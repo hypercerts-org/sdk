@@ -6,8 +6,18 @@
 //
 // Duck-typed rather than `instanceof XrpcError` so it works when the application has more than one
 // copy of @atproto/lex (see `assertClient` in context.ts).
+//
+// A schema validation error (it has `issues`) is described by its issues alone, as "<what is wrong>
+// at $.<path>"; an issue about the value itself has no path to point at, so " at $." is left out.
 export function describeError(error: unknown): string {
   if (!(error instanceof Error)) return String(error);
+  if ("issues" in error && Array.isArray(error.issues)) {
+    return error.issues
+      .map((issue: { path: readonly unknown[]; message: string; toString(): string }) =>
+        issue.path.length === 0 ? issue.message : issue.toString(),
+      )
+      .join(", ");
+  }
   const code = "error" in error && typeof error.error === "string" ? error.error : undefined;
   const message =
     code === undefined || error.message === code ? error.message : `${code}: ${error.message}`;

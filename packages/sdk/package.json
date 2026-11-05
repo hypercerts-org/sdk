@@ -15,6 +15,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./activity": {
+      "types": "./dist/activity/index.d.ts",
+      "default": "./dist/activity/index.js"
+    },
     "./blob": {
       "types": "./dist/blob/index.d.ts",
       "default": "./dist/blob/index.js"
@@ -47,6 +51,7 @@
     "@hypercerts-org/lexicon": "2.0.1"
   },
   "dependencies": {
-    "@atproto-labs/did-resolver": "0.3.11"
+    "@atproto-labs/did-resolver": "0.3.11",
+    "@atproto/lex-cbor": "0.1.7"
   }
 }

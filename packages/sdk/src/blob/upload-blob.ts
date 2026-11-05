@@ -1,6 +1,7 @@
 import { isTypedBlobRef, type TypedBlobRef } from "@atproto/lex";
 import type { SDKContext } from "../context.js";
 import { describeError, describeValue } from "../internal/describe.js";
+import { isBlob } from "../internal/input.js";
 
 /**
  * Binary content that {@link uploadBlob} accepts: a `Blob` or `File` in browsers and Node, a
@@ -31,9 +32,10 @@ export interface UploadBlobOptions {
  * @remarks
  * The upload goes through the context's client; the SDK opens no connection of its own.
  *
- * The blob is not part of any record yet. A PDS deletes blobs that no record references within a
- * short time window, so write the record that uses the reference soon after uploading. If that
- * write fails, the uploaded blob is simply left unused; nothing is rolled back.
+ * The blob is not part of any record yet. A PDS may delete blobs that no record references after a
+ * short time, so write the record that uses the reference soon after uploading. If that write
+ * fails, the upload is not rolled back. Deletion of unreferenced blobs is not guaranteed, and a
+ * blob with the same content that another record already uses stays.
  *
  * The SDK does not fetch external URLs (a URL in a record stays a URL), read file paths, resize or
  * convert content, or check MIME type and size limits. The PDS enforces its limits when it
@@ -108,15 +110,15 @@ function resolveMimeType(data: BlobData, mimeType: string | undefined): `${strin
   // Checked by tag, not `instanceof`, so values from another realm (an iframe, jsdom, a polyfill)
   // are accepted. Node's Buffer is tagged Uint8Array. See `asBody` for ArrayBuffers.
   const tag = Object.prototype.toString.call(data);
-  const isBlob = tag === "[object Blob]" || tag === "[object File]";
-  if (!isBlob && tag !== "[object Uint8Array]" && tag !== "[object ArrayBuffer]") {
+  const blobData = isBlob(data);
+  if (!blobData && tag !== "[object Uint8Array]" && tag !== "[object ArrayBuffer]") {
     throw new TypeError(
       `uploadBlob: \`data\` must be a Blob, File, Uint8Array or ArrayBuffer, but received ${describeValue(data)}. ` +
         "The SDK does not read file paths, fetch URLs or accept streams: read the content into a Blob or Uint8Array first.",
     );
   }
   // A Blob whose type the platform could not determine has `type === ""`.
-  const type = mimeType ?? (isBlob && (data as Blob).type !== "" ? (data as Blob).type : undefined);
+  const type = mimeType ?? (blobData && data.type !== "" ? data.type : undefined);
   if (type === undefined) {
     throw new TypeError(
       'uploadBlob: the content\'s MIME type is unknown. Pass it as `{ mimeType }`, for example `{ mimeType: "image/png" }`.',

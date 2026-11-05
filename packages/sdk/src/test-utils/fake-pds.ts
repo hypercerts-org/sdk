@@ -17,7 +17,7 @@ export interface RecordedRequest {
  * the client sent. Responses go through the client's real decoding and validation.
  */
 export function fakePds(
-  respond: (request: RecordedRequest) => Response,
+  respond: (request: RecordedRequest) => Response | Promise<Response>,
   clientOptions: ClientOptions = {},
 ): {
   context: SDKContext;
