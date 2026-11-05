@@ -247,8 +247,10 @@ function allSlots(plan: ActivityPlan): Slot[] {
  *
  * Blobs (`Blob` or `File` values for `image` and attachments) are uploaded before the write, and
  * URL strings are stored as they are and never fetched. Uploads are outside the atomic write: if
- * the write fails, the uploaded blobs are left unreferenced and the PDS discards them after a
- * while. The order is: validate the input, read the existing records, upload blobs, validate each
+ * the PDS rejects the write, this call leaves the uploaded blobs unreferenced. A PDS usually deletes unreferenced blobs after a while, but this is not guaranteed, and a blob
+ * with the same content that another record already uses stays.
+ * After {@link WriteOutcomeUnknownError} or {@link WriteResultMismatchError} the records may exist,
+ * so the blobs may be referenced and publicly readable. The order is: validate the input, read the existing records, upload blobs, validate each
  * record against its lexicon, write. A failed read or an input error stops before any upload; a
  * lexicon rule that rejects a record is only found after the blobs are uploaded.
  *

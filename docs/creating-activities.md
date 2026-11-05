@@ -51,16 +51,16 @@ The standalone `createRights`, `createContributorInformation` and `createContrib
 
 ## Atomicity and uploads
 
-All new records are sent in one `com.atproto.repo.applyWrites` request, which a PDS commits as a whole: every record exists afterwards or none does. Blobs are the exception: `Blob` values are uploaded first and are not part of that commit. If the PDS rejects the write (`WriteRejectedError`), the uploads stay unreferenced and the PDS discards them after a while. After a `WriteOutcomeUnknownError` the records may have been committed, and after a `WriteResultMismatchError` they were, so the blobs can stay referenced and publicly readable; check the attempted records before relying on cleanup. Existing records are read before anything is uploaded, so an unresolvable URI fails without side effects.
+All new records are sent in one `com.atproto.repo.applyWrites` request, which a PDS commits as a whole: every record exists afterwards or none does. Blobs are the exception: `Blob` values are uploaded first and are not part of that commit. If the PDS rejects the write (`WriteRejectedError`), this call leaves its uploads unreferenced. A PDS usually deletes unreferenced blobs after a while, but this is not guaranteed, and a blob with the same content that another record already uses stays. After a `WriteOutcomeUnknownError` the records may have been committed, and after a `WriteResultMismatchError` they were, so the blobs can stay referenced and publicly readable; check the attempted records before relying on cleanup. Existing records are read before anything is uploaded, so an unresolvable URI fails without side effects.
 
 ## Failures
 
-| Error                      | Means                                                                                                                 |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `TypeError`                | The input is invalid. Nothing was written. The message names the field.                                               |
-| `WriteRejectedError`       | The PDS answered with a 4xx. No record was created. Fix the cause and call again.                                     |
-| `WriteOutcomeUnknownError` | No usable answer (network, timeout, 5xx). The records may exist. `attempted` lists every URI. The SDK does not retry. |
-| `WriteResultMismatchError` | The PDS committed the records but reported other CIDs than the SDK computed, so references between them may be off.   |
+| Error                      | Means                                                                                                                                                                                                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `TypeError`                | The input is invalid. Nothing was written. The message names the field.                                                                                                                                                                                                        |
+| `WriteRejectedError`       | The PDS answered with a 4xx. No record was created. Fix the cause and call again.                                                                                                                                                                                              |
+| `WriteOutcomeUnknownError` | No usable answer (network, timeout, 5xx). The records may exist. `attempted` lists every URI. The SDK does not retry.                                                                                                                                                          |
+| `WriteResultMismatchError` | The PDS committed the records but reported different URIs or CIDs than the SDK computed, or a different number of results, so references between them may be off. `attempted` holds the computed references and `reported` the PDS's; compare them to inspect what was stored. |
 
 After a `WriteOutcomeUnknownError`, check the URIs (for example with `com.atproto.repo.getRecord`) before trying again. Calling `createActivity` again creates a second set of records under new keys.
 

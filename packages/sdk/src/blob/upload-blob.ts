@@ -32,9 +32,10 @@ export interface UploadBlobOptions {
  * @remarks
  * The upload goes through the context's client; the SDK opens no connection of its own.
  *
- * The blob is not part of any record yet. A PDS deletes blobs that no record references within a
- * short time window, so write the record that uses the reference soon after uploading. If that
- * write fails, the uploaded blob is simply left unused; nothing is rolled back.
+ * The blob is not part of any record yet. A PDS may delete blobs that no record references after a
+ * short time, so write the record that uses the reference soon after uploading. If that write
+ * fails, the upload is not rolled back. Deletion of unreferenced blobs is not guaranteed, and a
+ * blob with the same content that another record already uses stays.
  *
  * The SDK does not fetch external URLs (a URL in a record stays a URL), read file paths, resize or
  * convert content, or check MIME type and size limits. The PDS enforces its limits when it
