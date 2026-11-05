@@ -98,7 +98,14 @@ function createConsumer(dir, tarballs) {
   // treat the temp dir as part of this repo. It also answers pnpm's build-script prompt: pnpm fails
   // the install if a dependency has an unreviewed build script, and @atproto/lex pulls in
   // core-js, whose postinstall only prints a banner.
-  writeFileSync(join(consumer, "pnpm-workspace.yaml"), "allowBuilds:\n  core-js: false\n");
+  //
+  // Temporary workaround: @atproto/lex-schema 0.2.10 exports `walk`, which clashes with
+  // @atproto/lex 0.4.4's own `walk` and fails type checking (TS2308). Pin 0.2.9 until
+  // https://github.com/bluesky-social/atproto/issues/5822 is fixed, then remove the override.
+  writeFileSync(
+    join(consumer, "pnpm-workspace.yaml"),
+    'allowBuilds:\n  core-js: false\noverrides:\n  "@atproto/lex-schema": 0.2.9\n',
+  );
   run("pnpm", ["install", "--no-frozen-lockfile"], consumer);
   return consumer;
 }
