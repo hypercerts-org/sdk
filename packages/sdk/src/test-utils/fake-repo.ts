@@ -11,6 +11,12 @@ export interface ReceivedCreate {
   cid: string;
 }
 
+/** One `putRecord` the fake received, as the PDS would decode it. */
+export interface ReceivedPut extends ReceivedCreate {
+  /** The `swapRecord` of the request: `null` means "only if no record is there yet". */
+  swapRecord: string | null | undefined;
+}
+
 export interface FakeRepoOptions {
   /** Records that already exist in the repo being read, as URI to CID. */
   existing?: Record<string, string>;
@@ -18,12 +24,16 @@ export interface FakeRepoOptions {
   uploadBlob?: (request: RecordedRequest) => Response;
   /** Replaces the fake's answer to `applyWrites`, to simulate failures. */
   applyWrites?: (request: RecordedRequest) => Response;
+  /** Replaces the fake's answer to `putRecord`, to simulate failures. */
+  putRecord?: (request: RecordedRequest) => Response;
 }
 
 /**
  * A fake PDS that behaves like the parts of a repo the creation functions use: it hands out blob
  * references for uploads, answers `getRecord` for `existing` records, and answers `applyWrites` by
  * decoding the request body from the wire and computing each record's CID from the decoded value.
+ * It answers `putRecord` the same way, except that `swapRecord: null` ("only if absent") fails with
+ * `InvalidSwap`, as the reference PDS does, when the record is in `existing`.
  *
  * It stores nothing and cannot show that a real PDS commits a request atomically. The CIDs come
  * from the same CBOR encoder the reference PDS uses, so a matching CID shows that the SDK's
@@ -31,6 +41,7 @@ export interface FakeRepoOptions {
  */
 export function fakeRepo(options: FakeRepoOptions = {}) {
   const creates: ReceivedCreate[][] = [];
+  const puts: ReceivedPut[] = [];
   const pds = fakePds((request) => {
     const path = new URL(request.path, "https://pds.test").pathname;
     if (path.endsWith("com.atproto.repo.uploadBlob")) {
@@ -40,9 +51,12 @@ export function fakeRepo(options: FakeRepoOptions = {}) {
     if (path.endsWith("com.atproto.repo.applyWrites")) {
       return options.applyWrites?.(request) ?? applyWrites(request, creates);
     }
+    if (path.endsWith("com.atproto.repo.putRecord")) {
+      return options.putRecord?.(request) ?? putRecord(request, puts, options.existing);
+    }
     return json(404, { error: "XRPCNotSupported", message: path });
   });
-  return { ...pds, creates };
+  return { ...pds, creates, puts };
 }
 
 /** The paths of the requests the fake received, for example `com.atproto.repo.applyWrites`. */
@@ -94,6 +108,34 @@ async function applyWrites(
       cid: write.cid,
     })),
   });
+}
+
+async function putRecord(
+  request: RecordedRequest,
+  received: ReceivedPut[],
+  existing: Record<string, string> = {},
+): Promise<Response> {
+  const body = lexParse(new TextDecoder().decode(request.body)) as unknown as {
+    repo: string;
+    collection: string;
+    rkey: string;
+    record: LexMap;
+    swapRecord?: string | null;
+  };
+  const uri = `at://${body.repo}/${body.collection}/${body.rkey}`;
+  const current = existing[uri];
+  if (body.swapRecord === null && current !== undefined) {
+    return json(400, { error: "InvalidSwap", message: `Record was at ${current}` });
+  }
+  const cid = (await cidForLex(body.record)).toString();
+  received.push({
+    collection: body.collection,
+    rkey: body.rkey,
+    value: body.record,
+    cid,
+    swapRecord: body.swapRecord,
+  });
+  return json(200, { uri, cid });
 }
 
 /** The create that wrote a record of `collection`. */

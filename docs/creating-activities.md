@@ -41,7 +41,7 @@ Each supporting field says what you want. The SDK never guesses and never search
 
 `{ uri }` must point at the right type for the field (`org.hypercerts.claim.rights` for `rights`, `app.certified.location` for each location, and so on) and use a DID, not a handle. Do not mix `uri` with record fields.
 
-The standalone `createRights`, `createContributorInformation` and `createContribution` create one such record on their own with the same validation, and return its `{ uri, cid }`.
+The standalone `createRights`, `createContributorInformation` and `createContribution` (from `@hypercerts-org/sdk/activity`) and `createLocation` (from `@hypercerts-org/sdk/location`, see [Profiles and locations](./profiles-and-locations.md)) create one such record on their own with the same validation, and return its `{ uri, cid }`.
 
 ## Defaults and record keys
 

@@ -4,7 +4,8 @@ import {
   createContributorInformation,
   createRights,
 } from "../src/activity/index.js";
-import { PNG, png, rights, unique } from "./fixtures.js";
+import { createLocation } from "../src/location/index.js";
+import { coordinates, PNG, png, rights, unique } from "./fixtures.js";
 import { blobIn, collections, expectBlobServed, expectStored } from "./records.js";
 import { type Account, loginAs } from "./session.js";
 
@@ -58,5 +59,32 @@ describe("the standalone creators", () => {
     const stored = await expectStored(user.client, ref);
     expect(stored.image).toMatchObject({ $type: "org.hypercerts.defs#smallImage" });
     await expectBlobServed(user.client, user.did, blobIn(stored.image, "image"), PNG);
+  });
+
+  it("createLocation stores the record and returns the CID the PDS reports", async () => {
+    const input = { ...coordinates, name: unique("Valley") };
+
+    const ref = await createLocation(user.context, input);
+
+    const stored = await expectStored(user.client, ref);
+    expect(stored).toMatchObject({
+      ...input,
+      location: { $type: "app.certified.location#string", string: "27.47,90.17" },
+    });
+  });
+
+  it("stores a Blob location as a blob the PDS serves", async () => {
+    const bytes = new TextEncoder().encode(unique('{"type":"Point","coordinates":[90.17,27.47]}'));
+    const blob = new File([bytes], "point.geojson", { type: "application/geo+json" });
+
+    const ref = await createLocation(user.context, {
+      ...coordinates,
+      locationType: "geojson-point",
+      location: { blob },
+    });
+
+    const stored = await expectStored(user.client, ref);
+    expect(stored.location).toMatchObject({ $type: "org.hypercerts.defs#smallBlob" });
+    await expectBlobServed(user.client, user.did, blobIn(stored.location, "blob"), bytes);
   });
 });
