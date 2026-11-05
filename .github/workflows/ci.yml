@@ -70,7 +70,9 @@ jobs:
           key: jscpd-models-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: jscpd-models-
       # Functions that do the same thing written differently, which the check above misses.
+      # Report-only for now: it flags too many false matches to block merges.
       - if: ${{ !cancelled() }}
+        continue-on-error: true
         run: pnpm check:duplicates:semantic --reporters console,sarif --output jscpd-semantic-report
       # Upload even when clones fail the step above, which is when the annotations are useful.
       - if: ${{ !cancelled() && hashFiles('jscpd-report/jscpd-report.sarif') != '' }}
