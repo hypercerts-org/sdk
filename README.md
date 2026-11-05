@@ -39,6 +39,7 @@ pnpm build
 | `pnpm build`                     | Build all packages                                                                                                      |
 | `pnpm typecheck`                 | Type-check all packages                                                                                                 |
 | `pnpm test`                      | Run the tests with Vitest                                                                                               |
+| `pnpm test:e2e`                  | Run the end-to-end tests against a PDS in a local sandbox (needs setup, see [End-to-end tests](./docs/e2e-testing.md))  |
 | `pnpm lint`                      | Lint with Biome                                                                                                         |
 | `pnpm format`                    | Format files with Biome                                                                                                 |
 | `pnpm format:check`              | Check formatting without changing files                                                                                 |
