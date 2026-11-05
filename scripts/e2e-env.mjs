@@ -52,7 +52,7 @@ if (githubEnv) {
   );
 } else {
   for (const [name, value] of Object.entries(variables)) {
-    console.log(`export ${name}='${value.replaceAll("'", "'\\''")}'`);
+    console.log(`export ${name}='${value.replaceAll("'", String.raw`'\''`)}'`);
   }
 }
 

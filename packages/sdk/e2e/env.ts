@@ -32,8 +32,9 @@ export interface E2eEnv {
 export function readE2eEnv(env: NodeJS.ProcessEnv = process.env): E2eEnv {
   const missing = E2E_VARIABLES.filter((name) => !env[name]);
   if (missing.length > 0) {
+    const list = missing.map((name) => `  ${name}`).join("\n");
     throw new Error(
-      `The end-to-end tests need a running PDS and two accounts, but these environment variables are not set:\n${missing.map((name) => `  ${name}`).join("\n")}\n` +
+      `The end-to-end tests need a running PDS and two accounts, but these environment variables are not set:\n${list}\n` +
         "docs/e2e-testing.md shows how to start Atmosphere in a Box and set them. " +
         "If the PDS uses the sandbox's private CA, also set NODE_EXTRA_CA_CERTS to its root certificate.",
     );

@@ -66,7 +66,7 @@ export function strongRefsIn(value: unknown): Ref[] {
  */
 export async function expectReferencesResolve(reader: Client, record: LexMap): Promise<Ref[]> {
   const refs = strongRefsIn(record);
-  for (const ref of refs) await expectStored(reader, ref);
+  await Promise.all(refs.map((ref) => expectStored(reader, ref)));
   return refs;
 }
 
