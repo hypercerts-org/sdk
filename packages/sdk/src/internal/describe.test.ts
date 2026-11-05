@@ -26,4 +26,23 @@ describe("describeError", () => {
 
     expect(describeError(error)).toBe("Unexpected fetchHandler() error: fetch failed");
   });
+
+  it("describes a validation error by its issues, without a path for the value itself", () => {
+    const issue = (path: string[], message: string) => ({
+      path,
+      message,
+      toString: () => `${message} at $.${path.join(".")}`,
+    });
+    const error = Object.assign(new Error("ignored"), {
+      error: "InvalidRequest",
+      issues: [
+        issue(["title"], "string too big"),
+        issue([], "has an endDate before its startDate"),
+      ],
+    });
+
+    expect(describeError(error)).toBe(
+      "string too big at $.title, has an endDate before its startDate",
+    );
+  });
 });

@@ -1,6 +1,7 @@
 import { isTypedBlobRef, type TypedBlobRef } from "@atproto/lex";
 import type { SDKContext } from "../context.js";
 import { describeError, describeValue } from "../internal/describe.js";
+import { isBlob } from "../internal/input.js";
 
 /**
  * Binary content that {@link uploadBlob} accepts: a `Blob` or `File` in browsers and Node, a
@@ -108,15 +109,15 @@ function resolveMimeType(data: BlobData, mimeType: string | undefined): `${strin
   // Checked by tag, not `instanceof`, so values from another realm (an iframe, jsdom, a polyfill)
   // are accepted. Node's Buffer is tagged Uint8Array. See `asBody` for ArrayBuffers.
   const tag = Object.prototype.toString.call(data);
-  const isBlob = tag === "[object Blob]" || tag === "[object File]";
-  if (!isBlob && tag !== "[object Uint8Array]" && tag !== "[object ArrayBuffer]") {
+  const blobData = isBlob(data);
+  if (!blobData && tag !== "[object Uint8Array]" && tag !== "[object ArrayBuffer]") {
     throw new TypeError(
       `uploadBlob: \`data\` must be a Blob, File, Uint8Array or ArrayBuffer, but received ${describeValue(data)}. ` +
         "The SDK does not read file paths, fetch URLs or accept streams: read the content into a Blob or Uint8Array first.",
     );
   }
   // A Blob whose type the platform could not determine has `type === ""`.
-  const type = mimeType ?? (isBlob && (data as Blob).type !== "" ? (data as Blob).type : undefined);
+  const type = mimeType ?? (blobData && data.type !== "" ? data.type : undefined);
   if (type === undefined) {
     throw new TypeError(
       'uploadBlob: the content\'s MIME type is unknown. Pass it as `{ mimeType }`, for example `{ mimeType: "image/png" }`.',

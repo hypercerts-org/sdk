@@ -44,4 +44,18 @@ const image = await uploadBlob(context, file);
 
 Operations are imported individually from subpath exports grouped by domain, so the ones you do not import stay out of your bundle.
 
+Create an Activity together with its supporting records in one write:
+
+```ts
+import { createActivity } from "@hypercerts-org/sdk/activity";
+
+const { uri, cid } = await createActivity(context, {
+  title: "Reforestation in the Phobjikha valley",
+  shortDescription: "Planting 5,000 native trees.",
+  contributors: [{ identity: { displayName: "Alice" }, details: { inline: "Lead" } }],
+});
+```
+
+See [Creating activities](https://github.com/hypercerts-org/sdk/blob/main/docs/creating-activities.md) for reusing existing records, defaults and failure handling.
+
 See the TSDoc on `createSDKContext` (shown in your editor) for the full contract.
