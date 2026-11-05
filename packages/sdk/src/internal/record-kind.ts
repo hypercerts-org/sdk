@@ -7,9 +7,9 @@ import {
   prepareChecked,
 } from "./build-context.js";
 import { compact, strictObject } from "./input.js";
-import type { PreparedRecord } from "./prepare-record.js";
+import { fixedRecordKey, type PreparedRecord } from "./prepare-record.js";
 import type { StrongRef } from "./resolve-record-ref.js";
-import { submitWrites } from "./submit-writes.js";
+import { submitCreateOnly, submitWrites } from "./submit-writes.js";
 
 /**
  * Turns one input field into the value stored in the record, for example uploading a `Blob` and
@@ -89,7 +89,8 @@ export async function buildRecord<T extends { createdAt?: string | undefined }>(
  * written unless the whole input is valid.
  *
  * Internal. Backs the standalone creators, which therefore share their builders with
- * `createActivity`.
+ * `createActivity`. A record whose lexicon fixes its key is written with `submitCreateOnly`, so an
+ * existing record is reported instead of overwritten; any other record with `submitWrites`.
  */
 export async function createStandalone<T extends { createdAt?: string | undefined }>(
   context: SDKContext,
@@ -104,7 +105,11 @@ export async function createStandalone<T extends { createdAt?: string | undefine
     parseInput(build, "input", kind.input, input),
     "input",
   );
-  await submitWrites(context, build.did, [record], operation);
+  if (fixedRecordKey(kind.schema) === undefined) {
+    await submitWrites(context, build.did, [record], operation);
+  } else {
+    await submitCreateOnly(context, build.did, record, operation);
+  }
   return record.ref;
 }
 

@@ -6,6 +6,7 @@ export {
   WriteRejectedError,
   WriteResultMismatchError,
 } from "../internal/submit-writes.js";
+export type { LocationInput, LocationValue } from "../location/build-location.js";
 export type {
   ActivityInput,
   ContributorInput,
@@ -20,6 +21,5 @@ export type { ContributionInput } from "./build-contribution.js";
 export { createContribution } from "./build-contribution.js";
 export type { ContributorInformationInput } from "./build-contributor-information.js";
 export { createContributorInformation } from "./build-contributor-information.js";
-export type { LocationInput, LocationValue } from "./build-location.js";
 export type { RightsInput } from "./build-rights.js";
 export { createRights } from "./build-rights.js";

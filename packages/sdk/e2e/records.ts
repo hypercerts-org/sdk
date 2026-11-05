@@ -10,6 +10,7 @@ import {
   type NsidString,
   type TypedBlobRef,
 } from "@atproto/lex";
+import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
 import * as location from "@hypercerts-org/lexicon/app/certified/location";
 import * as activity from "@hypercerts-org/lexicon/org/hypercerts/claim/activity";
 import * as contribution from "@hypercerts-org/lexicon/org/hypercerts/claim/contribution";
@@ -75,6 +76,7 @@ export const collections = {
   activity: activity.main.$type,
   rights: rights.main.$type,
   location: location.main.$type,
+  profile: profile.main.$type,
   contributorInformation: contributorInformation.main.$type,
   contribution: contribution.main.$type,
 } as const;

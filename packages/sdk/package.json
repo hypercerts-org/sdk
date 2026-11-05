@@ -19,9 +19,17 @@
       "types": "./dist/activity/index.d.ts",
       "default": "./dist/activity/index.js"
     },
+    "./actor": {
+      "types": "./dist/actor/index.d.ts",
+      "default": "./dist/actor/index.js"
+    },
     "./blob": {
       "types": "./dist/blob/index.d.ts",
       "default": "./dist/blob/index.js"
+    },
+    "./location": {
+      "types": "./dist/location/index.d.ts",
+      "default": "./dist/location/index.js"
     },
     "./package.json": "./package.json"
   },
