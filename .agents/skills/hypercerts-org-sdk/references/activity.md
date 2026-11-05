@@ -128,7 +128,7 @@ const createdLocations = result.locations.filter((ref) => ref.created);
 
 ## Supporting records on their own
 
-`createRights`, `createContribution` and `createContributorInformation` take `(context, input)` and return `{ uri, cid }`. Locations can currently only be created inside `createActivity`.
+`createRights`, `createContribution` and `createContributorInformation` take `(context, input)` and return `{ uri, cid }`. A location is created on its own with `createLocation` from `@hypercerts-org/sdk/location` (see [`LocationInput`](#locationinput-appcertifiedlocation)).
 
 ```ts
 import { createContribution } from "@hypercerts-org/sdk/activity";
@@ -203,7 +203,7 @@ Dates are ISO 8601 date-times. `createdAt` is optional on every record and defau
 
 ### `LocationInput` (`app.certified.location`)
 
-Only inside `createActivity`; there is no standalone `createLocation` yet.
+Used in `createActivity`'s `locations`, or on its own: `createLocation(context, input)` from `@hypercerts-org/sdk/location` returns `{ uri, cid }`. `LocationInput` and `LocationValue` types are exported from both `/activity` and `/location`. A `locationType` outside the lexicon's known values is accepted.
 
 | Field          | Type                                | Notes                                                                               |
 | -------------- | ----------------------------------- | ----------------------------------------------------------------------------------- |
