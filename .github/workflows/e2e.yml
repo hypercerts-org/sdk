@@ -1,0 +1,85 @@
+name: E2E
+
+# Runs the SDK against a real PDS in an Atmosphere in a Box (AiaB) sandbox. It pulls several
+# container images and takes minutes, so it does not run on pushes to main: it runs on pull
+# requests and by hand.
+# See docs/e2e-testing.md.
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+env:
+  # The full commit of https://tangled.org/kandake.africa/atmosphereinabox to test against. It is
+  # not on GitHub, so it is cloned below instead of checked out with actions/checkout. To update
+  # it, change the SHA here and run this workflow by hand. docs/e2e-testing.md points here.
+  AIAB_SHA: c91a650ca1b8e5cc0e8b4653ad05d5b4fbf298e3
+
+jobs:
+  e2e:
+    name: End-to-end tests against a PDS
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # A newer push to the same pull request replaces the run for the older one; its teardown
+    # steps do not matter because the runner is discarded.
+    concurrency:
+      group: e2e-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      # The version AiaB documents for its command line tool.
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.8.3
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check out Atmosphere in a Box
+        run: |
+          git clone --quiet https://tangled.org/kandake.africa/atmosphereinabox.git "$RUNNER_TEMP/atmosphereinabox"
+          git -C "$RUNNER_TEMP/atmosphereinabox" checkout --quiet --detach "$AIAB_SHA"
+          test "$(git -C "$RUNNER_TEMP/atmosphereinabox" rev-parse HEAD)" = "$AIAB_SHA"
+          echo "AIAB_DIR=$RUNNER_TEMP/atmosphereinabox" >> "$GITHUB_ENV"
+
+      - name: Create the sandbox with one PDS and two accounts
+        working-directory: ${{ env.AIAB_DIR }}
+        run: |
+          deno task install
+          deno task sandbox create --pds 1 --users-per-pds 2 --project sdk-e2e --subnet auto
+          deno task sandbox check
+          deno task sandbox up --build
+          deno task sandbox seed
+
+      # The sandbox publishes no ports. Its loopback relay and hosts entries make the PDS and PLC
+      # directory reachable from the runner by their sandbox hostnames.
+      - name: Make the sandbox reachable from the runner
+        working-directory: ${{ env.AIAB_DIR }}
+        run: |
+          deno task sandbox access hosts | sudo tee -a /etc/hosts
+          deno task sandbox access start
+          deno task sandbox access check
+
+      - name: Export the test configuration
+        run: node scripts/e2e-env.mjs "$AIAB_DIR" --github-env "$GITHUB_ENV"
+
+      - name: Run the end-to-end tests
+        run: pnpm test:e2e
+
+      - name: Show the sandbox's containers
+        if: ${{ failure() }}
+        working-directory: ${{ env.AIAB_DIR }}
+        run: deno task sandbox ps
+
+      - name: Remove the sandbox
+        if: ${{ always() && env.AIAB_DIR != '' }}
+        working-directory: ${{ env.AIAB_DIR }}
+        run: |
+          deno task sandbox access stop || true
+          deno task sandbox destroy --accept-destructive

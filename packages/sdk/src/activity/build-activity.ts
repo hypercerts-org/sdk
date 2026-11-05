@@ -236,7 +236,7 @@ function allSlots(plan: ActivityPlan): Slot[] {
  * reference the new records by strong reference, and one `com.atproto.repo.applyWrites` request
  * then creates the Activity and every new supporting record. The PDS commits that request as a
  * whole: all of the records exist afterwards or none do. This is the PDS's guarantee; the SDK's
- * tests run against a fake PDS and do not demonstrate it.
+ * end-to-end tests check it by making one record of the request fail on a real PDS.
  *
  * Metadata defaults: `createdAt` is the time of the call (one timestamp for all the records the
  * call creates) unless you set it on a record. Every new record gets a new TID as its record key,
