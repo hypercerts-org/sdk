@@ -91,8 +91,8 @@ Every field that points at another record takes the same two choices, and the SD
 - An existing record must be of the type the field holds. A work-scope tag is not a vocabulary tag, and passing one where the other is expected is a `TypeError` that names the field and both types, before anything is sent. `{ uri }` must use a DID, not a handle.
 - Array order is kept, nothing is deduplicated, and an empty array is allowed.
 - Two **new** vocabulary tags in one call cannot have the same key, because they would be the same record. To use one tag in several places, create it first and pass its `uri`.
-- Every new record is created in one `applyWrites` request, which a PDS commits as a whole: all of them exist afterwards or none do. The SDK works out every key and CID locally, so there are no intermediate writes.
-- One request holds at most 200 records on the reference PDS (`@atproto/pds` rejects more with "Too many writes. Max: 200"). A call that would create more throws a `TypeError` before anything is uploaded or written, and the SDK does not split it, because the records must be committed together. Create some records first and pass their URIs.
+- Everything is created in one write: all of it exists afterwards, or none does.
+- One write holds at most 200 records. A larger call throws a `TypeError` before anything is uploaded. Create some records first and pass their URIs.
 
 ## Features
 

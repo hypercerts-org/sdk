@@ -124,41 +124,21 @@ export const vocabularyTagKind: RecordKind<VocabularyTagInput> = recordKind(
  * records, in the authenticated account's repo, if it does not exist yet.
  *
  * @remarks
- * The record key is `<category>.<key>`, for example `zone-role.site`, exactly as you give them: the
- * SDK does not lowercase, trim or otherwise change either part. Each must be a valid record key
- * without dots. So one account has at most one tag per category and key, and this function only
- * creates: it never overwrites or merges into an existing tag, and the SDK has no operation that
- * updates one. If the key is taken it throws {@link RecordAlreadyExistsError}, with the URI of the
- * tag in the way. To use that tag instead, pass its `uri` where an existing tag is accepted, for
- * example in `tags` of {@link createFeature}.
+ * The record key is `<category>.<key>`, for example `zone-role.site`, used exactly as given. So an
+ * account has one tag per category and key. This function only creates; if the key is taken it
+ * throws {@link RecordAlreadyExistsError} with the existing tag's URI, which you can pass as
+ * `{ uri }` instead.
  *
- * `broader` and `supersededBy` each take the data of a new vocabulary tag or `{ uri }` of an
- * existing one, and a new tag can have its own `broader` and `supersededBy`, to any depth. An
- * existing record must be a vocabulary tag (`org.hypercerts.vocab.tag`), not a work-scope tag or any
- * other record. Two new tags in one call cannot have the same key; to use one tag in several
- * places, create it first and pass its URI.
+ * `broader` and `supersededBy` take a new vocabulary tag's fields or `{ uri }` of an existing one,
+ * nested to any depth. Two new tags in one call cannot have the same key.
  *
- * The write depends on what the call creates:
- * - **Only this tag** (no nested new tags): `com.atproto.repo.putRecord` with `swapRecord: null`,
- *   the protocol's "only if no record is there yet", which the PDS checks as part of the write. So
- *   two simultaneous calls cannot overwrite each other: one creates the tag and the other throws
- *   {@link RecordAlreadyExistsError}. This was verified against the reference PDS only. Because it
- *   is a `putRecord`, an OAuth session needs both the `create` and the `update` permission on
- *   `org.hypercerts.vocab.tag` (for example `repo:org.hypercerts.vocab.tag?action=create&action=update`):
- *   the PDS checks both, even though this function never overwrites. With only `create` the PDS
- *   answers HTTP 403 and this function throws {@link WriteRejectedError}.
- * - **This tag and new nested tags**: one `com.atproto.repo.applyWrites` request creates all of
- *   them, and the PDS commits it as a whole. A batch has no "only if absent" option, so the SDK
- *   first reads each new tag's key with `com.atproto.repo.getRecord` and, if one exists, throws
- *   {@link RecordAlreadyExistsError} before uploading or writing anything. This needs only the
- *   `create` permission. One request holds at most 200 records on the reference PDS, and the SDK
- *   does not split a call: a larger one fails before anything is written.
+ * OAuth permissions: creating only this tag needs both `create` and `update` on
+ * `org.hypercerts.vocab.tag` (the SDK uses `putRecord` so two calls can't overwrite each other);
+ * with only `create` it throws {@link WriteRejectedError}. Creating nested tags too needs only
+ * `create`, and everything is created in one write of at most 200 records.
  *
- * `createdAt` defaults to the time of the call. `referenceDocument` takes a URL string, which is
- * stored as it is and never fetched, or a `Blob`, which is uploaded before the write. An upload is
- * not part of the write: if the write fails, including when a tag already exists, this call leaves
- * the uploaded blob unreferenced. A PDS usually deletes unreferenced blobs after a while, but this
- * is not guaranteed, and a blob with the same content that another record already uses stays.
+ * `createdAt` defaults to the time of the call. A `Blob` in `referenceDocument` is uploaded before
+ * the write; if the write fails, it is left unused and the PDS may or may not delete it later.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
@@ -286,24 +266,15 @@ export const workScopeTagKind: RecordKind<WorkScopeTagInput> = recordKind(
  * scope expressions are built from, in the authenticated account's repo.
  *
  * @remarks
- * The record key is a new TID chosen by the SDK, and `createdAt` defaults to the time of the call.
- * Nothing is looked up or deduplicated: calling this twice creates two tags, also when `key` is the
- * same. To reuse a tag, pass its URI in `usedTags` of {@link createActivity}.
+ * Nothing is deduplicated: calling this twice creates two tags, even with the same `key`. To reuse
+ * a tag, pass its URI in `usedTags` of {@link createActivity}.
  *
- * `parent` and `supersededBy` each take the data of a new work-scope tag or `{ uri }` of an
- * existing one, and a new tag can have its own `parent` and `supersededBy`, to any depth. An
- * existing record must be a work-scope tag (`org.hypercerts.workscope.tag`), not a vocabulary tag
- * or any other record. Every new tag is created in one `com.atproto.repo.applyWrites` request,
- * which the PDS commits as a whole: all of them exist afterwards or none does. The SDK validates
- * everything and works out every record's key and CID locally first, so the request is built
- * without intermediate writes. One request holds at most 200 records on the reference PDS, and
- * the SDK does not split a call: a larger one fails before anything is written.
+ * `parent` and `supersededBy` take a new work-scope tag's fields or `{ uri }` of an existing one,
+ * nested to any depth. Everything is created in one write of at most 200 records: all of it exists
+ * afterwards, or none does. `createdAt` defaults to the time of the call.
  *
- * `referenceDocument` takes a URL string, which is stored as it is and never fetched, or a `Blob`,
- * which is uploaded before the write. An upload is not part of the write: if the PDS rejects the
- * write, this call leaves the uploaded blob unreferenced. A PDS usually deletes unreferenced blobs
- * after a while, but this is not guaranteed, and a blob with the same content that another record
- * already uses stays.
+ * A `Blob` in `referenceDocument` is uploaded before the write; if the write fails, it is left
+ * unused and the PDS may or may not delete it later.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.

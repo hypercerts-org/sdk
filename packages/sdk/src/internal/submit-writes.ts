@@ -121,9 +121,7 @@ export const MAX_WRITES_PER_REQUEST = 200;
 export function assertWithinWriteLimit(operation: string, count: number): void {
   if (count <= MAX_WRITES_PER_REQUEST) return;
   throw new TypeError(
-    `${operation}: this call would create ${count} records, but one write holds at most ${MAX_WRITES_PER_REQUEST} (the reference PDS rejects more with "Too many writes. Max: ${MAX_WRITES_PER_REQUEST}"). ` +
-      "The SDK does not split a call, because the records reference each other and must be committed together. " +
-      "Nothing was written. Create some of the records first (for example with createVocabularyTag) and pass their URIs as { uri }, or pass fewer.",
+    `${operation}: this call would create ${count} records, but one write holds at most ${MAX_WRITES_PER_REQUEST}. Nothing was written. Create some records first and pass them as { uri }.`,
   );
 }
 

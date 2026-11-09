@@ -375,7 +375,7 @@ describe("createActivity", () => {
 
     const before = requests.length;
     await expect(createActivity(context, { ...base, locations: locations(200) })).rejects.toThrow(
-      /would create 201 records, but one write holds at most 200/,
+      /would create 201 records, but one write holds at most 200\. Nothing was written/,
     );
     expect(requests).toHaveLength(before);
   });

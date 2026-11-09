@@ -125,42 +125,22 @@ type FeatureTree = SupportingRecordRef & {
  * in one atomic write.
  *
  * @remarks
- * Each `tags` and `locations` entry says what you want with a tagged choice, so intent is never
- * guessed: the fields of a record create a new one, and `{ uri }` reuses an existing one, whose
- * current CID is read and which is never rewritten. An existing record must be of the type the
- * field holds (`org.hypercerts.vocab.tag` for `tags`, `app.certified.location` for `locations`);
- * a work-scope tag is not a vocabulary tag. A new tag may itself have a new or existing `broader`
- * and `supersededBy` tag, to any depth (see {@link createVocabularyTag}). Nothing is searched for
- * or deduplicated, and the order of both arrays is kept.
+ * Each `tags` and `locations` entry is either a new record's fields or `{ uri }` of an existing
+ * record of the right type, which is reused as it is. A new tag can have its own `broader` and
+ * `supersededBy` tags (see {@link createVocabularyTag}). Nothing is deduplicated, and order is kept.
  *
- * `description` is a string (stored as the lexicon's `descriptionString`), a Leaflet document
- * (passed as it is and validated by the lexicon; it needs `$type: "pub.leaflet.pages.linearDocument"`),
- * or `{ uri }` of an existing record of any type (its CID is read and a reference is stored). The
- * SDK never creates a document record. `type`, `langs`, `sameAs` and `createdAt` are stored as
- * given; `createdAt` defaults to the time of the call, one timestamp for all the records the call
- * creates.
+ * `description` is a string, a Leaflet document (with `$type: "pub.leaflet.pages.linearDocument"`),
+ * or `{ uri }` of an existing record. `createdAt` defaults to the time of the call.
  *
- * The Feature gets a new TID as its record key, chosen by the SDK. A new vocabulary tag gets the
- * key `<category>.<key>` (see {@link createVocabularyTag}), so it can already be taken. A batch has
- * no "only if absent" option, so before uploading or writing anything the SDK reads each new tag's
- * key with `com.atproto.repo.getRecord`; if one exists it throws {@link RecordAlreadyExistsError}
- * naming its URI, and nothing is written. Two new tags in one call cannot have the same key. To use
- * a tag that exists, or one tag in several places, pass its `uri`.
+ * A new tag's record key is `<category>.<key>`, so the SDK checks first that no such tag exists and
+ * throws {@link RecordAlreadyExistsError} if one does. To use an existing tag, pass its `uri`.
  *
- * One `com.atproto.repo.applyWrites` request then creates the Feature and every new record, and the
- * PDS commits it as a whole: all of the records exist afterwards or none do. Every record's key and
- * CID are worked out locally first, so there are no intermediate writes. The request holds at most
- * 200 records on the reference PDS, and the SDK does not split a call: a larger one fails before
- * anything is uploaded or written. An OAuth session needs the `create` permission on the Feature,
- * vocabulary tag and location collections the call writes to.
+ * Everything is created in one write: all the records exist afterwards, or none do. One write holds
+ * at most 200 records. The OAuth session needs `create` on the Feature, tag and location
+ * collections it writes to.
  *
- * Blobs (`Blob` values for a new location's `{ blob }` and a new tag's `referenceDocument`) are
- * uploaded before the write, and URL strings are stored as they are and never fetched. Uploads are
- * not part of the write: if the write fails, this call leaves the uploaded blobs unreferenced. A
- * PDS usually deletes unreferenced blobs after a while, but this is not guaranteed, and a blob with
- * the same content that another record already uses stays. After
- * {@link WriteOutcomeUnknownError} or {@link WriteResultMismatchError} the records may exist, so the
- * blobs may be referenced and publicly readable.
+ * Files (`Blob` values) are uploaded before the write. If the write fails, they are left unused and
+ * the PDS may or may not delete them later.
  *
  * Not supported: the lexicon's `signatures`, a blob that was uploaded already, and updating a
  * Feature.

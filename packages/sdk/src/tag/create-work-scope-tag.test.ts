@@ -92,7 +92,7 @@ describe("createWorkScopeTag", () => {
     for (let i = 1; i <= 200; i++) chain = { ...tag(`tag_${i}`), parent: chain };
 
     await expect(createWorkScopeTag(context, chain)).rejects.toThrow(
-      /would create 201 records, but one write holds at most 200/,
+      /would create 201 records, but one write holds at most 200\. Nothing was written/,
     );
 
     expect(requests).toHaveLength(0);

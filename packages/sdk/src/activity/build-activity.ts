@@ -293,48 +293,25 @@ function allSlots(plan: ActivityPlan): Slot[] {
  * contributor-information, contribution and work-scope tag records it needs, in one atomic write.
  *
  * @remarks
- * Each supporting field says what you want with a tagged choice, so intent is never guessed:
- * - the fields of a record (a plain object) create a new record;
- * - `{ uri }` reuses an existing record, whose current CID is read and which is never rewritten.
- *   Its type must match the field, for example only `org.hypercerts.claim.rights` for `rights`;
- * - `{ inline: "..." }`, for a contributor's `identity` and `details` only, stores that string in
- *   the Activity itself (the lexicon's `contributorIdentity` and `contributorRole`) without a
- *   record.
+ * Each supporting field takes one of:
+ * - a new record's fields, to create it;
+ * - `{ uri }` of an existing record of the right type, reused as it is;
+ * - `{ inline: "..." }` (a contributor's `identity` and `details` only), stored in the Activity
+ *   itself without a record.
  *
- * Nothing is searched for or deduplicated: two calls with the same data create two sets of records.
+ * Nothing is deduplicated: two calls with the same data create two sets of records.
  *
- * `workScope` is either a free-form string or a structured CEL scope, `{ expression, usedTags }`
- * (see {@link CelWorkScopeInput}). Each entry of `usedTags` is the data of a new work-scope tag,
- * created in the same write, or `{ uri }` of an existing one, and a new tag may itself point at a
- * new or existing `parent` and `supersededBy` tag (see `createWorkScopeTag` in
- * `@hypercerts-org/sdk/tag`). The expression is stored exactly as written: the SDK does not parse,
- * evaluate or check it.
+ * `workScope` is a string or a CEL scope, `{ expression, usedTags }` (see {@link CelWorkScopeInput}).
+ * The expression is stored as written; the SDK does not check it.
  *
- * Every record's key and CID are worked out locally before anything is sent, so the Activity can
- * reference the new records by strong reference, and one `com.atproto.repo.applyWrites` request
- * then creates the Activity and every new supporting record. The PDS commits that request as a
- * whole: all of the records exist afterwards or none do. This is the PDS's guarantee; the SDK's
- * end-to-end tests check it by making one record of the request fail on a real PDS.
+ * Everything is created in one write: all the records exist afterwards, or none do. One write holds
+ * at most 200 records, the Activity included. `createdAt` defaults to the time of the call.
  *
- * Metadata defaults: `createdAt` is the time of the call (one timestamp for all the records the
- * call creates) unless you set it on a record. Every new record gets a new TID as its record key,
- * chosen by the SDK.
+ * Not supported: `signatures`, `shortDescriptionFacets` and a non-string `description`.
  *
- * One `applyWrites` request holds at most 200 records on the reference PDS, so a call that would
- * create more (the Activity included) fails before anything is uploaded, and the SDK does not split
- * it, because the records must be committed together.
- *
- * Not supported: the lexicon's `signatures`, `shortDescriptionFacets` and a `description` that is
- * not a string.
- *
- * Blobs (`Blob` or `File` values for `image` and attachments) are uploaded before the write, and
- * URL strings are stored as they are and never fetched. Uploads are outside the atomic write: if
- * the PDS rejects the write, this call leaves the uploaded blobs unreferenced. A PDS usually deletes unreferenced blobs after a while, but this is not guaranteed, and a blob
- * with the same content that another record already uses stays.
- * After {@link WriteOutcomeUnknownError} or {@link WriteResultMismatchError} the records may exist,
- * so the blobs may be referenced and publicly readable. The order is: validate the input, read the existing records, upload blobs, validate each
- * record against its lexicon, write. A failed read or an input error stops before any upload; a
- * lexicon rule that rejects a record is only found after the blobs are uploaded.
+ * Files (`Blob` or `File` values) are uploaded before the write. If the write fails, they are left
+ * unused and the PDS may or may not delete them later. Input errors are found before any upload; a
+ * lexicon rule that rejects a record only after.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the records are created in that account's repo.
