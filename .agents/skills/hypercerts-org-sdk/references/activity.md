@@ -38,7 +38,7 @@ const result = await createActivity(context, {
   description: "## Goals\nRestore crane habitat along the valley floor.",
   langs: ["en"],
   image: cover, // uploaded by the SDK; a URL string is stored as-is instead
-  workScope: "reforestation, native species", // or a CEL scope, see the tags reference
+  workScope: "reforestation, native species", // or a CEL scope, see "CEL work scope" below
   startDate: "2024-03-01T00:00:00Z",
   endDate: "2024-11-30T00:00:00Z",
   rights: {
@@ -141,6 +141,30 @@ const details = await createContribution(context, {
 });
 ```
 
+## CEL work scope
+
+`workScope` takes a string, or a CEL scope:
+
+```ts
+import { createActivity } from "@hypercerts-org/sdk/activity";
+
+const result = await createActivity(context, {
+  title: "Mangrove restoration in Kenya",
+  shortDescription: "Replanting 20 hectares.",
+  workScope: {
+    expression: "scope.hasAll(['mangrove_restoration', 'environmental_education'])",
+    usedTags: [
+      { key: "mangrove_restoration", name: "Mangrove restoration" }, // created in the same write
+      { uri: "at://did:plc:abc123/org.hypercerts.workscope.tag/3k2a4b5c6d7e8" }, // existing
+    ],
+    // version defaults to "v1", createdAt to the time of the call
+  },
+});
+result.workScope?.usedTags[0]; // { uri, cid, created: true }
+```
+
+Each `usedTags` entry is a new work-scope tag or `{ uri }` of an existing one; see [tag.md](tag.md#work-scope-tags) for its fields. The expression is stored exactly as written; the SDK does not parse or evaluate it and does not check that `usedTags` matches the tags it names.
+
 ## Activity pitfalls
 
 - A `{ uri }` must use a DID authority, not a handle, and point at the right collection (`org.hypercerts.claim.rights` for `rights`, `app.certified.location` for locations, `org.hypercerts.claim.contributorInformation` for `identity`, `org.hypercerts.claim.contribution` for `details`). Do not mix `uri` with other fields.
@@ -162,7 +186,7 @@ Dates are ISO 8601 date-times. `createdAt` is optional on every record and defau
 | `description`          | `string`                       | Plain text or Markdown.                        |
 | `langs`                | `string[]`                     | BCP-47 tags of the text's languages, up to 3. Usually one; more only for mixed-language text. |
 | `image`                | `Blob \| string`               | JPEG/PNG/WebP up to 5 MB (uploaded), or a URL. |
-| `workScope`            | `string \| CelWorkScopeInput`  | Free-form, or a CEL scope (tags reference).    |
+| `workScope`            | `string \| CelWorkScopeInput`  | Free-form, or a CEL scope (see below).         |
 | `startDate`, `endDate` | `string`                       | `endDate` ≥ `startDate`.                       |
 | `rights`               | `RightsInput \| { uri }`       |                                                |
 | `locations`            | `(LocationInput \| { uri })[]` |                                                |

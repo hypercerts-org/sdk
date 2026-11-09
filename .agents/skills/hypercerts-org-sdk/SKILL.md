@@ -60,11 +60,11 @@ Operations are grouped by domain, each under its own subpath. Read the domain's 
 
 | Domain | Import | Reference |
 | - | - | - |
-| Activity (hypercert claims, rights, contributors, contributions, locations) | `@hypercerts-org/sdk/activity` | [references/activity.md](references/activity.md) |
+| Activity (hypercert claims, rights, contributors, contributions, locations, CEL work scopes) | `@hypercerts-org/sdk/activity` | [references/activity.md](references/activity.md) |
 | Profile (the account's `app.certified.actor.profile`) | `@hypercerts-org/sdk/actor` | [references/profile.md](references/profile.md) |
 | Location (a standalone `app.certified.location`, shared by several activities) | `@hypercerts-org/sdk/location` | [references/location.md](references/location.md) |
-| Tags (`org.hypercerts.vocab.tag`, `org.hypercerts.workscope.tag`) and Features (`org.hypercerts.entity.feature`) | `@hypercerts-org/sdk/tag`, `@hypercerts-org/sdk/feature` | [references/tags-and-features.md](references/tags-and-features.md) |
-| CEL work scope of an Activity | `@hypercerts-org/sdk/activity` | [references/tags-and-features.md](references/tags-and-features.md#cel-work-scope-in-createactivity) |
+| Tag (`org.hypercerts.vocab.tag`, `org.hypercerts.workscope.tag`) | `@hypercerts-org/sdk/tag` | [references/tag.md](references/tag.md) |
+| Feature (`org.hypercerts.entity.feature`, with its tags and locations) | `@hypercerts-org/sdk/feature` | [references/feature.md](references/feature.md) |
 
 Two things to know before opening a reference:
 
