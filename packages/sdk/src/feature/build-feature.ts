@@ -12,8 +12,11 @@ import {
   type SupportingRecordRef,
 } from "../internal/slots.js";
 import { type LocationInput, locationKind } from "../location/build-location.js";
-import type { VocabularyTagResult } from "../tag/build-tag.js";
-import { type VocabularyTagInput, vocabularyTagKind } from "../tag/build-tag.js";
+import {
+  type VocabularyTagInput,
+  type VocabularyTagResult,
+  vocabularyTagKind,
+} from "../tag/build-tag.js";
 
 /**
  * A Leaflet document (`pub.leaflet.pages.linearDocument`): rich text in blocks. Passed to the record
