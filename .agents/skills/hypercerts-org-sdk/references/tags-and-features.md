@@ -32,7 +32,7 @@ try {
 - It only creates. A taken key throws `RecordAlreadyExistsError` and changes nothing; there is no update.
 - Only this tag (no new nested tags): `putRecord` with `swapRecord: null`, race-safe, checked against the reference PDS only. An OAuth session needs **both** `create` and `update` on `org.hypercerts.vocab.tag` (for example `repo:org.hypercerts.vocab.tag?action=create&action=update`); with only `create` the PDS answers 403 and you get `WriteRejectedError`.
 - With new nested tags: one `applyWrites`, after the SDK has read each new key and found none taken. Only `create` is needed.
-- After `WriteOutcomeUnknownError` it is safe to call again (it creates the tags or throws `RecordAlreadyExistsError`).
+- After `WriteOutcomeUnknownError` calling again cannot create duplicates, but `RecordAlreadyExistsError` only means one key is taken, and a retry racing the first write can throw `WriteOutcomeUnknownError` again. Check each attempted URI before treating the tags as created.
 - Fields: `description`, `aliases` (≤ 50), `sameAs` (URIs, ≤ 20), `referenceDocument` (`Blob` up to 10 MB, uploaded, or a URL), `broader[]` (≤ 20), `supersededBy`, `createdAt`.
 
 ## Work-scope tags
@@ -64,7 +64,7 @@ const feature = await createFeature(context, {
     { uri: "at://did:plc:abc123/org.hypercerts.vocab.tag/land-cover.wetland" }, // existing
   ],
   locations: [
-    { lpVersion: "1.0", srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84", locationType: "coordinate-decimal", location: { string: "27.47,90.17" } },
+    { lpVersion: "1.0", srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84", locationType: "coordinate-decimal", location: { string: "90.17,27.47" } },
   ],
 });
 feature.tags[0]; // { uri, cid, created: true }

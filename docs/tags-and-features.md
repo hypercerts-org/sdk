@@ -51,7 +51,10 @@ How the write is made depends on what the call creates:
 - **Only this tag** (no new nested tags): `com.atproto.repo.putRecord` with `swapRecord: null`, which the PDS applies only if no record is at that key. Two simultaneous calls therefore cannot overwrite each other: one creates the tag and the other throws `RecordAlreadyExistsError`. This was verified against the reference PDS only. Because the write is a `putRecord`, an OAuth session needs both the `create` and the `update` permission on `org.hypercerts.vocab.tag`, for example the scope `repo:org.hypercerts.vocab.tag?action=create&action=update`. With only `create` the PDS answers HTTP 403 and the call throws `WriteRejectedError`.
 - **This tag and new nested tags**: one `applyWrites` request creates all of them. A batch has no "only if absent" option, so the SDK first reads each new tag's key with `com.atproto.repo.getRecord` and throws `RecordAlreadyExistsError` before uploading or writing anything if one exists. This needs only the `create` permission.
 
-After a `WriteOutcomeUnknownError` you can call `createVocabularyTag` again: every tag it creates has a fixed key, so the retry either creates them or throws `RecordAlreadyExistsError`, which then means they exist, most likely from the first attempt.
+After a `WriteOutcomeUnknownError` you can call `createVocabularyTag` again: every tag it creates has a fixed key, so a retry never creates duplicates. It does not prove the first attempt succeeded, though:
+
+- `RecordAlreadyExistsError` means one of the keys is taken, not that every tag exists. A nested tag may have been created by someone else in the meantime. Check each URI listed in the error from the first attempt before treating the batch as complete.
+- If the first write is still in flight, the retry can pass its key checks and then conflict with it. The reference PDS answers that with HTTP 500, so the retry throws `WriteOutcomeUnknownError` again. Wait, then check the URIs.
 
 ## Work-scope tags
 
@@ -108,14 +111,14 @@ const feature = await createFeature(context, {
   langs: ["en"],
   tags: [
     { category: "zone-role", key: "site", name: "Site", status: "accepted" }, // created
-    { uri: "at://did:plc:abc123/org.hypercerts.vocab.tag/land-cover.wetland" }, // reused
+    { uri: "at://did:plc:abc123/org.hypercerts.vocab.tag/land-cover.wetland" }, // reused; placeholder, use an existing tag's URI
   ],
   locations: [
     {
       lpVersion: "1.0",
       srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
       locationType: "coordinate-decimal",
-      location: { string: "27.47,90.17" },
+      location: { string: "90.17,27.47" },
     }, // created
   ],
 });
