@@ -25,7 +25,8 @@ export interface Account {
  * not refreshed: a test run is far shorter than its lifetime.
  *
  * `rewrite` lets a test change a request, including its access token, just before it is sent, to
- * make the PDS see something the SDK would never send.
+ * make the PDS see something the SDK would never send. It may be asynchronous, so a test can also
+ * do something else (such as write a record with another client) at that moment.
  *
  * @throws {@link Error} If the PDS cannot be reached or refuses the credentials.
  */
@@ -39,17 +40,20 @@ export async function login(
   });
   const client = new Client({
     did: body.did,
-    fetchHandler: (path, init) => {
+    fetchHandler: async (path, init) => {
       const headers = new Headers(init.headers);
       headers.set("authorization", `Bearer ${body.accessJwt}`);
-      return fetch(new URL(path, pdsUrl), rewrite(path, { ...init, headers }));
+      return fetch(new URL(path, pdsUrl), await rewrite(path, { ...init, headers }));
     },
   });
   return { did: body.did, client, context: createSDKContext({ client }) };
 }
 
 /** Changes the request to `path` before it is sent. */
-export type RewriteRequest = (path: string, init: RequestInit) => RequestInit;
+export type RewriteRequest = (
+  path: string,
+  init: RequestInit,
+) => RequestInit | Promise<RequestInit>;
 
 /** Signs in as one of the two accounts named by the environment. */
 export function loginAs(user: "user1" | "user2", rewrite?: RewriteRequest): Promise<Account> {

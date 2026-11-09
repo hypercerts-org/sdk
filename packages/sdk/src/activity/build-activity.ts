@@ -11,7 +11,7 @@ import {
   prepareChecked,
 } from "../internal/build-context.js";
 import { describeValue } from "../internal/describe.js";
-import { blobOrUrl, compact, dateRange, strictObject } from "../internal/input.js";
+import { blobOrUrl, compact, dateRange, strictObject, weightString } from "../internal/input.js";
 import { mediaValue } from "../internal/media.js";
 import type { PreparedRecord } from "../internal/prepare-record.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
@@ -163,17 +163,12 @@ export interface CreateActivityResult {
   contributors: readonly ContributorResult[];
 }
 
-const weight = l.refine(l.string(), {
-  check: (value: string) => /^\d+(\.\d+)?$/.test(value) && Number(value) > 0,
-  message: 'must be a positive decimal number written as a string, for example "1" or "0.25"',
-});
-
 // The choices of `rights`, `locations` and a contributor's fields are read by `toSlot`, which
 // knows what each may hold, so the schema only says where they are.
 const contributorShape = strictObject({
   identity: l.unknown(),
   details: l.optional(l.unknown()),
-  weight: l.optional(weight),
+  weight: l.optional(weightString),
 });
 
 const celWorkScope = strictObject({
@@ -224,19 +219,20 @@ interface ActivityPlan {
   contributors: ContributorPlan[];
 }
 
-// Reads every choice, and with it every nested record's data, before any request is sent.
-function planActivity(build: BuildContext, input: l.InferOutput<typeof activityInput>) {
+// Reads every choice, and with it every nested record's data, before any request is sent. `at`
+// prefixes the field names in messages when the Activity is nested in a larger input.
+function planActivity(build: BuildContext, input: l.InferOutput<typeof activityInput>, at: string) {
   return {
-    workScope: planWorkScope(build, input.workScope),
+    workScope: planWorkScope(build, input.workScope, at),
     rights:
       input.rights === undefined
         ? undefined
-        : toSlot(build, "rights", input.rights, rightsKind, false),
+        : toSlot(build, `${at}rights`, input.rights, rightsKind, false),
     locations: (input.locations ?? []).map((value, i) =>
-      toSlot(build, `locations[${i}]`, value, locationKind, false),
+      toSlot(build, `${at}locations[${i}]`, value, locationKind, false),
     ),
     contributors: (input.contributors ?? []).map((contributor, i): ContributorPlan => {
-      const field = `contributors[${i}]`;
+      const field = `${at}contributors[${i}]`;
       return {
         identity: toSlot(
           build,
@@ -255,22 +251,22 @@ function planActivity(build: BuildContext, input: l.InferOutput<typeof activityI
   } satisfies ActivityPlan;
 }
 
-function planWorkScope(build: BuildContext, value: unknown): WorkScopePlan | undefined {
+function planWorkScope(build: BuildContext, value: unknown, at: string): WorkScopePlan | undefined {
   if (value === undefined) return undefined;
   if (typeof value === "string") return { kind: "text", scope: value };
   if (!isInputObject(value)) {
     throw new TypeError(
-      `${build.operation}: workScope must be a string (a free-form description) or { expression, usedTags } (a CEL scope), but received ${describeValue(value)}.`,
+      `${build.operation}: ${at}workScope must be a string (a free-form description) or { expression, usedTags } (a CEL scope), but received ${describeValue(value)}.`,
     );
   }
-  const scope = parseInput(build, "workScope", celWorkScope, value);
+  const scope = parseInput(build, `${at}workScope`, celWorkScope, value);
   return {
     kind: "cel",
     expression: scope.expression,
     version: scope.version ?? "v1",
     createdAt: scope.createdAt ?? build.createdAt,
     usedTags: scope.usedTags.map((tag, i) =>
-      toSlot(build, `workScope.usedTags[${i}]`, tag, workScopeTagKind, false),
+      toSlot(build, `${at}workScope.usedTags[${i}]`, tag, workScopeTagKind, false),
     ),
   };
 }
@@ -422,18 +418,51 @@ export async function createActivity(
   input: ActivityInput,
 ): Promise<CreateActivityResult> {
   const build = createBuildContext(context, "createActivity");
-  const parsed = parseInput(build, "input", activityInput, input);
-  const plan = planActivity(build, parsed);
+  const { writes, result } = await prepareActivity(build, input);
+  await submitWrites(context, build.did, writes, "createActivity");
+  return result;
+}
+
+/** An Activity and its new supporting records, validated and ready to submit. Nothing is written. */
+export interface PreparedActivity {
+  /** The records to create, in the order to submit them: the new supporting records, then the Activity. */
+  readonly writes: readonly PreparedRecord[];
+  /** What the caller gets back once the writes are committed. */
+  readonly result: CreateActivityResult;
+}
+
+/**
+ * Does everything `createActivity` does before it writes: validates the input, reads the existing
+ * records it points at, uploads blobs and prepares every new record, the Activity last.
+ *
+ * Internal. `createActivity` submits the result as it is; operations that put the Activity in a
+ * larger write (see `createActivityInCollection`) submit it together with their own writes. Uploads
+ * are not undone if the caller never submits the writes.
+ *
+ * `path` names the Activity's data in messages when it is part of a larger input, for example
+ * `activity` gives `activity.locations[0]`; omit it when the input is the Activity itself.
+ *
+ * Throws what `createActivity` throws before its write: TypeError for invalid input and Error for
+ * a failed read or upload.
+ */
+export async function prepareActivity(
+  build: BuildContext,
+  input: unknown,
+  path?: string,
+): Promise<PreparedActivity> {
+  const at = path === undefined ? "" : `${path}.`;
+  const parsed = parseInput(build, path ?? "input", activityInput, input);
+  const plan = planActivity(build, parsed, at);
   const slots = allSlots(plan);
   const fresh = newSlots(slots);
   assertDistinctKeys(build, fresh);
   // The Activity itself is one more record in the write.
-  assertWithinWriteLimit("createActivity", fresh.length + 1);
+  assertWithinWriteLimit(build.operation, fresh.length + 1);
 
   // Reads first, then uploads: a URI that cannot be resolved fails before anything is uploaded.
   const existing = await readBeforeWriting(build, slots, { checkKeys: true });
   const [image, created] = await Promise.all([
-    parsed.image === undefined ? undefined : mediaValue(build, "image", parsed.image, "image"),
+    parsed.image === undefined ? undefined : mediaValue(build, `${at}image`, parsed.image, "image"),
     prepareNew(slots, existing),
   ]);
 
@@ -444,8 +473,10 @@ export async function createActivity(
     activity.main,
     activityRecord(build, parsed, plan, image, refOf),
   );
-  await submitWrites(context, build.did, [...created.values(), record], "createActivity");
-  return { ...record.ref, ...summarise(plan, created, refOf) };
+  return {
+    writes: [...created.values(), record],
+    result: { ...record.ref, ...summarise(plan, created, refOf) },
+  };
 }
 
 function activityRecord(

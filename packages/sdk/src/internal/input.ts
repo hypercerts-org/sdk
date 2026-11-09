@@ -60,6 +60,16 @@ export function compact<T extends object>(value: T): Compacted<T> {
 /** A `Blob` or `File` to upload. */
 export const blob = l.custom<Blob>(isBlob, "must be a Blob or File");
 
+/**
+ * A positive decimal number written as a string, for example `"2"` or `"0.5"`. The lexicons store
+ * weights as strings and say only that they are positive; this is the SDK's one rule for them.
+ * The string is kept as written, not normalised, and its length is left to the lexicon.
+ */
+export const weightString = l.refine(l.string(), {
+  check: (value: string) => /^\d+(\.\d+)?$/.test(value) && Number(value) > 0,
+  message: 'must be a positive decimal number written as a string, for example "1" or "0.25"',
+});
+
 /** An optional string. The lexicon checks its length and format. */
 export const optionalText = l.optional(l.string());
 

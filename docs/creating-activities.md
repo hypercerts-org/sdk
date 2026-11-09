@@ -97,6 +97,44 @@ try {
 }
 ```
 
+## Adding the new Activity to a Collection
+
+`createActivityInCollection` from `@hypercerts-org/sdk/collection` creates an Activity exactly like `createActivity` (the same `activity` input) and appends it to an existing `org.hypercerts.collection` record of yours, all in one `applyWrites` commit: the Activity, its new supporting records and the new version of the Collection exist afterwards, or none of it does.
+
+```ts
+import { createActivityInCollection } from "@hypercerts-org/sdk/collection";
+
+const { activity, collection } = await createActivityInCollection(context, {
+  // Placeholder: the URI of one of your own Collections.
+  collectionUri: "at://did:plc:abc123/org.hypercerts.collection/3k2a4b5c6d7e8",
+  activity: {
+    title: "Reforestation in the Phobjikha valley",
+    shortDescription: "Planting 5,000 native trees.",
+  },
+  itemWeight: "2", // optional; the same rule as a contributor's weight
+});
+// activity is what createActivity returns. collection is { uri, cid }: the same URI, the new version's CID.
+```
+
+- The Collection must be in the signed-in account's repo. The new item is appended last; every other field, including `createdAt`, existing items and fields the SDK does not know, is kept as it was. A Collection with 1000 items is full and is refused.
+- The Collection's `signatures` are left as they are. Appending an item changes the record, so a signature made over its earlier content no longer matches.
+- `applyWrites` cannot say "only if this record is unchanged", so the SDK reads the repository's latest commit before it reads the Collection and asks the PDS to apply the write only if the repository is still at that commit. If anything else wrote to the account in between, the PDS refuses the whole request, nothing is written, and you get a `WriteRejectedError` with `code === "InvalidSwap"`. It also fires for an unrelated write to the same account, so busy accounts see it now and then. The SDK never retries or merges; call again and the Collection is read afresh.
+- Blobs are uploaded before the repository is read, so the uploads are outside the commit, as for `createActivity`. The Collection is read once before the uploads, so a Collection that does not exist, is invalid or is full fails before anything is uploaded.
+- Failures are the same as in the table above, with `attempted` also holding the Collection's URI (last) and `WriteRejectedError` possibly carrying `InvalidSwap`.
+
+```ts
+import { createActivityInCollection, WriteRejectedError } from "@hypercerts-org/sdk/collection";
+
+try {
+  await createActivityInCollection(context, input);
+} catch (error) {
+  // Nothing was written, so calling again cannot duplicate anything.
+  if (error instanceof WriteRejectedError && error.code === "InvalidSwap") {
+    await createActivityInCollection(context, input);
+  } else throw error;
+}
+```
+
 ## Not covered
 
-Collections and projects, updating or deleting records, linking an existing Activity to new records, deduplication and signatures are not part of these functions.
+Creating or editing Collections and projects, any other update or delete of a record, linking an existing Activity to new records, adding an Activity to someone else's Collection, deduplication and signatures are not part of these functions.

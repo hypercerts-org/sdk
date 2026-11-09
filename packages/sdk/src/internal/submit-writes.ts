@@ -1,16 +1,19 @@
-import type { DidString, NsidString, TypedLexMap } from "@atproto/lex";
+import type { CidString, DidString, NsidString, TypedLexMap } from "@atproto/lex";
 import type { SDKContext } from "../context.js";
 import { describeError } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import type { StrongRef } from "./resolve-record-ref.js";
 
 /**
- * Base class of the errors thrown when the single request that creates records did not succeed.
+ * Base class of the errors thrown when the single request that writes records did not succeed.
  * Check `instanceof` against {@link WriteRejectedError}, {@link WriteOutcomeUnknownError} and
  * {@link WriteResultMismatchError} to tell them apart.
  */
 export abstract class WriteError extends Error {
-  /** The URI and CID of every record the failed request tried to create, in request order. */
+  /**
+   * The URI and CID of every record the failed request tried to write, in request order: the new
+   * records first, then any record it updated (with the CID the update would give it).
+   */
   readonly attempted: readonly StrongRef[];
 
   constructor(message: string, attempted: readonly StrongRef[], options?: ErrorOptions) {
@@ -20,10 +23,13 @@ export abstract class WriteError extends Error {
 }
 
 /**
- * The PDS answered with a client error (HTTP 4xx) and so did not create any of the records. The
- * request can be corrected and sent again; nothing needs cleaning up.
+ * The PDS answered with a client error (HTTP 4xx) and so did not apply any of the writes: no
+ * record was created and none was changed. The request can be corrected and sent again; nothing
+ * needs cleaning up.
  *
  * `status` and `code` are the HTTP status and the XRPC error code (for example `InvalidRequest`).
+ * `code` is `InvalidSwap` when the repository changed after the SDK read it (see the operation's
+ * documentation): nothing is wrong with the input, and calling again reads the repository afresh.
  * `cause` is the client's original error.
  */
 export class WriteRejectedError extends WriteError {
@@ -73,8 +79,8 @@ export class RecordAlreadyExistsError extends WriteRejectedError {
 
 /**
  * No usable answer came back (network failure, timeout, a server error or an unreadable response),
- * so it is not known whether the PDS created the records. `attempted` lists every URI that may
- * now exist.
+ * so it is not known whether the PDS applied the writes. `attempted` lists every URI that may
+ * now exist or have changed.
  *
  * The SDK does not retry. Retrying with new record keys would duplicate every record if the first
  * attempt had succeeded. The exception is a record whose key is fixed or decided by its data and
@@ -87,7 +93,7 @@ export class WriteOutcomeUnknownError extends WriteError {
 }
 
 /**
- * The PDS created the records but reported different URIs or CIDs than the SDK computed. Records
+ * The PDS applied the writes but reported different URIs or CIDs than the SDK computed. Records
  * that were written with references to each other (an Activity and its rights, for example) may
  * therefore point at CIDs that do not match what is stored. `attempted` holds the references the
  * SDK computed and `reported` the ones the PDS returned, both in request order.
@@ -100,6 +106,34 @@ export class WriteResultMismatchError extends WriteError {
     super(message, attempted);
     this.reported = reported;
   }
+}
+
+/** What a request writes besides the records it creates. */
+export interface SubmitOptions {
+  /**
+   * Existing records to replace with a new full value, written after the creates in the same
+   * commit. Each is prepared with the record key it already has (see `prepareRecord`).
+   */
+  readonly updates?: readonly PreparedRecord[];
+  /**
+   * The CID of the repo's head commit as the caller read it (see `readRepoHead`). The PDS rejects
+   * the whole request with `InvalidSwap` if the repo has a newer commit by then. Set it when an
+   * update is based on a record the caller read, because `applyWrites` has no per-record check.
+   */
+  readonly swapCommit?: CidString;
+  /**
+   * Whether calling again after an unknown outcome cannot duplicate records: every record has a key
+   * the input decided, and the caller checks none exists before sending. Only changes the advice in
+   * the error message.
+   */
+  readonly retrySafe?: boolean;
+}
+
+/** What one request tried to write, for messages and for the errors' `attempted`. */
+interface Request {
+  readonly created: readonly StrongRef[];
+  readonly updated: readonly StrongRef[];
+  readonly swapCommit: CidString | undefined;
 }
 
 /**
@@ -126,12 +160,13 @@ export function assertWithinWriteLimit(operation: string, count: number): void {
 }
 
 /**
- * Creates all `records` in `did`'s repo with one `com.atproto.repo.applyWrites` request, which the
- * PDS applies as a single commit: every record is created or none is.
+ * Creates all `records` in `did`'s repo, and replaces the records in `options.updates`, with one
+ * `com.atproto.repo.applyWrites` request, which the PDS applies as a single commit: every write
+ * happens or none does.
  *
  * Internal. Boundaries:
  * - Never retries and never splits the request; the caller decides what to do about a failure.
- *   `retrySafe` says whether calling again after an unknown outcome cannot duplicate records
+ *   `options.retrySafe` says whether calling again after an unknown outcome cannot duplicate records
  *   (every record has a key the input decided, and the caller checks none exists before sending);
  *   it only changes the advice in the error message.
  * - Does not pass `validate`, so the PDS applies its own default; records are validated by the
@@ -140,34 +175,53 @@ export function assertWithinWriteLimit(operation: string, count: number): void {
  *   Everything else, including a 2xx whose body the client could not read, is outcome-unknown.
  * - Compares the PDS's reported URIs and CIDs with the computed ones, because records already
  *   reference each other by CID.
+ * - `options.swapCommit` is the only guard against a concurrent change that `applyWrites` offers.
+ *   It covers the whole repo, so any other write to the account since the head was read, not only
+ *   one to the updated record, rejects the request: a false alarm the caller accepts.
  *
  * Throws WriteRejectedError, WriteOutcomeUnknownError or WriteResultMismatchError. `operation`
  * names the public function for the message.
  */
-export function submitWrites(
+export async function submitWrites(
   context: SDKContext,
   did: DidString,
   records: readonly PreparedRecord[],
   operation: string,
-  retrySafe = false,
+  options: SubmitOptions = {},
 ): Promise<void> {
+  const updates = options.updates ?? [];
+  const request: Request = {
+    created: records.map((record) => record.ref),
+    updated: updates.map((record) => record.ref),
+    swapCommit: options.swapCommit,
+  };
   return submit(
     operation,
-    records.map((record) => record.ref),
+    request,
     async () => {
       const response = await context.client.applyWrites(
-        () =>
-          records.map(({ collection, rkey, value }) => ({
+        () => [
+          ...records.map(({ collection, rkey, value }) => ({
             $type: "com.atproto.repo.applyWrites#create" as const,
             collection,
             rkey,
             value,
           })),
-        { repo: did },
+          ...updates.map(({ collection, rkey, value }) => ({
+            $type: "com.atproto.repo.applyWrites#update" as const,
+            collection,
+            rkey,
+            value,
+          })),
+        ],
+        {
+          repo: did,
+          ...(options.swapCommit === undefined ? {} : { swapCommit: options.swapCommit }),
+        },
       );
       return response.body.results;
     },
-    retrySafe,
+    options.retrySafe ?? false,
   );
 }
 
@@ -200,7 +254,7 @@ export async function submitCreateOnly(
   try {
     await submit(
       operation,
-      [record.ref],
+      { created: [record.ref], updated: [], swapCommit: undefined },
       async () => {
         const response = await context.client.putRecord(
           record.value as TypedLexMap<NsidString>,
@@ -242,7 +296,7 @@ function alreadyExists(
 // the error message.
 async function submit(
   operation: string,
-  attempted: readonly StrongRef[],
+  request: Request,
   send: () => Promise<readonly unknown[] | undefined>,
   retrySafe: boolean,
 ): Promise<void> {
@@ -250,46 +304,82 @@ async function submit(
   try {
     results = await send();
   } catch (error) {
-    throw classifyFailure(operation, error, attempted, retrySafe);
+    throw classifyFailure(operation, error, request, retrySafe);
   }
-  assertReportedRefs(operation, attempted, results);
+  assertReportedRefs(operation, request, results);
 }
 
-function classifyFailure(
-  operation: string,
-  error: unknown,
-  attempted: readonly StrongRef[],
-  retrySafe: boolean,
-) {
+const attemptedOf = ({ created, updated }: Request) => [...created, ...updated];
+
+const recordsOf = (refs: readonly StrongRef[]) =>
+  refs.length === 1 ? "the record" : `the ${refs.length} records`;
+
+// What a request did or did not do to each record, worded for `effect`. A request that only creates
+// keeps the plain wording, so a caller never reads "created" about an update.
+function describeEffects(
+  { created, updated }: Request,
+  effect: { created: string; changed: string },
+): string {
+  if (updated.length === 0) {
+    return `${recordsOf(created)} ${created.length === 1 ? "was" : "were"} ${effect.created}`;
+  }
+  return [
+    ...(created.length === 0 ? [] : [`${newRecordsOf(created)} ${effect.created}`]),
+    `${updated.map((ref) => ref.uri).join(", ")} was ${effect.changed}`,
+  ].join(" and ");
+}
+
+const newRecordsOf = (refs: readonly StrongRef[]) =>
+  refs.length === 1 ? "the new record was" : `the ${refs.length} new records were`;
+
+// The wording when the PDS refused the request, and when no usable answer came back.
+const NOT_WRITTEN = { created: "not created", changed: "not changed" };
+const MAYBE_WRITTEN = { created: "created", changed: "changed" };
+
+function classifyFailure(operation: string, error: unknown, request: Request, retrySafe: boolean) {
   const status = property(error, "status");
   const code = property(error, "error");
   const reason = describeError(error);
-  const records = attempted.length === 1 ? "the record" : `the ${attempted.length} records`;
+  const attempted = attemptedOf(request);
   if (typeof status === "number" && status >= 400 && status < 500 && status !== 408) {
-    return new WriteRejectedError(
-      `${operation}: the PDS rejected the request (HTTP ${status}: ${reason}), so ${records} ${attempted.length === 1 ? "was" : "were"} not created. ` +
-        "Nothing needs cleaning up. Fix the cause (for example the input, the session's permissions or a rate limit) and call again.",
-      attempted,
-      { status, code: typeof code === "string" ? code : undefined },
-      { cause: error },
-    );
+    const details = { status, code: typeof code === "string" ? code : undefined };
+    const message =
+      code === "InvalidSwap" && request.swapCommit !== undefined
+        ? repositoryChanged(operation, reason, request)
+        : `${operation}: the PDS rejected the request (HTTP ${status}: ${reason}), so ${describeEffects(request, NOT_WRITTEN)}. ` +
+          "Nothing needs cleaning up. Fix the cause (for example the input, the session's permissions or a rate limit) and call again.";
+    return new WriteRejectedError(message, attempted, details, { cause: error });
   }
   return new WriteOutcomeUnknownError(
-    `${operation}: no usable answer from the PDS (${reason}), so it is not known whether ${records} ${attempted.length === 1 ? "was" : "were"} created: ${attempted.map((ref) => ref.uri).join(", ")}. ` +
-      retryAdvice(operation, retrySafe, attempted.length !== 1),
+    `${operation}: no usable answer from the PDS (${reason}), so it is not known whether ${describeEffects(request, MAYBE_WRITTEN)}: ${attempted.map((ref) => ref.uri).join(", ")}. ` +
+      retryAdvice(operation, request, retrySafe),
     attempted,
     { cause: error },
   );
 }
 
-function retryAdvice(operation: string, retrySafe: boolean, plural: boolean): string {
+function retryAdvice(operation: string, request: Request, retrySafe: boolean): string {
   if (retrySafe) {
-    const subject = plural
-      ? "every record has a fixed key and none is created if it exists, so the call either creates them or fails because one already exists"
-      : "the record has a fixed key and is only created if absent, so the call either creates it or fails because it already exists";
+    const subject =
+      attemptedOf(request).length !== 1
+        ? "every record has a fixed key and none is created if it exists, so the call either creates them or fails because one already exists"
+        : "the record has a fixed key and is only created if absent, so the call either creates it or fails because it already exists";
     return `The SDK does not retry, but calling ${operation} again is safe: ${subject}, most likely from the first attempt. To check first, use com.atproto.repo.getRecord.`;
   }
-  return `Check whether they exist (for example with com.atproto.repo.getRecord) before trying again. The SDK does not retry, because calling ${operation} again would create duplicates with new record keys if the first attempt succeeded.`;
+  const check =
+    request.updated.length === 0
+      ? "Check whether they exist"
+      : "Check which of the new records exist and whether the updated record changed";
+  return `${check} (for example with com.atproto.repo.getRecord) before trying again. The SDK does not retry, because calling ${operation} again would create duplicates with new record keys if the first attempt succeeded.`;
+}
+
+// `InvalidSwap` is what the PDS answers when the repo head is no longer the one the caller read:
+// the one rejection that is not a mistake in the input and that calling again is expected to fix.
+function repositoryChanged(operation: string, reason: string, request: Request): string {
+  return (
+    `${operation}: the repository changed since it was read (HTTP 400: ${reason}), most likely because another write to this account landed in between. ` +
+    `Nothing was written: ${describeEffects(request, NOT_WRITTEN)}. The SDK neither retries nor merges. Nothing needs cleaning up. Call again to read the repository afresh and try once more.`
+  );
 }
 
 // Duck-typed rather than `instanceof XrpcResponseError`: see `assertClient` in context.ts. Only
@@ -304,17 +394,22 @@ function property(error: unknown, name: "status" | "error"): unknown {
 // it must agree with the computed references.
 function assertReportedRefs(
   operation: string,
-  attempted: readonly StrongRef[],
+  request: Request,
   results: readonly unknown[] | undefined,
 ): void {
   if (results === undefined) return;
+  const attempted = attemptedOf(request);
   const reported = results.map(toRef);
   const matches =
     reported.length === attempted.length &&
     reported.every((ref, i) => ref?.uri === attempted[i]?.uri && ref?.cid === attempted[i]?.cid);
   if (matches) return;
+  const [applied, references] =
+    request.updated.length === 0
+      ? ["created the records", "the new records"]
+      : ["applied the writes", "the records"];
   throw new WriteResultMismatchError(
-    `${operation}: the PDS created the records but reported different URIs or CIDs than the SDK computed, so references between the new records may not match what is stored. ` +
+    `${operation}: the PDS ${applied} but reported different URIs or CIDs than the SDK computed, so references between ${references} may not match what is stored. ` +
       `Computed: ${JSON.stringify(attempted)}. Reported: ${JSON.stringify(reported)}.`,
     attempted,
     reported.filter((ref) => ref !== undefined),
