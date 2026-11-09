@@ -15,12 +15,12 @@ import type { PreparedRecord } from "../internal/prepare-record.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import { prepareNew, resolveExisting, type Slot, toSlot } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
+import { type LocationInput, locationKind } from "../location/build-location.js";
 import { type ContributionInput, contributionKind } from "./build-contribution.js";
 import {
   type ContributorInformationInput,
   contributorInformationKind,
 } from "./build-contributor-information.js";
-import { type LocationInput, locationKind } from "./build-location.js";
 import { type RightsInput, rightsKind } from "./build-rights.js";
 
 /**
@@ -291,7 +291,7 @@ function allSlots(plan: ActivityPlan): Slot[] {
  *       lpVersion: "1.0",
  *       srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
  *       locationType: "coordinate-decimal",
- *       location: { string: "27.47,90.17" },
+ *       location: { string: "90.17,27.47" },
  *       name: "Phobjikha valley",
  *     }, // created
  *   ],

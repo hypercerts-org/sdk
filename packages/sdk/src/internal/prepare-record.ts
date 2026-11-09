@@ -17,10 +17,21 @@ export interface PreparedRecord {
 }
 
 /**
+ * The record key a lexicon fixes for its records (`literal:self` gives `self`), or `undefined` when
+ * the key is chosen by the writer. Such a record exists at most once per repo.
+ */
+export function fixedRecordKey(schema: l.RecordSchema): RecordKeyString | undefined {
+  return schema.key.startsWith("literal:")
+    ? (schema.key.slice("literal:".length) as RecordKeyString)
+    : undefined;
+}
+
+/**
  * Validates a record and computes the URI and CID it will have in `did`'s repo, without writing it.
  *
  * Internal. Boundaries:
- * - Allocates a fresh TID as the record key (see `nextTid`) and builds the URI from `did`.
+ * - Uses the record key the lexicon fixes (see `fixedRecordKey`), otherwise allocates a fresh TID
+ *   (see `nextTid`), and builds the URI from `did`.
  * - Validates against the lexicon's `RecordSchema`; the lexicon decides what is valid, not the SDK.
  * - The CID is that of the DAG-CBOR encoding of the validated value, the same function the
  *   reference PDS applies to the record it receives, so the PDS arrives at the same CID as long as
@@ -37,7 +48,7 @@ export async function prepareRecord<S extends l.RecordSchema>(
   const result = schema.safeValidate(schema.build(input));
   if (!result.success) throw result.reason;
   const value: LexMap = result.value;
-  const rkey = nextTid();
+  const rkey = fixedRecordKey(schema) ?? nextTid();
   const uri: AtUriString = `at://${did}/${schema.$type}/${rkey}`;
   const cid = (await cidForLex(value)).toString();
   return { collection: schema.$type, rkey, value, ref: { uri, cid } };

@@ -24,7 +24,7 @@ const location = {
   lpVersion: "1.0",
   srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
   locationType: "coordinate-decimal",
-  location: { string: "27.47,90.17" },
+  location: { string: "90.17,27.47" },
 };
 
 describe("createActivity", () => {
@@ -259,6 +259,14 @@ describe("createActivity", () => {
       "a new record the lexicon rejects",
       { ...base, locations: [{ ...location, locationType: "x".repeat(21) }] },
       /locations\[0\] is not a valid app\.certified\.location record/,
+    ],
+    [
+      "an inline location with a lowercase country code",
+      {
+        ...base,
+        locations: [{ ...location, locationType: "country-code", location: { string: "bt" } }],
+      },
+      /locations\[0\].*uppercase ISO 3166-1 alpha-2/,
     ],
   ])("sends nothing for %s", async (_, input, message) => {
     const { context, requests } = fakeRepo();

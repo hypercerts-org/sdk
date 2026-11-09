@@ -1,9 +1,11 @@
+import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
 import * as rights from "@hypercerts-org/lexicon/org/hypercerts/claim/rights";
 import { describe, expect, it } from "vitest";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, methods } from "../test-utils/fake-repo.js";
 import { prepareRecord } from "./prepare-record.js";
 import {
+  submitCreateOnly,
   submitWrites,
   WriteOutcomeUnknownError,
   WriteRejectedError,
@@ -72,6 +74,24 @@ describe("submitWrites", () => {
     });
 
     const error = await submitWrites(context, DID, [record], "op").catch((e) => e);
+
+    expect(error).toBeInstanceOf(WriteResultMismatchError);
+    expect(error.reported).toEqual([{ uri: record.ref.uri, cid: CID }]);
+  });
+});
+
+describe("submitCreateOnly", () => {
+  const prepareProfile = () =>
+    prepareRecord(DID, profile.main, {
+      displayName: "Alice",
+      createdAt: "2024-01-01T00:00:00.000Z",
+    });
+
+  it("reports a URI or CID that differs from the computed one", async () => {
+    const record = await prepareProfile();
+    const { context } = fakeRepo({ putRecord: () => json(200, { uri: record.ref.uri, cid: CID }) });
+
+    const error = await submitCreateOnly(context, DID, record, "op").catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteResultMismatchError);
     expect(error.reported).toEqual([{ uri: record.ref.uri, cid: CID }]);

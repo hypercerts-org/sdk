@@ -50,6 +50,18 @@ TSDoc comments on exported symbols are the SDK's API reference. They ship in the
 - Live objects such as the `Client` are not data; check them with a small duck-typed guard, not a schema.
 - Do not add Zod or another validation library.
 
+## Consumer skill
+
+`.agents/skills/hypercerts-org-sdk/` teaches coding agents in consumers' repositories to use the SDK. It follows the [Agent Skills spec](https://agentskills.io/specification): agents load all of `SKILL.md` when the skill activates and read files in `references/` only when a task needs them.
+
+When a change adds or changes a public operation, update the skill in the same PR:
+
+- Each domain (subpath) gets its own `references/<domain>.md` with examples for the common cases and the likely mistakes, pitfalls, and a field table. Do not put a domain's details in `SKILL.md`.
+- `SKILL.md` holds only what every domain shares: install, context, imports table, blobs, write errors, general pitfalls and Verify. Add one row per domain to its domain table, and at most a line for a mistake an agent would make before reading the reference.
+- Link every reference file from `SKILL.md`. Reference files may link to each other but must not be the only way to reach one.
+- Keep `SKILL.md` under 500 lines. Add the operation's trigger phrases to the `description` frontmatter; agents pick skills by that field alone.
+- Examples import only from public entry points and match the TSDoc. Do not describe operations that are not implemented yet.
+
 ## Generated files
 
 - `dist/` and `.turbo/` are build output. Never edit or commit them.

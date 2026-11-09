@@ -7,9 +7,9 @@ import {
   prepareChecked,
 } from "./build-context.js";
 import { compact, strictObject } from "./input.js";
-import type { PreparedRecord } from "./prepare-record.js";
+import { fixedRecordKey, type PreparedRecord } from "./prepare-record.js";
 import type { StrongRef } from "./resolve-record-ref.js";
-import { submitWrites } from "./submit-writes.js";
+import { submitCreateOnly, submitWrites } from "./submit-writes.js";
 
 /**
  * Turns one input field into the value stored in the record, for example uploading a `Blob` and
@@ -35,10 +35,17 @@ export interface RecordKind<T> {
   readonly transforms: Readonly<Record<string, FieldTransform>>;
 }
 
+/** A rule that spans fields of an input, with the message shown when it fails. */
+export interface Refinement {
+  check: (input: never) => boolean;
+  message: string;
+  path?: string;
+}
+
 /**
  * Declares a record kind. `shape` lists the SDK input's fields; `createdAt`, which every record
- * has, is added. Fields named in `transforms` are converted before they are stored, and `refinement`
- * adds a rule that spans fields.
+ * has, is added. Fields named in `transforms` are converted before they are stored, and each of
+ * `refinements` adds a rule that spans fields, checked in order.
  *
  * The result is typed from `shape`, so assigning it to a `RecordKind` of the public input interface
  * fails to compile when the two drift apart.
@@ -47,10 +54,13 @@ export function recordKind<const TShape extends Record<string, l.Validator>>(
   schema: l.RecordSchema,
   shape: TShape,
   transforms: Readonly<Record<string, FieldTransform>> = {},
-  refinement?: { check: (input: never) => boolean; message: string },
+  refinements: readonly Refinement[] = [],
 ) {
   const strict = strictObject({ ...shape, createdAt: l.optional(l.string()) });
-  const input = refinement ? l.refine(strict, refinement as never) : strict;
+  const input = refinements.reduce<l.Validator>(
+    (schema, refinement) => l.refine(schema, refinement as never),
+    strict,
+  ) as typeof strict;
   return { schema, input, transforms } satisfies RecordKind<unknown>;
 }
 
@@ -89,7 +99,8 @@ export async function buildRecord<T extends { createdAt?: string | undefined }>(
  * written unless the whole input is valid.
  *
  * Internal. Backs the standalone creators, which therefore share their builders with
- * `createActivity`.
+ * `createActivity`. A record whose lexicon fixes its key is written with `submitCreateOnly`, so an
+ * existing record is reported instead of overwritten; any other record with `submitWrites`.
  */
 export async function createStandalone<T extends { createdAt?: string | undefined }>(
   context: SDKContext,
@@ -104,7 +115,11 @@ export async function createStandalone<T extends { createdAt?: string | undefine
     parseInput(build, "input", kind.input, input),
     "input",
   );
-  await submitWrites(context, build.did, [record], operation);
+  if (fixedRecordKey(kind.schema) === undefined) {
+    await submitWrites(context, build.did, [record], operation);
+  } else {
+    await submitCreateOnly(context, build.did, record, operation);
+  }
   return record.ref;
 }
 

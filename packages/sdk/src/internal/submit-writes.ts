@@ -1,4 +1,4 @@
-import type { DidString } from "@atproto/lex";
+import type { DidString, NsidString, TypedLexMap } from "@atproto/lex";
 import type { SDKContext } from "../context.js";
 import { describeError } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
@@ -27,7 +27,7 @@ export abstract class WriteError extends Error {
  * `cause` is the client's original error.
  */
 export class WriteRejectedError extends WriteError {
-  override readonly name = "WriteRejectedError";
+  override readonly name: string = "WriteRejectedError";
   readonly status: number;
   readonly code: string | undefined;
 
@@ -49,7 +49,9 @@ export class WriteRejectedError extends WriteError {
  * now exist.
  *
  * The SDK does not retry. Retrying with new record keys would duplicate every record if the first
- * attempt had succeeded.
+ * attempt had succeeded. The exception is a record with a fixed key that is only created if absent
+ * (`createProfile`): calling again either creates it or is refused because it already exists,
+ * most likely from the first attempt, so it cannot duplicate.
  */
 export class WriteOutcomeUnknownError extends WriteError {
   override readonly name = "WriteOutcomeUnknownError";
@@ -87,33 +89,102 @@ export class WriteResultMismatchError extends WriteError {
  * Throws WriteRejectedError, WriteOutcomeUnknownError or WriteResultMismatchError. `operation`
  * names the public function for the message.
  */
-export async function submitWrites(
+export function submitWrites(
   context: SDKContext,
   did: DidString,
   records: readonly PreparedRecord[],
   operation: string,
 ): Promise<void> {
-  const attempted = records.map((record) => record.ref);
+  return submit(
+    operation,
+    records.map((record) => record.ref),
+    async () => {
+      const response = await context.client.applyWrites(
+        () =>
+          records.map(({ collection, rkey, value }) => ({
+            $type: "com.atproto.repo.applyWrites#create" as const,
+            collection,
+            rkey,
+            value,
+          })),
+        { repo: did },
+      );
+      return response.body.results;
+    },
+    false,
+  );
+}
+
+/**
+ * Creates one record at its fixed record key, only if there is no record at that key yet, with
+ * `com.atproto.repo.putRecord` and `swapRecord: null`.
+ *
+ * Internal. Used for records whose lexicon fixes the key (see `fixedRecordKey`), where the key
+ * can already be taken. `applyWrites` cannot tell the caller so: the reference PDS answers a
+ * `create` at a taken key with a generic HTTP 500, which is indistinguishable from a server fault.
+ * `putRecord` with `swapRecord: null` is the lexicon's own "only if absent": the PDS checks it
+ * together with the write, so concurrent calls cannot overwrite each other, and answers a taken
+ * key with HTTP 400 `InvalidSwap`, which this reports as a WriteRejectedError with
+ * `code === "InvalidSwap"` (the only reason this request can fail that way). Checked against the
+ * reference PDS only.
+ *
+ * Otherwise the same boundaries as `submitWrites`: no retries, the same failure classification,
+ * and the reported URI and CID are compared with the computed ones. Unlike `submitWrites`, a
+ * caller may safely call again after an unknown outcome: the key is fixed and the write is only
+ * made if absent, so a second call cannot duplicate the record.
+ *
+ * Throws WriteRejectedError, WriteOutcomeUnknownError or WriteResultMismatchError.
+ */
+export function submitCreateOnly(
+  context: SDKContext,
+  did: DidString,
+  record: PreparedRecord,
+  operation: string,
+): Promise<void> {
+  return submit(
+    operation,
+    [record.ref],
+    async () => {
+      const response = await context.client.putRecord(
+        record.value as TypedLexMap<NsidString>,
+        record.rkey,
+        {
+          repo: did,
+          // The lexicon allows `null` ("must not exist yet"); the client's option type leaves it out.
+          swapRecord: null as unknown as string,
+        },
+      );
+      return [response.body];
+    },
+    true,
+  );
+}
+
+// Sends one write request and checks what it reports. `send` resolves to the PDS's results, one
+// per record in request order, or `undefined` if the PDS reported none. `retrySafe` says whether
+// calling again after an unknown outcome cannot duplicate records; it only changes the advice in
+// the error message.
+async function submit(
+  operation: string,
+  attempted: readonly StrongRef[],
+  send: () => Promise<readonly unknown[] | undefined>,
+  retrySafe: boolean,
+): Promise<void> {
   let results: readonly unknown[] | undefined;
   try {
-    const response = await context.client.applyWrites(
-      () =>
-        records.map(({ collection, rkey, value }) => ({
-          $type: "com.atproto.repo.applyWrites#create" as const,
-          collection,
-          rkey,
-          value,
-        })),
-      { repo: did },
-    );
-    results = response.body.results;
+    results = await send();
   } catch (error) {
-    throw classifyFailure(operation, error, attempted);
+    throw classifyFailure(operation, error, attempted, retrySafe);
   }
   assertReportedRefs(operation, attempted, results);
 }
 
-function classifyFailure(operation: string, error: unknown, attempted: readonly StrongRef[]) {
+function classifyFailure(
+  operation: string,
+  error: unknown,
+  attempted: readonly StrongRef[],
+  retrySafe: boolean,
+) {
   const status = property(error, "status");
   const code = property(error, "error");
   const reason = describeError(error);
@@ -129,10 +200,16 @@ function classifyFailure(operation: string, error: unknown, attempted: readonly 
   }
   return new WriteOutcomeUnknownError(
     `${operation}: no usable answer from the PDS (${reason}), so it is not known whether ${records} ${attempted.length === 1 ? "was" : "were"} created: ${attempted.map((ref) => ref.uri).join(", ")}. ` +
-      `Check whether they exist (for example with com.atproto.repo.getRecord) before trying again. The SDK does not retry, because calling ${operation} again would create duplicates with new record keys if the first attempt succeeded.`,
+      retryAdvice(operation, retrySafe),
     attempted,
     { cause: error },
   );
+}
+
+function retryAdvice(operation: string, retrySafe: boolean): string {
+  return retrySafe
+    ? `The SDK does not retry, but calling ${operation} again is safe: the record has a fixed key and is only created if absent, so the call either creates it or fails because it already exists, most likely from the first attempt. To check first, use com.atproto.repo.getRecord.`
+    : `Check whether they exist (for example with com.atproto.repo.getRecord) before trying again. The SDK does not retry, because calling ${operation} again would create duplicates with new record keys if the first attempt succeeded.`;
 }
 
 // Duck-typed rather than `instanceof XrpcResponseError`: see `assertClient` in context.ts. Only

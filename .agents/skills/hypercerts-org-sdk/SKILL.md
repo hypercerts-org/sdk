@@ -1,6 +1,6 @@
 ---
 name: hypercerts-org-sdk
-description: Write Hypercerts records from an app with @hypercerts-org/sdk. Covers setting up the SDK context from an authenticated @atproto/lex Client, creating an Activity (hypercert claim) together with its rights, locations, contributors and contributions in one atomic write, reusing existing records by URI, creating supporting records on their own, uploading images and files as blobs, and handling write failures without creating duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create a hypercert, activity claim, contributor, contribution, rights or location record on a PDS. Not for changing the SDK's own source.
+description: Write Hypercerts records from an app with @hypercerts-org/sdk. Covers setting up the SDK context from an authenticated @atproto/lex Client, creating an Activity (hypercert claim) together with its rights, locations, contributors and contributions in one atomic write, reusing existing records by URI, creating supporting records, standalone locations and an account profile on their own, uploading images and files as blobs, and handling write failures without creating duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create a hypercert, activity claim, contributor, contribution, rights or location record, or an account profile (display name, avatar, banner), on a PDS. Not for changing the SDK's own source.
 metadata:
   author: hypercerts-org
   version: "2"
@@ -46,6 +46,8 @@ Make a new context when the signed-in account changes. Records are always writte
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `@hypercerts-org/sdk`          | `createSDKContext`, `SDKContext`                                                                                                                                                                       |
 | `@hypercerts-org/sdk/activity` | `createActivity`, `createRights`, `createContribution`, `createContributorInformation`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types |
+| `@hypercerts-org/sdk/actor`    | `createProfile`, `ProfileAlreadyExistsError`, the same `Write*` errors, `ProfileInput`                                                                                                                 |
+| `@hypercerts-org/sdk/location` | `createLocation`, the same `Write*` errors, `LocationInput`, `LocationValue`                                                                                                                           |
 | `@hypercerts-org/sdk/blob`     | `uploadBlob`                                                                                                                                                                                           |
 
 The root entry does not re-export operations. `import { createActivity } from "@hypercerts-org/sdk"` fails.
@@ -57,10 +59,17 @@ Operations are grouped by domain, each under its own subpath. Read the domain's 
 | Domain | Import | Reference |
 | - | - | - |
 | Activity (hypercert claims, rights, contributors, contributions, locations) | `@hypercerts-org/sdk/activity` | [references/activity.md](references/activity.md) |
+| Profile (the account's `app.certified.actor.profile`) | `@hypercerts-org/sdk/actor` | [references/profile.md](references/profile.md) |
+| Location (a standalone `app.certified.location`, shared by several activities) | `@hypercerts-org/sdk/location` | [references/location.md](references/location.md) |
+
+Two things to know before opening a reference:
+
+- `createProfile` needs an OAuth scope with both `create` and `update` on `app.certified.actor.profile`. With only `create` it fails with `WriteRejectedError` (403).
+- `location: { uri }` inside a location is a link to external data; a whole location given as `{ uri }` in `createActivity` reuses an existing record.
 
 ## 5. Images and files
 
-- `create*` operations upload `Blob`/`File` values for you (`image`, `attachment`, a location's `{ blob }`). Pass the file, not an upload result.
+- `create*` operations upload `Blob`/`File` values for you (`image`, `attachment`, a profile's `avatar` and `banner`, a location's `{ blob }`). Pass the file, not an upload result.
 - A string is stored as a URL and never fetched.
 - Use `uploadBlob` only when writing a record yourself with the client:
 
@@ -87,7 +96,7 @@ Uploads happen before the write and are not rolled back. If the PDS rejects the 
 
 Order of work: validate input → read `{ uri }` records → upload blobs → validate against lexicons → one write. The SDK never retries.
 
-The three write errors are exported from `@hypercerts-org/sdk/activity` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order. `instanceof WriteError` catches all three.
+The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor` and `/location` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order. `instanceof WriteError` catches all three.
 
 | Error                      | Meaning                                                                                        | What to do                                    |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
@@ -129,11 +138,11 @@ try {
 
 - `createSDKContext({ client: session })` or passing an `@atproto/api` `Agent` throws. Wrap it: `new Client(session)`.
 - Passing an `uploadBlob` result as `image` throws. Pass the `Blob`/`File`.
-- Retrying blindly after `WriteOutcomeUnknownError` duplicates every record under new keys.
+- Retrying blindly after `WriteOutcomeUnknownError` duplicates every record under new keys. The exception is `createProfile`, whose key is fixed and which is only created if absent.
 - Do not call operations a subpath does not export, even if a TSDoc example mentions them.
 
 ## Verify
 
-1. Imports come only from `@hypercerts-org/sdk`, `@hypercerts-org/sdk/activity` or `@hypercerts-org/sdk/blob`.
+1. Imports come only from `@hypercerts-org/sdk`, `.../activity`, `.../actor`, `.../location` or `.../blob`.
 2. `tsc --noEmit` passes. The input types catch wrong field names and shapes.
 3. `com.atproto.repo.getRecord` on each returned `uri` returns the record, and any references it holds match the URIs and CIDs the SDK returned.

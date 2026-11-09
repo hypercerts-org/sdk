@@ -58,4 +58,6 @@ const { uri, cid } = await createActivity(context, {
 
 See [Creating activities](https://github.com/hypercerts-org/sdk/blob/main/docs/creating-activities.md) for reusing existing records, defaults and failure handling.
 
+See [Profiles and locations](https://github.com/hypercerts-org/sdk/blob/main/docs/profiles-and-locations.md) for creating an account profile and standalone location records.
+
 See the TSDoc on `createSDKContext` (shown in your editor) for the full contract.
