@@ -102,7 +102,7 @@ Uploads happen before the write and are not rolled back. If the PDS rejects the 
 
 Order of work: validate input → read `{ uri }` records → upload blobs → validate against lexicons → one write. The SDK never retries.
 
-The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor`, `/location`, `/tag`, `/feature` and `/collection` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order. `instanceof WriteError` catches all three.
+The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor`, `/location`, `/tag`, `/feature` and `/collection` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order: for `createActivity` the Activity is last; for `createActivityInCollection` the Collection is last and the Activity is just before it. `instanceof WriteError` catches all three.
 
 | Error                      | Meaning                                                                                        | What to do                                    |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
@@ -129,7 +129,7 @@ try {
     throw new Error(`PDS rejected the activity (${error.code ?? error.status})`, { cause: error });
   }
   if (error instanceof WriteOutcomeUnknownError) {
-    // The write is all-or-nothing, so checking the Activity (always last in `attempted`) is enough.
+    // The write is all-or-nothing, so checking the Activity (last in `attempted` for `createActivity`) is enough.
     const activity = error.attempted.at(-1);
     const exists = activity && (await recordExists(context.client, activity.uri));
     if (exists) return { uri: activity.uri, cid: activity.cid }; // it went through
