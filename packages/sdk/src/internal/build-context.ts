@@ -1,4 +1,4 @@
-import type { DidString, l } from "@atproto/lex";
+import type { DidString, l, RecordKeyString } from "@atproto/lex";
 import type { SDKContext } from "../context.js";
 import { describeError } from "./describe.js";
 import { type PreparedRecord, prepareRecord } from "./prepare-record.js";
@@ -51,7 +51,8 @@ export function parseInput<T>(
 }
 
 /**
- * Validates a record against its lexicon and prepares it for writing (see `prepareRecord`).
+ * Validates a record against its lexicon and prepares it for writing (see `prepareRecord`), at
+ * `rkey` when the input chose the key.
  *
  * Throws TypeError, naming `field`, when the record is not valid for its lexicon.
  */
@@ -60,9 +61,10 @@ export async function prepareChecked<S extends l.RecordSchema>(
   field: string,
   schema: S,
   record: Omit<l.InferInput<S>, "$type">,
+  rkey?: RecordKeyString,
 ): Promise<PreparedRecord> {
   try {
-    return await prepareRecord(build.did, schema, record);
+    return await prepareRecord(build.did, schema, record, rkey);
   } catch (error) {
     throw new TypeError(
       `${build.operation}: ${field} is not a valid ${schema.$type} record: ${describeError(error)}.`,

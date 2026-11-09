@@ -1,11 +1,7 @@
 import * as contribution from "@hypercerts-org/lexicon/org/hypercerts/claim/contribution";
+import { createStandalone, type StandaloneCreator } from "../internal/create-record.js";
 import { dateRange, optionalText } from "../internal/input.js";
-import {
-  createStandalone,
-  type RecordKind,
-  recordKind,
-  type StandaloneCreator,
-} from "../internal/record-kind.js";
+import { type RecordKind, recordKind } from "../internal/record-kind.js";
 
 /** The data of a new `org.hypercerts.claim.contribution` record. */
 export interface ContributionInput {
@@ -30,7 +26,7 @@ export const contributionKind: RecordKind<ContributionInput> = recordKind(
     endDate: optionalText,
   },
   {},
-  [dateRange],
+  { refinements: [dateRange] },
 );
 
 /**

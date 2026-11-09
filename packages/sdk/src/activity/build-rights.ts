@@ -1,13 +1,9 @@
 import { l } from "@atproto/lex";
 import * as rights from "@hypercerts-org/lexicon/org/hypercerts/claim/rights";
+import { createStandalone, type StandaloneCreator } from "../internal/create-record.js";
 import { optionalMedia } from "../internal/input.js";
 import { mediaTransform } from "../internal/media.js";
-import {
-  createStandalone,
-  type RecordKind,
-  recordKind,
-  type StandaloneCreator,
-} from "../internal/record-kind.js";
+import { type RecordKind, recordKind } from "../internal/record-kind.js";
 
 /** The data of a new `org.hypercerts.claim.rights` record. */
 export interface RightsInput {

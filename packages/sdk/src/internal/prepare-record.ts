@@ -30,25 +30,31 @@ export function fixedRecordKey(schema: l.RecordSchema): RecordKeyString | undefi
  * Validates a record and computes the URI and CID it will have in `did`'s repo, without writing it.
  *
  * Internal. Boundaries:
- * - Uses the record key the lexicon fixes (see `fixedRecordKey`), otherwise allocates a fresh TID
- *   (see `nextTid`), and builds the URI from `did`.
+ * - Uses `chosenKey` when the input decides the key (a vocabulary tag's `<category>.<key>`), after
+ *   checking it against the lexicon's key rule; otherwise the key the lexicon fixes (see
+ *   `fixedRecordKey`); otherwise allocates a fresh TID (see `nextTid`). Builds the URI from `did`.
  * - Validates against the lexicon's `RecordSchema`; the lexicon decides what is valid, not the SDK.
  * - The CID is that of the DAG-CBOR encoding of the validated value, the same function the
  *   reference PDS applies to the record it receives, so the PDS arrives at the same CID as long as
  *   it stores the record unchanged. `submitWrites` checks this against the PDS's response.
  *
- * Throws LexValidationError when the record does not satisfy the schema, and Error when the value
- * cannot be encoded (for example a non-integer number).
+ * Throws LexValidationError when the record or `chosenKey` does not satisfy the schema, and Error
+ * when the value cannot be encoded (for example a non-integer number).
  */
 export async function prepareRecord<S extends l.RecordSchema>(
   did: DidString,
   schema: S,
   input: Omit<l.InferInput<S>, "$type">,
+  chosenKey?: RecordKeyString,
 ): Promise<PreparedRecord> {
   const result = schema.safeValidate(schema.build(input));
   if (!result.success) throw result.reason;
   const value: LexMap = result.value;
-  const rkey = fixedRecordKey(schema) ?? nextTid();
+  if (chosenKey !== undefined) {
+    const key = schema.keySchema.safeValidate(chosenKey);
+    if (!key.success) throw key.reason;
+  }
+  const rkey = chosenKey ?? fixedRecordKey(schema) ?? nextTid();
   const uri: AtUriString = `at://${did}/${schema.$type}/${rkey}`;
   const cid = (await cidForLex(value)).toString();
   return { collection: schema.$type, rkey, value, ref: { uri, cid } };

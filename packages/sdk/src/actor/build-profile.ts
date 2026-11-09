@@ -1,11 +1,12 @@
 import { l } from "@atproto/lex";
 import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
 import type { SDKContext } from "../context.js";
+import { createStandalone } from "../internal/create-record.js";
 import { optionalMedia, optionalText } from "../internal/input.js";
 import { mediaTransform } from "../internal/media.js";
-import { createStandalone, type RecordKind, recordKind } from "../internal/record-kind.js";
+import { type RecordKind, recordKind } from "../internal/record-kind.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
-import { WriteRejectedError } from "../internal/submit-writes.js";
+import { RecordAlreadyExistsError } from "../internal/submit-writes.js";
 
 /** The data of the `app.certified.actor.profile` record of an account. */
 export interface ProfileInput {
@@ -56,11 +57,11 @@ const profileKind: RecordKind<ProfileInput> = recordKind(
  *
  * @remarks
  * Nothing was changed: the existing profile is untouched. `attempted` holds the URI and CID the
- * new profile would have had. Extends {@link WriteRejectedError}, so code that handles any
- * rejected write also handles this; `status` is `400` and `code` is `InvalidSwap`, as the PDS
- * reported them.
+ * new profile would have had. Extends {@link RecordAlreadyExistsError}, which extends
+ * {@link WriteRejectedError}, so code that handles either also handles this; `status` is `400` and
+ * `code` is `InvalidSwap`, as the PDS reported them.
  */
-export class ProfileAlreadyExistsError extends WriteRejectedError {
+export class ProfileAlreadyExistsError extends RecordAlreadyExistsError {
   override readonly name = "ProfileAlreadyExistsError";
 }
 
@@ -142,19 +143,16 @@ export async function createProfile(context: SDKContext, input: ProfileInput): P
   try {
     return await createStandalone(context, "createProfile", profileKind, input);
   } catch (error) {
-    throw error instanceof WriteRejectedError && error.code === "InvalidSwap"
-      ? alreadyExists(error)
-      : error;
+    throw error instanceof RecordAlreadyExistsError ? alreadyExists(error) : error;
   }
 }
 
-function alreadyExists(rejected: WriteRejectedError): ProfileAlreadyExistsError {
-  const [ref] = rejected.attempted;
-  const where = ref ? ` (${ref.uri})` : "";
+function alreadyExists(exists: RecordAlreadyExistsError): ProfileAlreadyExistsError {
   return new ProfileAlreadyExistsError(
-    `createProfile: the account already has a profile, so nothing was written and the existing one is unchanged${where}. createProfile only creates a profile; it never overwrites one, and the SDK cannot update a profile yet.`,
-    rejected.attempted,
-    { status: rejected.status, code: rejected.code },
-    { cause: rejected.cause },
+    `createProfile: the account already has a profile, so nothing was written and the existing one is unchanged (${exists.uri}). createProfile only creates a profile; it never overwrites one, and the SDK cannot update a profile yet.`,
+    exists.uri,
+    exists.attempted,
+    { status: exists.status, code: exists.code },
+    { cause: exists.cause },
   );
 }

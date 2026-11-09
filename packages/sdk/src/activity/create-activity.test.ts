@@ -16,6 +16,8 @@ const RIGHTS = "org.hypercerts.claim.rights";
 const LOCATION = "app.certified.location";
 const CONTRIBUTOR_INFORMATION = "org.hypercerts.claim.contributorInformation";
 const CONTRIBUTION = "org.hypercerts.claim.contribution";
+const WORKSCOPE_TAG = "org.hypercerts.workscope.tag";
+const CEL = "org.hypercerts.workscope.cel";
 
 const png = () => new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
 const uriOf = (collection: string) => `at://${DID}/${collection}/3k2a4b5c6d7e8`;
@@ -111,6 +113,70 @@ describe("createActivity", () => {
       contributors: [
         { identity: { ...info, created: true }, details: { ...contribution, created: true } },
       ],
+    });
+  });
+
+  it("stores a CEL work scope as written, with new and existing work-scope tags", async () => {
+    const existingTag = uriOf(WORKSCOPE_TAG);
+    const { context, requests, creates } = fakeRepo({ existing: { [existingTag]: CID } });
+    const expression = "scope.hasAll(['mangrove_restoration', 'education'])  &&  true";
+
+    const result = await createActivity(context, {
+      ...base,
+      workScope: {
+        expression,
+        usedTags: [
+          {
+            key: "mangrove_restoration",
+            name: "Mangrove restoration",
+            parent: { key: "restoration", name: "Restoration" },
+          },
+          { uri: existingTag },
+        ],
+      },
+    });
+
+    expect(methods(requests)).toEqual([
+      "com.atproto.repo.getRecord",
+      "com.atproto.repo.applyWrites",
+    ]);
+    const writes = creates[0] ?? [];
+    expect(writes.map((w) => w.collection)).toEqual([WORKSCOPE_TAG, WORKSCOPE_TAG, ACTIVITY]);
+    const [restoration, mangrove] = writes.slice(0, 2).map(refTo);
+    const activity = writeOf(writes, ACTIVITY).value;
+    // The expression is stored untouched, the version defaults to v1 and `createdAt` to the call's.
+    expect(activity.workScope).toEqual({
+      $type: CEL,
+      expression,
+      usedTags: [mangrove, { uri: existingTag, cid: CID }],
+      version: "v1",
+      createdAt: activity.createdAt,
+    });
+    expect(result.workScope).toEqual({
+      usedTags: [
+        { ...mangrove, created: true, parent: { ...restoration, created: true } },
+        { uri: existingTag, cid: CID, created: false },
+      ],
+    });
+  });
+
+  it("takes the version and createdAt of a CEL work scope as given", async () => {
+    const { context, creates } = fakeRepo();
+
+    await createActivity(context, {
+      ...base,
+      workScope: {
+        expression: "scope.has('a')",
+        usedTags: [],
+        version: "v2",
+        createdAt: "2024-01-01T00:00:00.000Z",
+      },
+    });
+
+    expect(writeOf(creates[0] ?? [], ACTIVITY).value.workScope).toMatchObject({
+      version: "v2",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      usedTags: [],
     });
   });
 
@@ -256,6 +322,27 @@ describe("createActivity", () => {
       /locations\[0\].*must be \{ uri: string \}/,
     ],
     [
+      "a vocabulary tag URI in a CEL work scope",
+      {
+        ...base,
+        workScope: {
+          expression: "scope.has('site')",
+          usedTags: [{ uri: uriOf("org.hypercerts.vocab.tag") }],
+        },
+      },
+      /workScope\.usedTags\[0\] points at a record of type org\.hypercerts\.vocab\.tag, but this field holds org\.hypercerts\.workscope\.tag/,
+    ],
+    [
+      "a work scope that is neither a string nor a CEL scope",
+      { ...base, workScope: 7 },
+      /workScope must be a string \(a free-form description\) or \{ expression, usedTags \}/,
+    ],
+    [
+      "a CEL work scope without usedTags",
+      { ...base, workScope: { expression: "scope.has('a')" } },
+      /invalid workScope: .*usedTags/,
+    ],
+    [
       "a new record the lexicon rejects",
       { ...base, locations: [{ ...location, locationType: "x".repeat(21) }] },
       /locations\[0\] is not a valid app\.certified\.location record/,
@@ -276,6 +363,21 @@ describe("createActivity", () => {
     );
 
     expect(requests).toHaveLength(0);
+  });
+
+  it("writes 200 records, the Activity included, and sends nothing for 201", async () => {
+    const { context, requests, creates } = fakeRepo();
+    const locations = (count: number) => Array.from({ length: count }, () => location);
+
+    await createActivity(context, { ...base, locations: locations(199) });
+
+    expect(creates[0]).toHaveLength(200);
+
+    const before = requests.length;
+    await expect(createActivity(context, { ...base, locations: locations(200) })).rejects.toThrow(
+      /would create 201 records, but one write holds at most 200/,
+    );
+    expect(requests).toHaveLength(before);
   });
 
   it("reads existing records before uploading anything", async () => {

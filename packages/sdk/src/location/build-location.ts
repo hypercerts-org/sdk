@@ -1,13 +1,9 @@
 import { l } from "@atproto/lex";
 import * as location from "@hypercerts-org/lexicon/app/certified/location";
+import { createStandalone, type StandaloneCreator } from "../internal/create-record.js";
 import { blob, optionalText } from "../internal/input.js";
 import { mediaValue } from "../internal/media.js";
-import {
-  createStandalone,
-  type RecordKind,
-  recordKind,
-  type StandaloneCreator,
-} from "../internal/record-kind.js";
+import { type RecordKind, recordKind } from "../internal/record-kind.js";
 
 /**
  * Where a location's data is: a URI to external data, the data itself as a string, or a file the
@@ -70,25 +66,27 @@ export const locationKind: RecordKind<LocationInput> = recordKind(
       return mediaValue(build, field, "uri" in value ? value.uri : value.blob, "blob");
     },
   },
-  [
-    {
-      check: (input: LocationInput) =>
-        input.locationType !== "country-code" ||
-        ("string" in input.location && isCountryCode(input.location.string)),
-      message:
-        'must be { string } with an uppercase ISO 3166-1 alpha-2 code, such as { string: "BT" }, when locationType is "country-code"',
-      path: "location",
-    },
-    {
-      check: (input: LocationInput) =>
-        input.locationType !== "geojson-point" ||
-        !("string" in input.location) ||
-        isGeoJsonPoint(input.location.string),
-      message:
-        'must be a GeoJSON Point with [longitude, latitude] coordinates, such as { string: \'{"type":"Point","coordinates":[90.17,27.47]}\' }, when locationType is "geojson-point"',
-      path: "location",
-    },
-  ],
+  {
+    refinements: [
+      {
+        check: (input: LocationInput) =>
+          input.locationType !== "country-code" ||
+          ("string" in input.location && isCountryCode(input.location.string)),
+        message:
+          'must be { string } with an uppercase ISO 3166-1 alpha-2 code, such as { string: "BT" }, when locationType is "country-code"',
+        path: "location",
+      },
+      {
+        check: (input: LocationInput) =>
+          input.locationType !== "geojson-point" ||
+          !("string" in input.location) ||
+          isGeoJsonPoint(input.location.string),
+        message:
+          'must be a GeoJSON Point with [longitude, latitude] coordinates, such as { string: \'{"type":"Point","coordinates":[90.17,27.47]}\' }, when locationType is "geojson-point"',
+        path: "location",
+      },
+    ],
+  },
 );
 
 // The lexicon asks for uppercase ISO 3166-1 alpha-2. Only the form is checked, not that the code is

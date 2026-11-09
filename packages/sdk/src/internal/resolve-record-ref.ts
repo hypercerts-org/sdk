@@ -5,6 +5,8 @@ import {
   isNsidString,
   isRecordKeyString,
   l,
+  type NsidString,
+  type RecordKeyString,
 } from "@atproto/lex";
 import * as strongRef from "@hypercerts-org/lexicon/com/atproto/repo/strongRef";
 import type { SDKContext } from "../context.js";
@@ -63,6 +65,32 @@ export async function resolveRecordRef(context: SDKContext, uri: string): Promis
     );
   }
   return { uri: requested, cid: body.cid };
+}
+
+/**
+ * Whether the client's own repo holds a record at `collection` and `rkey`, read with
+ * `com.atproto.repo.getRecord` through the client.
+ *
+ * Internal. Used to find out, before anything is written, whether a record key that the caller
+ * chose is already taken. The answer is a snapshot: it does not stop another writer taking the key
+ * afterwards.
+ *
+ * Throws what the client throws when the read fails for any reason other than the record being
+ * absent.
+ */
+export async function recordExists(
+  context: SDKContext,
+  did: DidString,
+  collection: NsidString,
+  rkey: RecordKeyString,
+): Promise<boolean> {
+  try {
+    await context.client.getRecord(collection, rkey, { repo: did });
+    return true;
+  } catch (error) {
+    if (isRecordNotFound(error)) return false;
+    throw error;
+  }
 }
 
 async function clientForRepo(context: SDKContext, did: DidString): Promise<Client> {

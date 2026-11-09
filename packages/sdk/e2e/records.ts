@@ -16,6 +16,9 @@ import * as activity from "@hypercerts-org/lexicon/org/hypercerts/claim/activity
 import * as contribution from "@hypercerts-org/lexicon/org/hypercerts/claim/contribution";
 import * as contributorInformation from "@hypercerts-org/lexicon/org/hypercerts/claim/contributorInformation";
 import * as rights from "@hypercerts-org/lexicon/org/hypercerts/claim/rights";
+import * as feature from "@hypercerts-org/lexicon/org/hypercerts/entity/feature";
+import * as vocabularyTag from "@hypercerts-org/lexicon/org/hypercerts/vocab/tag";
+import * as workScopeTag from "@hypercerts-org/lexicon/org/hypercerts/workscope/tag";
 import { expect } from "vitest";
 
 /** A strong reference: a record's URI and the CID of one version of it. */
@@ -79,6 +82,9 @@ export const collections = {
   profile: profile.main.$type,
   contributorInformation: contributorInformation.main.$type,
   contribution: contribution.main.$type,
+  vocabularyTag: vocabularyTag.main.$type,
+  workScopeTag: workScopeTag.main.$type,
+  feature: feature.main.$type,
 } as const;
 
 /** The number of records of `collection` in the client's repo. */

@@ -27,9 +27,17 @@
       "types": "./dist/blob/index.d.ts",
       "default": "./dist/blob/index.js"
     },
+    "./feature": {
+      "types": "./dist/feature/index.d.ts",
+      "default": "./dist/feature/index.js"
+    },
     "./location": {
       "types": "./dist/location/index.d.ts",
       "default": "./dist/location/index.js"
+    },
+    "./tag": {
+      "types": "./dist/tag/index.d.ts",
+      "default": "./dist/tag/index.js"
     },
     "./package.json": "./package.json"
   },

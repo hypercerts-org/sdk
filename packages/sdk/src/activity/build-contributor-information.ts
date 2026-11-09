@@ -1,12 +1,8 @@
 import * as contributorInformation from "@hypercerts-org/lexicon/org/hypercerts/claim/contributorInformation";
+import { createStandalone, type StandaloneCreator } from "../internal/create-record.js";
 import { optionalMedia, optionalText } from "../internal/input.js";
 import { mediaTransform } from "../internal/media.js";
-import {
-  createStandalone,
-  type RecordKind,
-  recordKind,
-  type StandaloneCreator,
-} from "../internal/record-kind.js";
+import { type RecordKind, recordKind } from "../internal/record-kind.js";
 
 /** The data of a new `org.hypercerts.claim.contributorInformation` record. */
 export interface ContributorInformationInput {

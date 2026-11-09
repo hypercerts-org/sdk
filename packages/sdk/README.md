@@ -60,4 +60,6 @@ See [Creating activities](https://github.com/hypercerts-org/sdk/blob/main/docs/c
 
 See [Profiles and locations](https://github.com/hypercerts-org/sdk/blob/main/docs/profiles-and-locations.md) for creating an account profile and standalone location records.
 
+See [Tags and Features](https://github.com/hypercerts-org/sdk/blob/main/docs/tags-and-features.md) for creating vocabulary tags, work-scope tags and Features.
+
 See the TSDoc on `createSDKContext` (shown in your editor) for the full contract.
