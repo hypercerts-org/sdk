@@ -128,7 +128,7 @@ const createdLocations = result.locations.filter((ref) => ref.created);
 
 ## Supporting records on their own
 
-`createRights`, `createContribution` and `createContributorInformation` take `(context, input)` and return `{ uri, cid }`. A location is created on its own with `createLocation` from `@hypercerts-org/sdk/location` (see [`LocationInput`](#locationinput-appcertifiedlocation)).
+`createRights`, `createContribution` and `createContributorInformation` take `(context, input)` and return `{ uri, cid }`. A location is created on its own with `createLocation`; see [location.md](location.md).
 
 ```ts
 import { createContribution } from "@hypercerts-org/sdk/activity";
@@ -160,7 +160,7 @@ Dates are ISO 8601 date-times. `createdAt` is optional on every record and defau
 | `title`                | `string`                       | Required. Max 256 chars.                       |
 | `shortDescription`     | `string`                       | Required. Max 300 chars.                       |
 | `description`          | `string`                       | Plain text or Markdown.                        |
-| `langs`                | `string[]`                     | BCP-47 tags, up to 3.                          |
+| `langs`                | `string[]`                     | BCP-47 tags of the text's languages, up to 3. Usually one; more only for mixed-language text. |
 | `image`                | `Blob \| string`               | JPEG/PNG/WebP up to 5 MB (uploaded), or a URL. |
 | `workScope`            | `string`                       | Free-form.                                     |
 | `startDate`, `endDate` | `string`                       | `endDate` ≥ `startDate`.                       |
@@ -203,13 +203,4 @@ Dates are ISO 8601 date-times. `createdAt` is optional on every record and defau
 
 ### `LocationInput` (`app.certified.location`)
 
-Used in `createActivity`'s `locations`, or on its own: `createLocation(context, input)` from `@hypercerts-org/sdk/location` returns `{ uri, cid }`. `LocationInput` and `LocationValue` types are exported from both `/activity` and `/location`. A `locationType` outside the lexicon's known values is accepted.
-
-| Field          | Type                                | Notes                                                                               |
-| -------------- | ----------------------------------- | ----------------------------------------------------------------------------------- |
-| `lpVersion`    | `string`                            | Required. Location Protocol version, e.g. `"1.0"`. Max 10 chars.                    |
-| `srs`          | `string`                            | Required. e.g. `http://www.opengis.net/def/crs/OGC/1.3/CRS84`.                      |
-| `locationType` | `string`                            | Required. e.g. `coordinate-decimal`, `geojson-point`. Max 20 chars.                 |
-| `location`     | `{ uri } \| { string } \| { blob }` | Required. Exactly one key: link to external data, inline data, or a file to upload. |
-| `name`         | `string`                            | Max 100 chars.                                                                      |
-| `description`  | `string`                            | Max 500 chars.                                                                      |
+See [location.md](location.md#locationinput-appcertifiedlocation) for the fields and the three `location` shapes.

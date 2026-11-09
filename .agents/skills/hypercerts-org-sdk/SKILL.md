@@ -1,6 +1,6 @@
 ---
 name: hypercerts-org-sdk
-description: Write Hypercerts records from an app with @hypercerts-org/sdk. Covers setting up the SDK context from an authenticated @atproto/lex Client, creating an Activity (hypercert claim) together with its rights, locations, contributors and contributions in one atomic write, reusing existing records by URI, creating supporting records, standalone locations and an account profile on their own, uploading images and files as blobs, and handling write failures without creating duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create a hypercert, activity claim, contributor, contribution, rights or location record on a PDS. Not for changing the SDK's own source.
+description: Write Hypercerts records from an app with @hypercerts-org/sdk. Covers setting up the SDK context from an authenticated @atproto/lex Client, creating an Activity (hypercert claim) together with its rights, locations, contributors and contributions in one atomic write, reusing existing records by URI, creating supporting records, standalone locations and an account profile on their own, uploading images and files as blobs, and handling write failures without creating duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create a hypercert, activity claim, contributor, contribution, rights or location record, or an account profile (display name, avatar, banner), on a PDS. Not for changing the SDK's own source.
 metadata:
   author: hypercerts-org
   version: "2"
@@ -59,27 +59,13 @@ Operations are grouped by domain, each under its own subpath. Read the domain's 
 | Domain | Import | Reference |
 | - | - | - |
 | Activity (hypercert claims, rights, contributors, contributions, locations) | `@hypercerts-org/sdk/activity` | [references/activity.md](references/activity.md) |
-| Profile (the account's `app.certified.actor.profile`) | `@hypercerts-org/sdk/actor` | [Profiles](#profiles) below |
-| Location (a standalone `app.certified.location`) | `@hypercerts-org/sdk/location` | [Activity reference](references/activity.md#locationinput-appcertifiedlocation) |
+| Profile (the account's `app.certified.actor.profile`) | `@hypercerts-org/sdk/actor` | [references/profile.md](references/profile.md) |
+| Location (a standalone `app.certified.location`, shared by several activities) | `@hypercerts-org/sdk/location` | [references/location.md](references/location.md) |
 
-### Profiles
+Two things to know before opening a reference:
 
-`createProfile(context, input)` creates the account's profile, the one record at key `self`. Every field is optional: `displayName`, `description`, `pronouns`, `langs` (up to 3 BCP-47 tags), `website`, `avatar` (image `Blob`/`File` up to 5 MB, or a URL string), `banner` (image up to 10 MB, or a URL string).
-
-```ts
-import { createProfile, ProfileAlreadyExistsError } from "@hypercerts-org/sdk/actor";
-
-try {
-  await createProfile(context, { displayName: "Alice", avatar: avatarFile });
-} catch (error) {
-  if (!(error instanceof ProfileAlreadyExistsError)) throw error;
-  // The account already has a profile; the SDK cannot update it, and nothing was changed.
-}
-```
-
-- It only creates and never overwrites, even when two calls race. It uses `putRecord` with `swapRecord: null`, checked against the reference PDS only.
-- An OAuth session needs both `create` and `update` on `app.certified.actor.profile`, for example `repo:app.certified.actor.profile?action=create&action=update`. With only `create` the PDS answers 403 and you get `WriteRejectedError`.
-- After `WriteOutcomeUnknownError` it is safe to call again: the call creates the profile or throws `ProfileAlreadyExistsError`, which then means it exists, most likely from the first attempt.
+- `createProfile` needs an OAuth scope with both `create` and `update` on `app.certified.actor.profile`. With only `create` it fails with `WriteRejectedError` (403).
+- `location: { uri }` inside a location is a link to external data; a whole location given as `{ uri }` in `createActivity` reuses an existing record.
 
 ## 5. Images and files
 
