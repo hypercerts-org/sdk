@@ -8,11 +8,11 @@ Read [../SKILL.md](../SKILL.md) first for setup, blob uploads and error handling
 
 Each supporting field takes one of three shapes. The shape decides what happens, so the SDK never has to guess:
 
-| Shape                                         | Meaning                                                      | Allowed in                                                                   |
-| --------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| record fields `{ ... }`                       | create a new record                                          | `rights`, `locations[]`, `contributors[].identity`, `contributors[].details` |
-| `{ uri: "at://did:.../<collection>/<rkey>" }` | reuse an existing record (read for its CID, never rewritten) | the same fields                                                              |
-| `{ inline: "..." }`                           | store only the string in the Activity, no record             | `contributors[].identity` (DID or name), `contributors[].details` (role)     |
+| Shape                                         | Meaning                                                      | Allowed in                                                                                           |
+| --------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| record fields `{ ... }`                       | create a new record                                          | `rights`, `locations[]`, `contributors[].identity`, `contributors[].details`, `workScope.usedTags[]` |
+| `{ uri: "at://did:.../<collection>/<rkey>" }` | reuse an existing record (read for its CID, never rewritten) | the same fields                                                                                      |
+| `{ inline: "..." }`                           | store only the string in the Activity, no record             | `contributors[].identity` (DID or name), `contributors[].details` (role)                             |
 
 ### Minimal
 
@@ -38,7 +38,7 @@ const result = await createActivity(context, {
   description: "## Goals\nRestore crane habitat along the valley floor.",
   langs: ["en"],
   image: cover, // uploaded by the SDK; a URL string is stored as-is instead
-  workScope: "reforestation, native species",
+  workScope: "reforestation, native species", // or a CEL scope, see the tags reference
   startDate: "2024-03-01T00:00:00Z",
   endDate: "2024-11-30T00:00:00Z",
   rights: {
@@ -147,7 +147,7 @@ const details = await createContribution(context, {
 - `weight` is a positive decimal **string** (`"0.5"`), not a number. Weights don't have to add up to anything.
 - A location's `location: { uri }` is a link to external data (e.g. a GeoJSON file). That is different from a whole location given as `{ uri }`, which reuses an existing location record.
 - Dates are ISO 8601 date-times (`"2024-03-01T00:00:00Z"`), not bare dates. `endDate` must not be before `startDate`.
-- Not supported yet: `signatures`, `shortDescriptionFacets`, non-string `description`, CEL `workScope`, updates and deletes.
+- Not supported yet: `signatures`, `shortDescriptionFacets`, non-string `description`, updates and deletes.
 
 ## Field reference
 
@@ -162,7 +162,7 @@ Dates are ISO 8601 date-times. `createdAt` is optional on every record and defau
 | `description`          | `string`                       | Plain text or Markdown.                        |
 | `langs`                | `string[]`                     | BCP-47 tags of the text's languages, up to 3. Usually one; more only for mixed-language text. |
 | `image`                | `Blob \| string`               | JPEG/PNG/WebP up to 5 MB (uploaded), or a URL. |
-| `workScope`            | `string`                       | Free-form.                                     |
+| `workScope`            | `string \| CelWorkScopeInput`  | Free-form, or a CEL scope (tags reference).    |
 | `startDate`, `endDate` | `string`                       | `endDate` ≥ `startDate`.                       |
 | `rights`               | `RightsInput \| { uri }`       |                                                |
 | `locations`            | `(LocationInput \| { uri })[]` |                                                |

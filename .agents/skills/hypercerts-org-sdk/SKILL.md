@@ -1,9 +1,9 @@
 ---
 name: hypercerts-org-sdk
-description: Write Hypercerts records from an app with @hypercerts-org/sdk. Covers setting up the SDK context from an authenticated @atproto/lex Client, creating an Activity (hypercert claim) together with its rights, locations, contributors and contributions in one atomic write, reusing existing records by URI, creating supporting records, standalone locations and an account profile on their own, uploading images and files as blobs, and handling write failures without creating duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create a hypercert, activity claim, contributor, contribution, rights or location record, or an account profile (display name, avatar, banner), on a PDS. Not for changing the SDK's own source.
+description: Write Hypercerts records from an app with @hypercerts-org/sdk. Covers setting up the SDK context from an authenticated @atproto/lex Client, creating an Activity (hypercert claim) together with its rights, locations, contributors and contributions in one atomic write, reusing existing records by URI, creating supporting records, standalone locations and an account profile on their own, structured CEL work scopes, vocabulary tags and work-scope tags, Features (zones and strata) with their tags and locations, uploading images and files as blobs, and handling write failures without creating duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create a hypercert, activity claim, contributor, contribution, rights, location, vocabulary tag, work-scope tag, feature or CEL work scope record on a PDS. Not for changing the SDK's own source.
 metadata:
   author: hypercerts-org
-  version: "2"
+  version: "3"
 ---
 
 # @hypercerts-org/sdk
@@ -46,8 +46,10 @@ Make a new context when the signed-in account changes. Records are always writte
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `@hypercerts-org/sdk`          | `createSDKContext`, `SDKContext`                                                                                                                                                                       |
 | `@hypercerts-org/sdk/activity` | `createActivity`, `createRights`, `createContribution`, `createContributorInformation`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types |
-| `@hypercerts-org/sdk/actor`    | `createProfile`, `ProfileAlreadyExistsError`, the same `Write*` errors, `ProfileInput`                                                                                                                 |
+| `@hypercerts-org/sdk/actor`    | `createProfile`, `ProfileAlreadyExistsError`, `RecordAlreadyExistsError`, the same `Write*` errors, `ProfileInput`                                                                                     |
 | `@hypercerts-org/sdk/location` | `createLocation`, the same `Write*` errors, `LocationInput`, `LocationValue`                                                                                                                           |
+| `@hypercerts-org/sdk/tag`      | `createVocabularyTag`, `createWorkScopeTag`, `RecordAlreadyExistsError`, the same `Write*` errors, input/result types                                                                                  |
+| `@hypercerts-org/sdk/feature`  | `createFeature`, `RecordAlreadyExistsError`, the same `Write*` errors, `FeatureInput`, `CreateFeatureResult`, `LeafletDocument`                                                                        |
 | `@hypercerts-org/sdk/blob`     | `uploadBlob`                                                                                                                                                                                           |
 
 The root entry does not re-export operations. `import { createActivity } from "@hypercerts-org/sdk"` fails.
@@ -61,6 +63,8 @@ Operations are grouped by domain, each under its own subpath. Read the domain's 
 | Activity (hypercert claims, rights, contributors, contributions, locations) | `@hypercerts-org/sdk/activity` | [references/activity.md](references/activity.md) |
 | Profile (the account's `app.certified.actor.profile`) | `@hypercerts-org/sdk/actor` | [references/profile.md](references/profile.md) |
 | Location (a standalone `app.certified.location`, shared by several activities) | `@hypercerts-org/sdk/location` | [references/location.md](references/location.md) |
+| Tags (`org.hypercerts.vocab.tag`, `org.hypercerts.workscope.tag`) and Features (`org.hypercerts.entity.feature`) | `@hypercerts-org/sdk/tag`, `@hypercerts-org/sdk/feature` | [references/tags-and-features.md](references/tags-and-features.md) |
+| CEL work scope of an Activity | `@hypercerts-org/sdk/activity` | [references/tags-and-features.md](references/tags-and-features.md#cel-work-scope-in-createactivity) |
 
 Two things to know before opening a reference:
 
@@ -96,13 +100,14 @@ Uploads happen before the write and are not rolled back. If the PDS rejects the 
 
 Order of work: validate input → read `{ uri }` records → upload blobs → validate against lexicons → one write. The SDK never retries.
 
-The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor` and `/location` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order. `instanceof WriteError` catches all three.
+The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor`, `/location`, `/tag` and `/feature` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order. `instanceof WriteError` catches all three.
 
 | Error                      | Meaning                                                                                        | What to do                                    |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | `TypeError`                | Bad input. The message names the field (e.g. `contributors[1].weight`). Nothing written.       | Fix the input.                                |
 | `Error`                    | Not authenticated, a `{ uri }` record could not be read, or an upload failed. Nothing written. | Fix auth or the URI, then retry.              |
 | `WriteRejectedError`       | PDS answered 4xx. Nothing created. `status`, `code`.                                           | Safe to fix and retry.                        |
+| `RecordAlreadyExistsError` | A key you chose is taken (a `WriteRejectedError`). `uri` names the record. Nothing written.    | Use it as `{ uri }`, or choose another key.   |
 | `WriteOutcomeUnknownError` | Network error, timeout or 5xx. The records may exist. `attempted` lists every URI.             | Check before retrying.                        |
 | `WriteResultMismatchError` | Created, but the PDS reported other URIs/CIDs (`reported` vs `attempted`).                     | Do not retry. Log it and inspect the records. |
 
@@ -138,11 +143,14 @@ try {
 
 - `createSDKContext({ client: session })` or passing an `@atproto/api` `Agent` throws. Wrap it: `new Client(session)`.
 - Passing an `uploadBlob` result as `image` throws. Pass the `Blob`/`File`.
-- Retrying blindly after `WriteOutcomeUnknownError` duplicates every record under new keys. The exception is `createProfile`, whose key is fixed and which is only created if absent.
+- Retrying blindly after `WriteOutcomeUnknownError` duplicates every record under new keys. The exception is a call whose records all have a fixed key and are only created if absent: `createProfile` and `createVocabularyTag`. `createFeature` and `createWorkScopeTag` are not safe to repeat.
+- A vocabulary tag's key is `<category>.<key>` exactly as you pass it. A dot in either part throws a `TypeError`; the SDK does not normalise the parts.
+- A work-scope tag URI is not a vocabulary tag URI: each field accepts one collection, and a `{ uri }` of another throws a `TypeError`.
+- One write holds at most 200 records on the reference PDS. A larger call throws a `TypeError` before anything is written; the SDK does not split it. Create some records first and pass their URIs.
 - Do not call operations a subpath does not export, even if a TSDoc example mentions them.
 
 ## Verify
 
-1. Imports come only from `@hypercerts-org/sdk`, `.../activity`, `.../actor`, `.../location` or `.../blob`.
+1. Imports come only from `@hypercerts-org/sdk`, `.../activity`, `.../actor`, `.../feature`, `.../location`, `.../tag` or `.../blob`.
 2. `tsc --noEmit` passes. The input types catch wrong field names and shapes.
 3. `com.atproto.repo.getRecord` on each returned `uri` returns the record, and any references it holds match the URIs and CIDs the SDK returned.
