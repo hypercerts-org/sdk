@@ -28,6 +28,10 @@ export interface LocationInput {
   /**
    * The format of the data, for example `coordinate-decimal`, `geojson-point` or `country-code`.
    * At most 20 characters. Values outside the lexicon's known set are accepted.
+   *
+   * Two types have their `location` checked: `country-code` needs `{ string }` with an uppercase
+   * ISO 3166-1 alpha-2 code (`"BT"`), and `geojson-point` given as `{ string }` needs a GeoJSON
+   * Point with `[longitude, latitude]` coordinates.
    */
   locationType: string;
   /** The location data. See {@link LocationValue}. */
@@ -66,7 +70,55 @@ export const locationKind: RecordKind<LocationInput> = recordKind(
       return mediaValue(build, field, "uri" in value ? value.uri : value.blob, "blob");
     },
   },
+  [
+    {
+      check: (input: LocationInput) =>
+        input.locationType !== "country-code" ||
+        ("string" in input.location && isCountryCode(input.location.string)),
+      message:
+        'must be { string } with an uppercase ISO 3166-1 alpha-2 code, such as { string: "BT" }, when locationType is "country-code"',
+      path: "location",
+    },
+    {
+      check: (input: LocationInput) =>
+        input.locationType !== "geojson-point" ||
+        !("string" in input.location) ||
+        isGeoJsonPoint(input.location.string),
+      message:
+        'must be a GeoJSON Point with [longitude, latitude] coordinates, such as { string: \'{"type":"Point","coordinates":[90.17,27.47]}\' }, when locationType is "geojson-point"',
+      path: "location",
+    },
+  ],
 );
+
+// The lexicon asks for uppercase ISO 3166-1 alpha-2. Only the form is checked, not that the code is
+// assigned, so the SDK needs no country list.
+function isCountryCode(value: string): boolean {
+  return /^[A-Z]{2}$/.test(value);
+}
+
+// RFC 7946 Point: a position of longitude, latitude and an optional altitude. Range checks catch
+// swapped coordinates only when the latitude ends up outside ±90.
+function isGeoJsonPoint(value: string): boolean {
+  let point: unknown;
+  try {
+    point = JSON.parse(value);
+  } catch {
+    return false;
+  }
+  if (typeof point !== "object" || point === null) return false;
+  const { type, coordinates } = point as { type?: unknown; coordinates?: unknown };
+  if (type !== "Point" || !Array.isArray(coordinates)) return false;
+  const [longitude, latitude, ...rest] = coordinates as unknown[];
+  return (
+    rest.length <= 1 &&
+    rest.every(Number.isFinite) &&
+    Number.isFinite(longitude) &&
+    Number.isFinite(latitude) &&
+    Math.abs(longitude as number) <= 180 &&
+    Math.abs(latitude as number) <= 90
+  );
+}
 
 /**
  * Creates a location record (`app.certified.location`) in the authenticated account's repo.
@@ -80,8 +132,13 @@ export const locationKind: RecordKind<LocationInput> = recordKind(
  * unreferenced blobs after a while, but this is not guaranteed, and a blob with the same content
  * that another record already uses stays.
  *
- * Nothing is geocoded, parsed or checked against `locationType`: the data is stored as you give
- * it, and a `locationType` outside the lexicon's known values is accepted. Nothing is looked up or
+ * The data is stored as you give it and nothing is geocoded. Only two types are checked:
+ * `country-code` must be `{ string }` with an uppercase ISO 3166-1 alpha-2 code, as the lexicon
+ * asks (only the form is checked, not that the code is assigned), and an inline `geojson-point`
+ * must be a GeoJSON Point whose longitude and latitude are in range. Coordinates are longitude
+ * first; swapped ones are caught only when the latitude falls outside ±90. A `{ uri }` or
+ * `{ blob }` geojson-point is not read. A `locationType` outside the lexicon's known values is
+ * accepted. Nothing is looked up or
  * deduplicated either: calling this twice creates two records. To use a location that already
  * exists, pass its URI in `locations` of {@link createActivity} instead.
  *
@@ -90,7 +147,8 @@ export const locationKind: RecordKind<LocationInput> = recordKind(
  * @param input - The location's data. See {@link LocationInput}.
  * @returns The new record's URI and CID.
  * @throws {@link TypeError} If `input` has an unknown field, a `location` that is not exactly one
- * of `{ uri }`, `{ string }` and `{ blob }`, or a value the lexicon does not allow, for example a
+ * of `{ uri }`, `{ string }` and `{ blob }`, a `location` that does not match a `country-code` or
+ * `geojson-point` `locationType` (see remarks), or a value the lexicon does not allow, for example a
  * `srs` that is not a URI. Nothing was written. Blobs may already have been uploaded when a
  * lexicon rule rejects the record.
  * @throws {@link Error} If the client is not authenticated, or the blob upload fails.
@@ -108,11 +166,23 @@ export const locationKind: RecordKind<LocationInput> = recordKind(
  * const location = await createLocation(context, {
  *   lpVersion: "1.0",
  *   srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
- *   locationType: "coordinate-decimal",
- *   location: { string: "27.47,90.17" },
+ *   locationType: "geojson-point",
+ *   location: { string: '{"type":"Point","coordinates":[90.17,27.47]}' }, // [longitude, latitude]
  *   name: "Phobjikha valley",
  * });
  * console.log(location.uri, location.cid);
+ * ```
+ *
+ * @example A country
+ * ```ts
+ * import { createLocation } from "@hypercerts-org/sdk/location";
+ *
+ * await createLocation(context, {
+ *   lpVersion: "1.0",
+ *   srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84", // required, but means nothing here
+ *   locationType: "country-code",
+ *   location: { string: "BT" }, // not "bt", "BTN" or "Bhutan", which throw
+ * });
  * ```
  *
  * @example Pointing at external data is not the same as reusing a record

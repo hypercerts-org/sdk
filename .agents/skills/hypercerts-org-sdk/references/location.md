@@ -6,6 +6,21 @@ Create a location on its own when several activities share it. For a location us
 
 ## Examples
 
+### A country
+
+```ts
+import { createLocation } from "@hypercerts-org/sdk/location";
+
+// `context` comes from createSDKContext.
+await createLocation(context, {
+  lpVersion: "1.0",
+  srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84", // required, but ignored for country-code
+  locationType: "country-code",
+  location: { string: "BT" }, // uppercase ISO 3166-1 alpha-2
+  name: "Bhutan",
+});
+```
+
 ### Coordinates stored in the record
 
 ```ts
@@ -15,8 +30,8 @@ import { createLocation } from "@hypercerts-org/sdk/location";
 const valley = await createLocation(context, {
   lpVersion: "1.0",
   srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-  locationType: "coordinate-decimal",
-  location: { string: "27.47,90.17" },
+  locationType: "geojson-point",
+  location: { string: JSON.stringify({ type: "Point", coordinates: [90.17, 27.47] }) }, // [lon, lat]
   name: "Phobjikha valley",
   description: "Wetland restoration site.",
 });
@@ -57,7 +72,7 @@ const valley = await createLocation(context, {
   lpVersion: "1.0",
   srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
   locationType: "coordinate-decimal",
-  location: { string: "27.47,90.17" },
+  location: { string: "90.17,27.47" },
 });
 
 // A whole location given as { uri } refers to the existing record; nothing new is created.
@@ -70,13 +85,32 @@ for (const title of ["Crane habitat restoration", "Wetland monitoring"]) {
 }
 ```
 
+## Choosing `locationType`
+
+Follow these conventions so indexers and other apps can read the record. The SDK enforces the first two rows and throws `TypeError` otherwise; the rest are not checked. They come from the lexicon's description and the [Location Protocol location types](https://spec.decentralizedgeo.org/specification/location-types/).
+
+| `locationType`       | Put in `location`                                                                                   | Example                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `country-code`       | `{ string }` with an uppercase ISO 3166-1 alpha-2 code. `srs` is still required but has no meaning. | `{ string: "BT" }`, not `"bt"`, `"BTN"` or `"Bhutan"`                        |
+| `geojson-point`      | A single GeoJSON Point (RFC 7946), inline, linked or uploaded                                       | `{ string: '{"type":"Point","coordinates":[90.17,27.47]}' }`                 |
+| `geojson`            | Any other GeoJSON: Polygon, MultiPolygon, FeatureCollection, ... Its own `type` says which.        | `{ blob: polygonFile }` or `{ uri: "https://example.org/valley.geojson" }` |
+| `coordinate-decimal` | A decimal-degree pair, **longitude first**                                                          | `{ string: "90.17,27.47" }`                                                  |
+| `h3`, `geohash`, `wkt`, `address`, `scaledCoordinates` | The value in that format | `{ string: "POINT (90.17 27.47)" }` for `wkt` |
+
+- Coordinates are **longitude, latitude** with the CRS84 `srs`, in both GeoJSON and `coordinate-decimal`. For an inline `geojson-point` the SDK rejects a latitude outside ±90, but most swapped pairs are still in range and go through.
+- A `geojson-point` given as `{ uri }` or `{ blob }` is not read, so it is not checked.
+- `country-code` checks only the form: `"XX"` passes.
+- Prefer `geojson-point` over `coordinate-decimal` for a point: GeoJSON fixes the order and the separator, while the spec does not say how a `coordinate-decimal` pair is written as a string.
+- Use the most specific type: `geojson-point` for one point, `geojson` for everything else in GeoJSON.
+- Other values are allowed by the lexicon, but other apps may not understand them. Use one from the spec's registry when you can.
+
 ## The `location` value
 
 Exactly one key:
 
 | Shape        | Stored as                                                | Example                                         |
 | ------------ | -------------------------------------------------------- | ----------------------------------------------- |
-| `{ string }` | Inline in the record                                     | `{ string: "27.47,90.17" }`                     |
+| `{ string }` | Inline in the record                                     | `{ string: "90.17,27.47" }`                     |
 | `{ uri }`    | A URL to external data, never fetched                    | `{ uri: "https://example.org/valley.geojson" }` |
 | `{ blob }`   | A file uploaded before the write (any type, up to 10 MB) | `{ blob: geojsonFile }`                         |
 
@@ -88,7 +122,7 @@ Exactly one key:
 
 - `location: { uri }` (external data) is not the same as a whole location `{ uri }` in `createActivity` (an existing record). `createLocation` never accepts an AT URI of a location record.
 - Passing a bare string or a GeoJSON object as `location` throws `TypeError`. Wrap it: `{ string: "..." }`, or `{ string: JSON.stringify(geojson) }`.
-- Nothing is geocoded, parsed or checked against `locationType`. Values outside the lexicon's known list are accepted.
+- Nothing is geocoded. Apart from `country-code` and inline `geojson-point`, `location` is not checked against `locationType`. Values outside the lexicon's known list are accepted.
 - Nothing is deduplicated: calling `createLocation` twice creates two records. Keep the returned `uri` and reuse it.
 - A `{ blob }` upload is not rolled back if the write fails. See "Images and files" in [SKILL.md](../SKILL.md).
 
@@ -100,7 +134,7 @@ Also accepted inline in `createActivity`'s `locations`.
 | -------------- | ----------------------------------- | ----------------------------------------------------------------------------------- |
 | `lpVersion`    | `string`                            | Required. Location Protocol version, e.g. `"1.0"`. Max 10 chars.                    |
 | `srs`          | `string`                            | Required. Spatial reference system URI, e.g. `http://www.opengis.net/def/crs/OGC/1.3/CRS84`. Max 100 chars. |
-| `locationType` | `string`                            | Required. e.g. `coordinate-decimal`, `geojson-point`, `country-code`. Max 20 chars. |
+| `locationType` | `string`                            | Required. See [Choosing `locationType`](#choosing-locationtype). Max 20 chars. |
 | `location`     | `{ uri } \| { string } \| { blob }` | Required. See [the `location` value](#the-location-value).                          |
 | `name`         | `string`                            | Max 100 chars.                                                                      |
 | `description`  | `string`                            | Max 500 chars.                                                                      |

@@ -30,7 +30,7 @@ export const contributionKind: RecordKind<ContributionInput> = recordKind(
     endDate: optionalText,
   },
   {},
-  dateRange,
+  [dateRange],
 );
 
 /**

@@ -68,7 +68,7 @@ const { uri, cid } = await createLocation(context, {
   lpVersion: "1.0",
   srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
   locationType: "coordinate-decimal",
-  location: { string: "27.47,90.17" },
+  location: { string: "90.17,27.47" },
   name: "Phobjikha valley",
 });
 ```
@@ -83,7 +83,12 @@ const { uri, cid } = await createLocation(context, {
 
 `{ uri }` here is the address of the data. It is not the AT URI of an existing location record; to reuse one of those, pass its URI in `locations` of `createActivity`, see [Creating activities](./creating-activities.md).
 
-The SDK does not geocode, parse the data or check it against `locationType`. Values outside the lexicon's known `locationType` list are accepted.
+Coordinates are longitude first, as in GeoJSON. The SDK does not geocode, and checks `location` against `locationType` for two types only:
+
+- `country-code`: `{ string }` with an uppercase ISO 3166-1 alpha-2 code such as `"BT"`. Only the form is checked.
+- `geojson-point` given as `{ string }`: a GeoJSON Point with longitude and latitude in range.
+
+Anything else is stored as given, including values outside the lexicon's known `locationType` list.
 
 Each location gets a new TID as its record key, and `createdAt` is the time of the call. Calling `createLocation` twice creates two records.
 

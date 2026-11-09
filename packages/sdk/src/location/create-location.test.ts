@@ -13,9 +13,9 @@ describe("createLocation", () => {
   it.each<[string, LocationInput["location"], string[], object]>([
     [
       "inline data",
-      { string: "27.47,90.17" },
+      { string: "90.17,27.47" },
       [],
-      { $type: `${LOCATION}#string`, string: "27.47,90.17" },
+      { $type: `${LOCATION}#string`, string: "90.17,27.47" },
     ],
     [
       "a URI to external data, stored as it is",
@@ -53,6 +53,62 @@ describe("createLocation", () => {
     });
 
     expect(writeOf(creates[0] ?? [], LOCATION).value.locationType).toBe("plus-code");
+  });
+
+  it.each<[string, LocationInput["location"]]>([
+    ["lowercase", { string: "bt" }],
+    ["alpha-3", { string: "BTN" }],
+    ["a name", { string: "Bhutan" }],
+    ["not inline", { uri: "https://example.org/bt" }],
+  ])("rejects a country-code location that is %s, sending nothing", async (_, location) => {
+    const { context, requests } = fakeRepo();
+
+    await expect(
+      createLocation(context, { ...base, locationType: "country-code", location }),
+    ).rejects.toThrow(/uppercase ISO 3166-1 alpha-2/);
+
+    expect(requests).toHaveLength(0);
+  });
+
+  it("accepts an uppercase alpha-2 country code", async () => {
+    const { context, creates } = fakeRepo();
+
+    await createLocation(context, {
+      ...base,
+      locationType: "country-code",
+      location: { string: "BT" },
+    });
+
+    expect(writeOf(creates[0] ?? [], LOCATION).value.location).toMatchObject({ string: "BT" });
+  });
+
+  it.each([
+    ["not JSON", "90.17,27.47"],
+    ["not a Point", '{"type":"Polygon","coordinates":[]}'],
+    ["latitude out of range", '{"type":"Point","coordinates":[27.47,95]}'],
+    ["missing a coordinate", '{"type":"Point","coordinates":[90.17]}'],
+  ])("rejects an inline geojson-point that is %s, sending nothing", async (_, string) => {
+    const { context, requests } = fakeRepo();
+
+    await expect(
+      createLocation(context, { ...base, locationType: "geojson-point", location: { string } }),
+    ).rejects.toThrow(/GeoJSON Point with \[longitude, latitude\]/);
+
+    expect(requests).toHaveLength(0);
+  });
+
+  it("accepts an inline geojson-point, with or without altitude", async () => {
+    const { context, creates } = fakeRepo();
+
+    for (const coordinates of ["[90.17,27.47]", "[90.17,27.47,2900]"]) {
+      await createLocation(context, {
+        ...base,
+        locationType: "geojson-point",
+        location: { string: `{"type":"Point","coordinates":${coordinates}}` },
+      });
+    }
+
+    expect(creates).toHaveLength(2);
   });
 
   it("sends nothing when `location` names more than one representation", async () => {

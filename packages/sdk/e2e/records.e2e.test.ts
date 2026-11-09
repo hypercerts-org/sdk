@@ -69,7 +69,7 @@ describe("the standalone creators", () => {
     const stored = await expectStored(user.client, ref);
     expect(stored).toMatchObject({
       ...input,
-      location: { $type: "app.certified.location#string", string: "27.47,90.17" },
+      location: { $type: "app.certified.location#string", string: "90.17,27.47" },
     });
   });
 
