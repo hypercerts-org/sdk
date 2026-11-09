@@ -150,8 +150,9 @@ export async function createProfile(context: SDKContext, input: ProfileInput): P
 
 function alreadyExists(rejected: WriteRejectedError): ProfileAlreadyExistsError {
   const [ref] = rejected.attempted;
+  const where = ref ? ` (${ref.uri})` : "";
   return new ProfileAlreadyExistsError(
-    `createProfile: the account already has a profile, so nothing was written and the existing one is unchanged${ref ? ` (${ref.uri})` : ""}. createProfile only creates a profile; it never overwrites one, and the SDK cannot update a profile yet.`,
+    `createProfile: the account already has a profile, so nothing was written and the existing one is unchanged${where}. createProfile only creates a profile; it never overwrites one, and the SDK cannot update a profile yet.`,
     rejected.attempted,
     { status: rejected.status, code: rejected.code },
     { cause: rejected.cause },

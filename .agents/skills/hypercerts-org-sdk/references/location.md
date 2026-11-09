@@ -53,7 +53,9 @@ await createLocation(context, {
 ### Upload a file
 
 ```ts
-// `geojsonFile` is a File or Blob, for example from an <input type="file">.
+// `file` comes from an <input type="file">. Browsers often give .geojson files no type, and a
+// Blob without a type cannot be uploaded (createLocation has no `mimeType` option), so set one.
+const geojsonFile = file.type ? file : new Blob([file], { type: "application/geo+json" });
 await createLocation(context, {
   lpVersion: "1.0",
   srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
@@ -124,6 +126,7 @@ Exactly one key:
 - Passing a bare string or a GeoJSON object as `location` throws `TypeError`. Wrap it: `{ string: "..." }`, or `{ string: JSON.stringify(geojson) }`.
 - Nothing is geocoded. Apart from `country-code` and inline `geojson-point`, `location` is not checked against `locationType`. Values outside the lexicon's known list are accepted.
 - Nothing is deduplicated: calling `createLocation` twice creates two records. Keep the returned `uri` and reuse it.
+- A `{ blob }` needs a MIME type. A `File` the browser could not type (common for `.geojson`) fails with "could not upload location"; wrap it as shown in [Upload a file](#upload-a-file).
 - A `{ blob }` upload is not rolled back if the write fails. See "Images and files" in [SKILL.md](../SKILL.md).
 
 ## `LocationInput` (`app.certified.location`)

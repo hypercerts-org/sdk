@@ -87,7 +87,7 @@ try {
 
 - Two simultaneous calls can't overwrite each other: one creates, the other throws `ProfileAlreadyExistsError`. This relies on `swapRecord: null` and was verified against the reference PDS only.
 - An avatar or banner `Blob` is uploaded before the write. If the write fails, including because the profile already exists, the blob is left unreferenced.
-- More than three `langs`, or an image that is not JPEG, PNG or WebP, throws `TypeError` before anything is written.
+- An image that is not JPEG, PNG or WebP throws `TypeError` before anything is uploaded. Other lexicon errors, such as more than three `langs`, are found only after the images are uploaded: no record is written, but the uploaded blobs are left unreferenced.
 
 ## `ProfileInput` (`app.certified.actor.profile`)
 
