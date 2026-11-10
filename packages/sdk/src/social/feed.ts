@@ -36,10 +36,9 @@ const repostAction = recordRefAction({ create: "repost", undo: "unrepost" }, rep
  * `createdAt` the lexicon rejects. Nothing was written.
  * @throws {@link Error} If the client is not authenticated, or the target or the `via` record cannot
  * be read (missing, or the PDS cannot be reached). Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the like
- * may or may not exist. It carries the URI to check. The SDK does not retry, because a retry would
- * create a second like with a new key if the first attempt had succeeded.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create a second like if the first attempt had succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *
@@ -93,11 +92,10 @@ export const like = createAction(likeAction);
  * @throws {@link Error} If the client is not authenticated, or the likes cannot be read in full (a
  * failed or malformed page). A partial read is never treated as "not found". Nothing was changed.
  * @throws {@link WriteRejectedError} If the PDS refused the deletion (HTTP 4xx). With `code`
- * `"InvalidSwap"` the like changed after the scan, so it was not deleted; nothing is retried or
- * deleted without that check, and calling again scans afresh.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the like
- * may or may not be deleted. It carries the like's URI and CID. The SDK does not retry; calling
- * again is safe and either deletes the like or returns `not-found`.
+ * `"InvalidSwap"` the like changed after the scan, so it was not deleted; call again to scan
+ * afresh.
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is safe: it either deletes the like or returns `not-found`.
  *
  * @example
  * ```ts
@@ -141,10 +139,9 @@ export const unlike = undoAction(likeAction);
  * `createdAt` the lexicon rejects. Nothing was written.
  * @throws {@link Error} If the client is not authenticated, or the target or the `via` record cannot
  * be read (missing, or the PDS cannot be reached). Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the
- * repost may or may not exist. It carries the URI to check. The SDK does not retry, because a retry
- * would create a second repost with a new key if the first attempt had succeeded.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create a second repost if the first attempt had succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *
@@ -199,11 +196,10 @@ export const repost = createAction(repostAction);
  * @throws {@link Error} If the client is not authenticated, or the reposts cannot be read in full (a
  * failed or malformed page). A partial read is never treated as "not found". Nothing was changed.
  * @throws {@link WriteRejectedError} If the PDS refused the deletion (HTTP 4xx). With `code`
- * `"InvalidSwap"` the repost changed after the scan, so it was not deleted; nothing is retried or
- * deleted without that check, and calling again scans afresh.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the repost
- * may or may not be deleted. It carries the repost's URI and CID. The SDK does not retry; calling
- * again is safe and either deletes the repost or returns `not-found`.
+ * `"InvalidSwap"` the repost changed after the scan, so it was not deleted; call again to scan
+ * afresh.
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is safe: it either deletes the repost or returns `not-found`.
  *
  * @example
  * ```ts

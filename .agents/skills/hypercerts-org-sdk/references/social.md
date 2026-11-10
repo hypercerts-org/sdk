@@ -72,10 +72,10 @@ switch (result.status) {
 
 - The SDK lists **all** records of that collection in your own repo (every page, from your PDS, no indexer) and matches by subject: DID for follows, record URI for entity follows, likes and reposts. The CID a like or repost pinned is ignored, so a like of an older version of an edited record is found.
 - The target is **not** read, so a deleted or edited target does not stop you removing the like or follow.
-- Exactly one match is deleted with a CID guard. If that record changed in between, the PDS refuses: `WriteRejectedError` with `code === "InvalidSwap"`, nothing deleted. The SDK never retries or deletes without the guard; call again to scan afresh.
+- Exactly one match is deleted, only if it still has the CID the scan saw. If it changed in between, the call throws `WriteRejectedError` with `code === "InvalidSwap"` and nothing is deleted; call again to scan afresh.
 - A page that fails to load or looks wrong throws `Error`. It is never treated as "not found".
 - The scan is a snapshot. It cannot stop another writer creating a matching record meanwhile, so `deleted` does not promise that none remains.
-- `WriteOutcomeUnknownError` from an undo: `attempted` is the record the SDK tried to delete. Calling the undo again is safe: it either deletes the record or returns `not-found`.
+- `WriteOutcomeUnknownError` from an undo: `attempted` is the record the SDK tried to delete. Calling the undo again is safe: it either deletes the record or returns `not-found`. For create functions it is not safe to repeat; see [Handle failures](../SKILL.md#6-handle-failures).
 - The session needs permission to **delete** the collection (`app.certified.graph.follow`, `...graph.entityFollow`, `...feed.like`, `...feed.repost`) to undo, and to create it to create.
 
 ## Input fields

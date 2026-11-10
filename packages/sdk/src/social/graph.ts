@@ -63,10 +63,9 @@ const followEntityAction: SocialAction<RecordActionInput, RecordTargetInput> = {
  * @throws {@link Error} If the client is not authenticated, or the `via` record cannot be read.
  * Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx), for example because
- * the session may not create `app.certified.graph.follow` records. Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the
- * record may or may not exist. It carries the URI to check. The SDK does not retry, because a retry
- * would create a second follow with a new key if the first attempt had succeeded.
+ * the session may not create `app.certified.graph.follow` records.
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create a second follow if the first attempt had succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *
@@ -128,11 +127,10 @@ export const followAccount = createAction(followAccountAction);
  * full (a failed or malformed page). A partial read is never treated as "not found". Nothing was
  * changed.
  * @throws {@link WriteRejectedError} If the PDS refused the deletion (HTTP 4xx). With `code`
- * `"InvalidSwap"` the record changed after the scan, so it was not deleted; nothing is retried or
- * deleted without that check, and calling again scans afresh.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the record
- * may or may not be deleted. It carries the record's URI and CID. The SDK does not retry; calling
- * again is safe and either deletes the record or returns `not-found`.
+ * `"InvalidSwap"` the record changed after the scan, so it was not deleted; call again to scan
+ * afresh.
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is safe: it either deletes the record or returns `not-found`.
  *
  * @example
  * ```ts
@@ -177,10 +175,9 @@ export const unfollowAccount = undoAction(followAccountAction);
  * `createdAt` the lexicon rejects. Nothing was written.
  * @throws {@link Error} If the client is not authenticated, or the `via` record cannot be read.
  * Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the
- * record may or may not exist. It carries the URI to check. The SDK does not retry, because a retry
- * would create a second follow with a new key if the first attempt had succeeded.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create a second follow if the first attempt had succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *
@@ -232,11 +229,10 @@ export const followEntity = createAction(followEntityAction);
  * full (a failed or malformed page). A partial read is never treated as "not found". Nothing was
  * changed.
  * @throws {@link WriteRejectedError} If the PDS refused the deletion (HTTP 4xx). With `code`
- * `"InvalidSwap"` the record changed after the scan, so it was not deleted; nothing is retried or
- * deleted without that check, and calling again scans afresh.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the record
- * may or may not be deleted. It carries the record's URI and CID. The SDK does not retry; calling
- * again is safe and either deletes the record or returns `not-found`.
+ * `"InvalidSwap"` the record changed after the scan, so it was not deleted; call again to scan
+ * afresh.
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is safe: it either deletes the record or returns `not-found`.
  *
  * @example
  * ```ts
