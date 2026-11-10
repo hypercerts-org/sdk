@@ -203,7 +203,11 @@ export async function createActivityInCollection(
 
   // The records that need the network are read as late as possible, to keep the window in which
   // another write can slip in small. The head comes first: see `readRepoHead`.
-  const prepared = await prepareActivity(build, activity, "activity");
+  const prepared = await prepareActivity(build, activity, {
+    path: "activity",
+    // The Collection update goes in the same request.
+    otherWrites: 1,
+  });
   const head = await readRepoHead(context, build.did, OPERATION);
   const stored = await readRecord(context, collectionUri, OPERATION);
   const item = compact({

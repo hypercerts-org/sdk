@@ -272,6 +272,29 @@ describe("createActivityInCollection", () => {
 
     expect(writeOf(updates[0] ?? [], COLLECTION).value.items).toHaveLength(1000);
   });
+
+  it("counts the Collection update in the write limit and sends nothing past it", async () => {
+    const location = {
+      lpVersion: "1.0",
+      srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+      locationType: "geojson-point",
+      location: { string: '{"type":"Point","coordinates":[90.13,27.47]}' },
+    };
+    const withLocations = (count: number) =>
+      call({ activity: { ...activity, locations: Array.from({ length: count }, () => location) } });
+    const { context, requests, creates, updates } = fakeRepo({
+      records: { [collectionUri]: stored },
+    });
+
+    await createActivityInCollection(context, withLocations(198));
+    expect((creates[0] ?? []).length + (updates[0] ?? []).length).toBe(200);
+
+    const before = requests.length;
+    await expect(createActivityInCollection(context, withLocations(199))).rejects.toThrow(
+      /would write 201 records, but one write holds at most 200\. Nothing was written/,
+    );
+    expect(methods(requests.slice(before))).not.toContain("com.atproto.repo.applyWrites");
+  });
 });
 
 describe("createActivityInCollection when the write fails", () => {

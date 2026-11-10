@@ -51,7 +51,7 @@ export async function prepareRecord<S extends l.RecordSchema>(
     const key = schema.keySchema.safeValidate(chosenKey);
     if (!key.success) throw key.reason;
   }
-  return prepareAt(did, schema, input, chosenKey ?? fixedRecordKey(schema) ?? nextTid());
+  return prepareUpdate(did, schema, input, chosenKey ?? fixedRecordKey(schema) ?? nextTid());
 }
 
 /**
@@ -66,15 +66,6 @@ export async function prepareRecord<S extends l.RecordSchema>(
  * cannot be encoded.
  */
 export async function prepareUpdate<S extends l.RecordSchema>(
-  did: DidString,
-  schema: S,
-  input: Omit<l.InferInput<S>, "$type">,
-  rkey: RecordKeyString,
-): Promise<PreparedRecord> {
-  return prepareAt(did, schema, input, rkey);
-}
-
-async function prepareAt<S extends l.RecordSchema>(
   did: DidString,
   schema: S,
   input: Omit<l.InferInput<S>, "$type">,

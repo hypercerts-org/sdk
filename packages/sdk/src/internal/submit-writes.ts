@@ -144,7 +144,7 @@ interface Request {
 export const MAX_WRITES_PER_REQUEST = 200;
 
 /**
- * Fails before anything is uploaded or written when a call would create more records than one
+ * Fails before anything is uploaded or written when a call would write more records than one
  * `applyWrites` request may hold.
  *
  * Internal. The SDK never splits a call into several requests: the records reference each other
@@ -155,7 +155,7 @@ export const MAX_WRITES_PER_REQUEST = 200;
 export function assertWithinWriteLimit(operation: string, count: number): void {
   if (count <= MAX_WRITES_PER_REQUEST) return;
   throw new TypeError(
-    `${operation}: this call would create ${count} records, but one write holds at most ${MAX_WRITES_PER_REQUEST}. Nothing was written. Create some records first and pass them as { uri }.`,
+    `${operation}: this call would write ${count} records, but one write holds at most ${MAX_WRITES_PER_REQUEST}. Nothing was written. Create some records first and pass them as { uri }.`,
   );
 }
 

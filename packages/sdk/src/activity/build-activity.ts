@@ -439,8 +439,10 @@ export interface PreparedActivity {
  * larger write (see `createActivityInCollection`) submit it together with their own writes. Uploads
  * are not undone if the caller never submits the writes.
  *
- * `path` names the Activity's data in messages when it is part of a larger input, for example
- * `activity` gives `activity.locations[0]`; omit it when the input is the Activity itself.
+ * `options.path` names the Activity's data in messages when it is part of a larger input, for
+ * example `activity` gives `activity.locations[0]`; omit it when the input is the Activity itself.
+ * `options.otherWrites` counts the writes the caller adds to the same request, so a call that
+ * would not fit in one write fails before anything is uploaded.
  *
  * Throws what `createActivity` throws before its write: TypeError for invalid input and Error for
  * a failed read or upload.
@@ -448,8 +450,9 @@ export interface PreparedActivity {
 export async function prepareActivity(
   build: BuildContext,
   input: unknown,
-  path?: string,
+  options: { path?: string; otherWrites?: number } = {},
 ): Promise<PreparedActivity> {
+  const { path, otherWrites = 0 } = options;
   const at = path === undefined ? "" : `${path}.`;
   const parsed = parseInput(build, path ?? "input", activityInput, input);
   const plan = planActivity(build, parsed, at);
@@ -457,7 +460,7 @@ export async function prepareActivity(
   const fresh = newSlots(slots);
   assertDistinctKeys(build, fresh);
   // The Activity itself is one more record in the write.
-  assertWithinWriteLimit(build.operation, fresh.length + 1);
+  assertWithinWriteLimit(build.operation, fresh.length + 1 + otherWrites);
 
   // Reads first, then uploads: a URI that cannot be resolved fails before anything is uploaded.
   const existing = await readBeforeWriting(build, slots, { checkKeys: true });
