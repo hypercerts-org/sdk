@@ -135,11 +135,26 @@ export function toSlot<T extends { createdAt?: string | undefined }>(
 }
 
 /**
- * Reads a field that accepts only an existing record, of any type: `{ uri }`.
+ * Reads a field that accepts only an existing record: `{ uri }`. Any record type is accepted,
+ * unless `collections` lists the ones that are, in which case the slot's `collection` is the one
+ * the URI points at.
  *
- * Throws TypeError, naming `field`, when `value` is not `{ uri }` of a record.
+ * Throws TypeError, naming `field`, when `value` is not `{ uri }` of a record, or of a record of
+ * another type than `collections`.
  */
-function toExistingSlot(build: BuildContext, field: string, value: unknown): Slot {
+export function toExistingSlot(build: BuildContext, field: string, value: unknown): Slot;
+export function toExistingSlot<TCollection extends NsidString>(
+  build: BuildContext,
+  field: string,
+  value: unknown,
+  collections: readonly TCollection[],
+): Slot & { readonly collection: TCollection };
+export function toExistingSlot(
+  build: BuildContext,
+  field: string,
+  value: unknown,
+  collections?: readonly NsidString[],
+): Slot {
   const expected = "{ uri } of an existing record";
   if (!isExistingRecord(value)) {
     throw new TypeError(
@@ -147,7 +162,9 @@ function toExistingSlot(build: BuildContext, field: string, value: unknown): Slo
     );
   }
   assertNotMixed(build, field, value, "uri", expected);
-  return { collection: undefined, field, choice: existing(build, field, value, undefined) };
+  const choice = existing(build, field, value, collections);
+  const collection = collections?.find((candidate) => candidate === collectionOf(choice.uri));
+  return { collection, field, choice };
 }
 
 /**
@@ -249,22 +266,26 @@ function assertNotMixed(
 const inlineValue = l.object({ inline: l.string() });
 const existingRecord = l.object({ uri: l.string({ format: "at-uri" }) });
 
+// The collection part of a record URI, which `at-uri` alone does not require.
+const collectionOf = (uri: string): string | undefined => uri.split("/")[3];
+
 function existing(
   build: BuildContext,
   field: string,
   value: object,
-  collection: NsidString | undefined,
-): SlotChoice {
+  collections: NsidString | readonly NsidString[] | undefined,
+): Extract<SlotChoice, { kind: "existing" }> {
   const { uri } = parseInput(build, field, existingRecord, value);
+  const allowed = typeof collections === "string" ? [collections] : collections;
   // `at-uri` alone also accepts other record types, handle authorities and URIs without a key. The
   // type is checked here so a wrong one fails before any request; `resolveRecordRef` rejects the
   // rest.
-  const actual = uri.split("/")[3];
-  if (actual === undefined || (collection !== undefined && actual !== collection)) {
+  const actual = collectionOf(uri);
+  if (actual === undefined || (allowed !== undefined && !allowed.some((c) => c === actual))) {
     const target =
       actual === undefined ? "something that is not a record" : `a record of type ${actual}`;
     throw new TypeError(
-      `${build.operation}: ${field} points at ${target}, but this field holds ${collection ?? "a record"}: ${uri}. Expected at://<did>/${collection ?? "<collection>"}/<rkey>.`,
+      `${build.operation}: ${field} points at ${target}, but this field holds ${allowed?.join(", ") ?? "a record"}: ${uri}. Expected at://<did>/${allowed?.join("|") ?? "<collection>"}/<rkey>.`,
     );
   }
   return { kind: "existing", uri };
