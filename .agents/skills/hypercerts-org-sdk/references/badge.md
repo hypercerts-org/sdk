@@ -64,13 +64,12 @@ await awardBadge(context, {
 ```ts
 import { respondToBadgeAward } from "@hypercerts-org/sdk/badge";
 
-await respondToBadgeAward(context, {
-  awardUri: "at://did:plc:issuer/app.certified.badge.award/3k2a4b5c6d7e8",
-  response: "accepted",
-  weight: "2",
-});
-// `awardUri` is the URI of the award, from the issuer or your app.
-await respondToBadgeAward(context, { awardUri, response: "rejected" }); // no weight here
+// The URI of the award, from the issuer or your app.
+const awardUri = "at://did:plc:issuer/app.certified.badge.award/3k2a4b5c6d7e8";
+
+await respondToBadgeAward(context, { awardUri, response: "accepted", weight: "2" });
+// Or reject it (no weight here):
+await respondToBadgeAward(context, { awardUri, response: "rejected" });
 ```
 
 - The recipient of an award to an account is that account. For an award to a record it is the account whose repository holds the record (the SDK's rule; the lexicon does not say). Any other signed-in account, the issuer included, gets an `Error` and nothing is written.
