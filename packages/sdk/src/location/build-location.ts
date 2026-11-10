@@ -148,9 +148,8 @@ function isGeoJsonPoint(value: string): boolean {
  * `srs` that is not a URI. Nothing was written. Blobs may already have been uploaded when a
  * lexicon rule rejects the record.
  * @throws {@link Error} If the client is not authenticated, or the blob upload fails.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the record
- * may or may not exist. It carries the URI to check; the SDK does not retry.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *

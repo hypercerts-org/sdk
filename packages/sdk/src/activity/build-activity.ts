@@ -323,12 +323,9 @@ function allSlots(plan: ActivityPlan): Slot[] {
  * lexicon rule rejects a record.
  * @throws {@link Error} If the client is not authenticated, an existing record cannot be read, or
  * an upload fails.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). None of the records
- * was created and nothing needs cleaning up.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS (network
- * failure, timeout, a server error), so the records may or may not exist. It lists every URI that
- * was attempted. The SDK does not retry, because a retry would create duplicates under new keys
- * if the first attempt had succeeded. Check the URIs, then decide.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create duplicates under new keys if the first attempt had succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *

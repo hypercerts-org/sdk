@@ -163,12 +163,10 @@ type FeatureTree = SupportingRecordRef & {
  * @throws {@link Error} If the client is not authenticated, an existing record cannot be read, the
  * key of a new tag cannot be checked, or an upload fails.
  * @throws {@link RecordAlreadyExistsError} If a new tag's key is taken. Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). None of the records
- * was created and nothing needs cleaning up.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS (network
- * failure, timeout, a server error), so the records may or may not exist. It lists every URI that
- * was attempted. The SDK does not retry, because a retry would create a second Feature under a new
- * key if the first attempt had succeeded. Check the URIs, then decide.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create a second Feature under a new key if the first attempt had
+ * succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *

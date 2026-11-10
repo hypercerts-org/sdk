@@ -48,9 +48,8 @@ export const contributionKind: RecordKind<ContributionInput> = recordKind(
  * @throws {@link TypeError} If `input` has an unknown field, an `endDate` before its `startDate`,
  * or a value the lexicon does not allow. Nothing was written.
  * @throws {@link Error} If the client is not authenticated.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the record
- * may or may not exist. It carries the URI to check; the SDK does not retry.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *

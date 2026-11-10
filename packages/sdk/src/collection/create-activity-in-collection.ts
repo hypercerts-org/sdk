@@ -119,11 +119,10 @@ const inputSchema = strictObject({
  * Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). Nothing was created or
  * changed. With `code` `"InvalidSwap"` the repository changed after it was read; call again.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS (network
- * failure, timeout, a server error), so the records may or may not exist and the Collection may or
- * may not have changed. It lists the URI of the Collection and of every new record. The SDK does
- * not retry, because a retry would create a second Activity if the first attempt had succeeded.
- * Check the URIs, then decide.
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. The
+ * Collection may or may not have changed; `attempted` lists the new records and, last, the
+ * Collection. Calling again is not safe: it would create a second Activity if the first attempt had
+ * succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *
