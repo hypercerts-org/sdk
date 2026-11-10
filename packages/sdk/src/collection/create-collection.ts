@@ -50,13 +50,15 @@ const OPERATION = "createCollection";
  * throws {@link RecordAlreadyExistsError} if one does; use the existing tag's `uri` instead. Two
  * new tags with the same key in one call are a `TypeError`.
  *
- * The order of work is: validate all the input, count the records, read every existing record and
- * every new tag's key, upload the blobs, build the records, write. Input errors, a wrong record
- * type, too many records and an unreadable `{ uri }` stop before any upload. Uploads are outside
- * the atomic write: if the PDS rejects it, the uploaded blobs stay unreferenced, which a PDS usually
- * deletes after a while but is not guaranteed to. A file that the image limits reject, and a lexicon
- * rule that rejects a record (a title that is too long, say), are only found when that record is
- * built, so the files of other records may already be uploaded by then.
+ * Files (`Blob` or `File` values) are uploaded for the `avatar` and `banner` of the Collection and
+ * of every child Collection, and for the same fields as in the operations that create the other new
+ * records. The order of work is: validate all the input, count the records, read every existing
+ * record and every new tag's key, upload the blobs, build the records, write. Input errors, a wrong
+ * record type, too many records and an unreadable `{ uri }` stop before any upload. A file that the
+ * image limits reject, and a lexicon rule that rejects a record (a title that is too long, say),
+ * are only found when that record is built, so the files of other records may already be uploaded
+ * by then. Blobs are uploaded before the write and are not rolled back if it fails; see
+ * {@link uploadBlob}.
  *
  * Not supported: the lexicon's `signatures`, a blob that was uploaded already, adding items to a
  * Collection that exists (see {@link createActivityInCollection} for an Activity), and changing
@@ -75,15 +77,13 @@ const OPERATION = "createCollection";
  * @throws {@link Error} If the client is not authenticated, an existing record cannot be read, the
  * key of a new tag cannot be checked, or an upload fails. Nothing was written.
  * @throws {@link RecordAlreadyExistsError} If a new tag's key is taken. Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). None of the records
- * was created and nothing needs cleaning up.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS (network
- * failure, timeout, a server error), so the records may or may not exist. It lists every new record
- * the write holds, children before the records that point at them and the Collection last. The SDK
- * does not retry, because a retry would create every record again under new keys if the first
- * attempt had succeeded. Check the URIs, then decide.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. `attempted`
+ * lists every new record, children before the records that point at them and the Collection last.
+ * Calling again is not safe: it would create every record again under new keys if the first attempt
+ * had succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
- * computed, so the references between the new records may not match what is stored.
+ * computed.
  *
  * @example A Collection with a new Activity, a new Feature and an existing Activity
  * ```ts

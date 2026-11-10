@@ -42,11 +42,9 @@ collection.items[3]; // { uri, cid, type: "activity", created: false }
 
 ### Order of work and failures
 
-Validate all input and count the records, read every `{ uri }` and every new tag's key, upload files, build the records, one write. A bad item, a wrong record type, too many records or an unreadable `{ uri }` fails (`TypeError` or `Error`) before any upload. A file the image limits reject, or a record the lexicon rejects (a title that is too long), is only found when that record is built, so files of other records may already be uploaded. Uploads are outside the commit: if the PDS refuses the write, the blobs stay unreferenced.
+Validate all input and count the records, read every `{ uri }` and every new tag's key, upload files, build the records, one write. A bad item, a wrong record type, too many records or an unreadable `{ uri }` fails (`TypeError` or `Error`) before any upload. A file the image limits reject, or a record the lexicon rejects (a title that is too long), is only found when that record is built, so files of other records may already be uploaded. Uploads are not rolled back if the write fails; see [Uploads are not part of the atomic write](../SKILL.md#uploads-are-not-part-of-the-atomic-write).
 
-- `WriteRejectedError` (4xx): nothing was created; fix and call again.
-- `WriteOutcomeUnknownError`: the records may exist. `attempted` lists every new record, children before the records that point at them, the Collection **last**. The write is all-or-nothing, so check the Collection with `getRecord`; if it exists, everything does. **Do not retry blindly**: it would create every record again under new keys.
-- `WriteResultMismatchError`: created, but the PDS reported other URIs or CIDs. Do not retry.
+Errors are as in [Handle failures](../SKILL.md#6-handle-failures). After `WriteOutcomeUnknownError`, `attempted` lists every new record, children before the records that point at them, the Collection **last**. The write is all-or-nothing, so check the Collection with `getRecord`; if it exists, everything does. **Do not retry blindly**: it would create every record again under new keys.
 
 ### `CollectionInput`
 
