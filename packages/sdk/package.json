@@ -23,6 +23,10 @@
       "types": "./dist/actor/index.d.ts",
       "default": "./dist/actor/index.js"
     },
+    "./badge": {
+      "types": "./dist/badge/index.d.ts",
+      "default": "./dist/badge/index.js"
+    },
     "./blob": {
       "types": "./dist/blob/index.d.ts",
       "default": "./dist/blob/index.js"
