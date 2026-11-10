@@ -15,9 +15,5 @@ export {
 } from "../internal/submit-writes.js";
 export type { LocationInput } from "../location/build-location.js";
 export type { OrganizationInput, OrganizationUrl } from "./build-organization.js";
-export type {
-  CreateOrganizationInput,
-  CreateOrganizationResult,
-  OrganizationProfileRef,
-} from "./create-organization.js";
+export type { CreateOrganizationInput, CreateOrganizationResult } from "./create-organization.js";
 export { createOrganization, OrganizationAlreadyExistsError } from "./create-organization.js";

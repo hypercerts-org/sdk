@@ -29,7 +29,7 @@ const { organization, profile, location, additionalLocations } = await createOrg
   profileIfMissing: { displayName: "Phobjikha Conservation", avatar: avatarFile },
 });
 organization; // { uri, cid }
-profile; // { uri, cid, disposition: "created" | "reused" }
+profile; // { uri, cid, created: true } (false when the account already had one)
 location; // { uri, cid, created: true }
 additionalLocations; // [{ uri, cid, created: false }]
 ```
@@ -40,8 +40,8 @@ The display name, short description, website, avatar and banner belong to the **
 
 | Account state                           | What happens                                                                                  |
 | --------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Has a profile                           | Reused exactly as it is: `disposition: "reused"`. `profileIfMissing` is **not** an update and its images are not uploaded. It is still validated, so a typo in it throws either way. |
-| No profile, `profileIfMissing` given    | Created in the same commit: `disposition: "created"`.                                         |
+| Has a profile                           | Reused exactly as it is: `created: false`. `profileIfMissing` is **not** an update and its images are not uploaded. It is still validated, so a typo in it throws either way. |
+| No profile, `profileIfMissing` given    | Created in the same commit: `created: true`.                                         |
 | No profile, no `profileIfMissing`       | `TypeError` naming `profileIfMissing`. Nothing is uploaded or written. The SDK never creates an empty profile. |
 
 There is no operation that updates a profile or an organization.

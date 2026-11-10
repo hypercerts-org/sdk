@@ -15,6 +15,7 @@ import {
   planNew,
   prepareNew,
   readBeforeWriting,
+  recordRef,
   referencedResults,
   referenceLookup,
   type SupportingRecordRef,
@@ -49,16 +50,6 @@ export interface CreateOrganizationInput {
   profileIfMissing?: ProfileInput | undefined;
 }
 
-/** The account's profile after {@link createOrganization}, and whether the call created it. */
-export interface OrganizationProfileRef extends StrongRef {
-  /**
-   * `"created"` when this call wrote the profile from `profileIfMissing`, `"reused"` when the
-   * account already had one, which is unchanged. For a reused profile, `cid` is the one the SDK
-   * read.
-   */
-  disposition: "created" | "reused";
-}
-
 /**
  * The result of {@link createOrganization}.
  *
@@ -70,8 +61,12 @@ export interface OrganizationProfileRef extends StrongRef {
 export interface CreateOrganizationResult {
   /** The URI and CID of the new organization record. */
   organization: StrongRef;
-  /** The profile, created or reused. */
-  profile: OrganizationProfileRef;
+  /**
+   * The account's profile. `created` is `true` when this call wrote it from `profileIfMissing`,
+   * `false` when the account already had one, which is unchanged; its `cid` is then the one the SDK
+   * read.
+   */
+  profile: SupportingRecordRef;
   /** The primary location, when the input had `location`. */
   location?: SupportingRecordRef;
   /** The additional locations, in input order, when the input had `additionalLocations`. */
@@ -217,7 +212,7 @@ const inputSchema = strictObject({
  *   profileIfMissing: { displayName: "Phobjikha Conservation", avatar: "https://example.org/a.png" },
  * });
  * console.log(organization.uri); // at://<did>/app.certified.actor.organization/self
- * console.log(profile.disposition); // "created" or "reused"
+ * console.log(profile.created); // false when the account already had a profile
  * ```
  *
  * @example An organization already exists
@@ -291,9 +286,7 @@ export async function createOrganization(
 
   // A reused profile is not in the write, so its images are never uploaded.
   const slots = flattenSlots(
-    profilePlan.disposition === "created"
-      ? [profilePlan.slot, organizationSlot]
-      : [organizationSlot],
+    profilePlan.kind === "created" ? [profilePlan.slot, organizationSlot] : [organizationSlot],
   );
   assertWithinWriteLimit(OPERATION, newSlots(slots).length);
   const existing = await readBeforeWriting(build, slots, { checkKeys: false });
@@ -311,9 +304,9 @@ export async function createOrganization(
   return {
     organization: refOf(organizationSlot),
     profile:
-      profilePlan.disposition === "created"
-        ? { ...refOf(profilePlan.slot), disposition: "created" }
-        : { ...profilePlan.ref, disposition: "reused" },
+      profilePlan.kind === "created"
+        ? recordRef(profilePlan.slot, created, refOf)
+        : { ...profilePlan.ref, created: false },
     ...referencedResults(organizationSlot, created, refOf),
   };
 }
@@ -351,9 +344,7 @@ async function readStartingPoint(build: BuildContext): Promise<StartingPoint> {
   return { head, profile: profileRecord, organization: organizationRecord };
 }
 
-type ProfilePlan =
-  | { disposition: "reused"; ref: StrongRef }
-  | { disposition: "created"; slot: NewSlot };
+type ProfilePlan = { kind: "reused"; ref: StrongRef } | { kind: "created"; slot: NewSlot };
 
 // Reuse the profile the account has, or create it from the fallback.
 function planProfile(
@@ -361,9 +352,9 @@ function planProfile(
   existingProfile: StoredRecord | undefined,
   fallback: NewSlot | undefined,
 ): ProfilePlan {
-  if (existingProfile !== undefined) return { disposition: "reused", ref: existingProfile.ref };
+  if (existingProfile !== undefined) return { kind: "reused", ref: existingProfile.ref };
   if (fallback === undefined) throw missingProfile(singletonUri(build, profile.main.$type));
-  return { disposition: "created", slot: fallback };
+  return { kind: "created", slot: fallback };
 }
 
 const singletonUri = (build: BuildContext, collection: NsidString) =>
