@@ -12,8 +12,13 @@ export const PNG = Uint8Array.from(
 
 export const png = () => new Blob([PNG], { type: "image/png" });
 
-/** A text that is different on every call, so records left by earlier runs are never mistaken for these. */
-export const unique = (label: string) => `${label} ${randomUUID().slice(0, 8)}`;
+/**
+ * A text that is different on every call, so records left by earlier runs are never mistaken for
+ * these. Pass `"-"` as `separator` for a record key part (a vocabulary tag's key is
+ * `<category>.<key>`, chosen by the caller, so a tag left by an earlier run would be in the way).
+ */
+export const unique = (label: string, separator = " ") =>
+  `${label}${separator}${randomUUID().slice(0, 8)}`;
 
 export const coordinates: LocationInput = {
   lpVersion: "1.0",

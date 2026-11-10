@@ -1,5 +1,6 @@
 // Entry point for @hypercerts-org/sdk/activity.
 export type { StrongRef } from "../internal/resolve-record-ref.js";
+export type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 export {
   WriteError,
   WriteOutcomeUnknownError,
@@ -7,14 +8,14 @@ export {
   WriteResultMismatchError,
 } from "../internal/submit-writes.js";
 export type { LocationInput, LocationValue } from "../location/build-location.js";
+export type { WorkScopeTagInput, WorkScopeTagResult } from "../tag/build-tag.js";
 export type {
   ActivityInput,
+  CelWorkScopeInput,
   ContributorInput,
   ContributorResult,
   CreateActivityResult,
-  ExistingRecord,
   InlineValue,
-  SupportingRecordRef,
 } from "./build-activity.js";
 export { createActivity } from "./build-activity.js";
 export type { ContributionInput } from "./build-contribution.js";

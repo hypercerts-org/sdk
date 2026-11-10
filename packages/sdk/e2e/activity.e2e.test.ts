@@ -6,6 +6,7 @@ import {
   createRights,
   type SupportingRecordRef,
 } from "../src/activity/index.js";
+import { createWorkScopeTag } from "../src/tag/index.js";
 import { readE2eEnv } from "./env.js";
 import { coordinates, PNG, png, rights, unique } from "./fixtures.js";
 import { redirectPlcDirectory } from "./plc.js";
@@ -103,6 +104,55 @@ describe("createActivity with new records", () => {
 });
 
 const byUri = (a: Ref, b: Ref) => a.uri.localeCompare(b.uri);
+
+describe("createActivity with a CEL work scope", () => {
+  it("stores the expression as written with new and existing work-scope tags, and every reference resolves", async () => {
+    const existing = await createWorkScopeTag(user.context, {
+      key: "environmental_education",
+      name: unique("Environmental education"),
+    });
+    const expression =
+      "scope.hasAll(['mangrove_restoration', 'environmental_education'])  &&  true";
+    const before = await snapshotCounts(user.client);
+
+    const result = await createActivity(user.context, {
+      ...base(),
+      workScope: {
+        expression,
+        usedTags: [
+          {
+            key: "mangrove_restoration",
+            name: unique("Mangrove restoration"),
+            parent: { key: "restoration", name: unique("Restoration") },
+          },
+          { uri: existing.uri },
+        ],
+      },
+    });
+
+    const activity = await expectStored(user.client, result);
+    expect(activity.workScope).toMatchObject({
+      $type: "org.hypercerts.workscope.cel",
+      expression,
+      version: "v1",
+      usedTags: [{ uri: defined(result.workScope?.usedTags[0]).uri }, refOnly(existing)],
+    });
+    const referenced = await expectReferencesResolve(user.client, activity);
+    expect(referenced).toHaveLength(2);
+    // The parent is referenced by the new tag, not by the Activity.
+    await expectReferencesResolve(
+      user.client,
+      await expectStored(user.client, defined(result.workScope?.usedTags[0])),
+    );
+    expect(result.workScope?.usedTags.map((tag) => tag.created)).toEqual([true, false]);
+    // The Activity, the new tag and its new parent. The existing tag was not written again.
+    expect(await snapshotCounts(user.client)).toEqual({
+      ...before,
+      activity: before.activity + 1,
+      workScopeTag: before.workScopeTag + 2,
+    });
+  });
+});
 
 describe("createActivity reusing existing records by URI", () => {
   beforeAll(() => redirectPlcDirectory(readE2eEnv().plcUrl));

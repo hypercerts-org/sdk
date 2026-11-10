@@ -1,6 +1,6 @@
 # Creating activities
 
-`createActivity` from `@hypercerts-org/sdk/activity` creates an Activity together with the records it references (rights, locations, contributor information and contributions) in one write. You pass the data; the SDK allocates record keys, computes the references and submits everything at once. The per-field reference is in the TSDoc of each function, shown in your editor.
+`createActivity` from `@hypercerts-org/sdk/activity` creates an Activity together with the records it references (rights, locations, contributor information, contributions and work-scope tags) in one write. You pass the data; the SDK allocates record keys, computes the references and submits everything at once. The per-field reference is in the TSDoc of each function, shown in your editor.
 
 ```ts
 import { createActivity } from "@hypercerts-org/sdk/activity";
@@ -43,6 +43,28 @@ Each supporting field says what you want. The SDK never guesses and never search
 
 The standalone `createRights`, `createContributorInformation` and `createContribution` (from `@hypercerts-org/sdk/activity`) and `createLocation` (from `@hypercerts-org/sdk/location`, see [Profiles and locations](./profiles-and-locations.md)) create one such record on their own with the same validation, and return its `{ uri, cid }`.
 
+## Work scope
+
+`workScope` is either a free-form string, or a structured CEL (Common Expression Language) scope: an expression and the work-scope tags it uses.
+
+```ts
+await createActivity(context, {
+  title: "Mangrove restoration in Kenya",
+  shortDescription: "Replanting 20 hectares of mangrove.",
+  workScope: {
+    expression: "scope.hasAll(['mangrove_restoration', 'environmental_education'])",
+    usedTags: [
+      { key: "mangrove_restoration", name: "Mangrove restoration" }, // created in the same write
+      { uri: "at://did:plc:abc123/org.hypercerts.workscope.tag/3k2a4b5c6d7e8" }, // reused
+    ],
+    // version defaults to "v1"; createdAt to the time of the call
+  },
+});
+// result.workScope.usedTags[i] mirrors the input, with `created` as for the other records.
+```
+
+Each `usedTags` entry is the fields of a new work-scope tag (which can have its own `parent` and `supersededBy`, see [Tags and Features](./tags-and-features.md)) or `{ uri }` of an existing one. The expression is stored exactly as you write it: the SDK does not parse, evaluate or check it, so it does not notice a tag the expression names but `usedTags` leaves out.
+
 ## Defaults and record keys
 
 - `createdAt` is the time of the call, one timestamp for every record the call creates. Set it on a record to override.
@@ -51,7 +73,7 @@ The standalone `createRights`, `createContributorInformation` and `createContrib
 
 ## Atomicity and uploads
 
-All new records are sent in one `com.atproto.repo.applyWrites` request, which a PDS commits as a whole: every record exists afterwards or none does. Blobs are the exception: `Blob` values are uploaded first and are not part of that commit. If the PDS rejects the write (`WriteRejectedError`), this call leaves its uploads unreferenced. A PDS usually deletes unreferenced blobs after a while, but this is not guaranteed, and a blob with the same content that another record already uses stays. After a `WriteOutcomeUnknownError` the records may have been committed, and after a `WriteResultMismatchError` they were, so the blobs can stay referenced and publicly readable; check the attempted records before relying on cleanup. Existing records are read before anything is uploaded, so an unresolvable URI fails without side effects.
+All new records are sent in one `com.atproto.repo.applyWrites` request, which a PDS commits as a whole: every record exists afterwards or none does. One request holds at most 200 records on the reference PDS, so a call that would create more fails with a `TypeError` before anything is uploaded or written; the SDK does not split it. Blobs are the exception: `Blob` values are uploaded first and are not part of that commit. If the PDS rejects the write (`WriteRejectedError`), this call leaves its uploads unreferenced. A PDS usually deletes unreferenced blobs after a while, but this is not guaranteed, and a blob with the same content that another record already uses stays. After a `WriteOutcomeUnknownError` the records may have been committed, and after a `WriteResultMismatchError` they were, so the blobs can stay referenced and publicly readable; check the attempted records before relying on cleanup. Existing records are read before anything is uploaded, so an unresolvable URI fails without side effects.
 
 ## Failures
 

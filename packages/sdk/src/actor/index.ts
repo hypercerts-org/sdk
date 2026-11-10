@@ -1,6 +1,7 @@
 // Entry point for @hypercerts-org/sdk/actor.
 export type { StrongRef } from "../internal/resolve-record-ref.js";
 export {
+  RecordAlreadyExistsError,
   WriteError,
   WriteOutcomeUnknownError,
   WriteRejectedError,

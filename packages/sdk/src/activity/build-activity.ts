@@ -2,6 +2,7 @@ import { l } from "@atproto/lex";
 import * as strongRef from "@hypercerts-org/lexicon/com/atproto/repo/strongRef";
 import * as activity from "@hypercerts-org/lexicon/org/hypercerts/claim/activity";
 import * as defs from "@hypercerts-org/lexicon/org/hypercerts/defs";
+import * as cel from "@hypercerts-org/lexicon/org/hypercerts/workscope/cel";
 import type { SDKContext } from "../context.js";
 import {
   type BuildContext,
@@ -9,32 +10,40 @@ import {
   parseInput,
   prepareChecked,
 } from "../internal/build-context.js";
+import { describeValue } from "../internal/describe.js";
 import { blobOrUrl, compact, dateRange, strictObject } from "../internal/input.js";
 import { mediaValue } from "../internal/media.js";
 import type { PreparedRecord } from "../internal/prepare-record.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
-import { prepareNew, resolveExisting, type Slot, toSlot } from "../internal/slots.js";
-import { submitWrites } from "../internal/submit-writes.js";
+import {
+  assertDistinctKeys,
+  type ExistingRecord,
+  flattenSlots,
+  isInputObject,
+  newSlots,
+  prepareNew,
+  type ReferenceOf,
+  readBeforeWriting,
+  recordRef,
+  referenceLookup,
+  resultOf,
+  type Slot,
+  type SupportingRecordRef,
+  toSlot,
+} from "../internal/slots.js";
+import { assertWithinWriteLimit, submitWrites } from "../internal/submit-writes.js";
 import { type LocationInput, locationKind } from "../location/build-location.js";
+import {
+  type WorkScopeTagInput,
+  type WorkScopeTagResult,
+  workScopeTagKind,
+} from "../tag/build-tag.js";
 import { type ContributionInput, contributionKind } from "./build-contribution.js";
 import {
   type ContributorInformationInput,
   contributorInformationKind,
 } from "./build-contributor-information.js";
 import { type RightsInput, rightsKind } from "./build-rights.js";
-
-/**
- * Points at a record that already exists, to reuse it as it is.
- *
- * @remarks
- * The record is read to learn its current CID and is never rewritten. It must be a record of the
- * type the field holds (for example `org.hypercerts.claim.rights` for `rights`), identified by a
- * DID, not a handle: `at://<did>/<collection>/<rkey>`. It may belong to another account if it is
- * public. Do not combine `uri` with other fields; that would be ambiguous.
- */
-export interface ExistingRecord {
-  uri: string;
-}
 
 /**
  * A value the Activity stores directly, without a supporting record: a contributor's identity
@@ -63,6 +72,32 @@ export interface ContributorInput {
   weight?: string | undefined;
 }
 
+/**
+ * A structured work scope: a CEL (Common Expression Language) expression and the work-scope tags
+ * it uses.
+ *
+ * @remarks
+ * The expression is stored exactly as written. The SDK does not parse, evaluate or check it, so
+ * it does not notice a tag that the expression names but `usedTags` leaves out, or the reverse.
+ */
+export interface CelWorkScopeInput {
+  /**
+   * The CEL expression, for example `scope.hasAll(['mangrove_restoration']) && location.country
+   * == 'KE'`. At most 10000 characters and 5000 graphemes.
+   */
+  expression: string;
+  /**
+   * The work-scope tags the expression uses, at most 100: each entry is the data of a new
+   * `org.hypercerts.workscope.tag` record, created in the same write, or `{ uri }` of an existing
+   * one.
+   */
+  usedTags: readonly (WorkScopeTagInput | ExistingRecord)[];
+  /** The version of the CEL context schema. Defaults to `"v1"`. At most 16 characters. */
+  version?: string | undefined;
+  /** An ISO 8601 date-time. Defaults to the time of the call. */
+  createdAt?: string | undefined;
+}
+
 /** The data of a new `org.hypercerts.claim.activity` record and the supporting records it needs. */
 export interface ActivityInput {
   /** A display title. At most 256 characters. */
@@ -78,8 +113,11 @@ export interface ActivityInput {
    * uploads, or a URL string that is stored as it is.
    */
   image?: Blob | string | undefined;
-  /** A free-form description of the work scope. */
-  workScope?: string | undefined;
+  /**
+   * The work scope: a free-form description, or a structured CEL scope. See
+   * {@link CelWorkScopeInput}.
+   */
+  workScope?: string | CelWorkScopeInput | undefined;
   /** An ISO 8601 date-time: when the work began. */
   startDate?: string | undefined;
   /** An ISO 8601 date-time, not before `startDate`: when the work ended. */
@@ -92,17 +130,6 @@ export interface ActivityInput {
   locations?: readonly (LocationInput | ExistingRecord)[] | undefined;
   /** The contributors. See {@link ContributorInput}. */
   contributors?: readonly ContributorInput[] | undefined;
-}
-
-/**
- * A supporting record the Activity references, with whether this call created it.
- *
- * @remarks
- * `created` is `false` for a record passed as `{ uri }`; its CID is the one read before the write.
- */
-export interface SupportingRecordRef extends StrongRef {
-  /** `true` when this call created the record, `false` when it reused an existing one. */
-  created: boolean;
 }
 
 /** What a {@link createActivity} call stored for one contributor, in the order of the input. */
@@ -128,6 +155,8 @@ export interface CreateActivityResult {
   cid: StrongRef["cid"];
   /** The rights record, when the input had `rights`. */
   rights?: SupportingRecordRef;
+  /** The work-scope tags of a CEL `workScope`, in input order. Absent for a free-form scope. */
+  workScope?: { usedTags: readonly WorkScopeTagResult[] };
   /** The location records, in input order. */
   locations: readonly SupportingRecordRef[];
   /** The contributors, in input order. */
@@ -147,6 +176,13 @@ const contributorShape = strictObject({
   weight: l.optional(weight),
 });
 
+const celWorkScope = strictObject({
+  expression: l.string(),
+  usedTags: l.array(l.unknown()),
+  version: l.optional(l.string()),
+  createdAt: l.optional(l.string()),
+});
+
 const activityInput = l.refine(
   strictObject({
     title: l.string(),
@@ -154,7 +190,7 @@ const activityInput = l.refine(
     description: l.optional(l.string()),
     langs: l.optional(l.array(l.string())),
     image: l.optional(blobOrUrl),
-    workScope: l.optional(l.string()),
+    workScope: l.optional(l.unknown()),
     startDate: l.optional(l.string()),
     endDate: l.optional(l.string()),
     createdAt: l.optional(l.string()),
@@ -171,7 +207,18 @@ interface ContributorPlan {
   weight: string | undefined;
 }
 
+type WorkScopePlan =
+  | { kind: "text"; scope: string }
+  | {
+      kind: "cel";
+      expression: string;
+      version: string;
+      createdAt: string;
+      usedTags: Slot[];
+    };
+
 interface ActivityPlan {
+  workScope: WorkScopePlan | undefined;
   rights: Slot | undefined;
   locations: Slot[];
   contributors: ContributorPlan[];
@@ -180,6 +227,7 @@ interface ActivityPlan {
 // Reads every choice, and with it every nested record's data, before any request is sent.
 function planActivity(build: BuildContext, input: l.InferOutput<typeof activityInput>) {
   return {
+    workScope: planWorkScope(build, input.workScope),
     rights:
       input.rights === undefined
         ? undefined
@@ -207,52 +255,63 @@ function planActivity(build: BuildContext, input: l.InferOutput<typeof activityI
   } satisfies ActivityPlan;
 }
 
+function planWorkScope(build: BuildContext, value: unknown): WorkScopePlan | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === "string") return { kind: "text", scope: value };
+  if (!isInputObject(value)) {
+    throw new TypeError(
+      `${build.operation}: workScope must be a string (a free-form description) or { expression, usedTags } (a CEL scope), but received ${describeValue(value)}.`,
+    );
+  }
+  const scope = parseInput(build, "workScope", celWorkScope, value);
+  return {
+    kind: "cel",
+    expression: scope.expression,
+    version: scope.version ?? "v1",
+    createdAt: scope.createdAt ?? build.createdAt,
+    usedTags: scope.usedTags.map((tag, i) =>
+      toSlot(build, `workScope.usedTags[${i}]`, tag, workScopeTagKind, false),
+    ),
+  };
+}
+
+// The slots the Activity points at, in the order their records are written, nested ones before the
+// records that point at them.
 function allSlots(plan: ActivityPlan): Slot[] {
-  return [
+  return flattenSlots([
+    ...(plan.workScope?.kind === "cel" ? plan.workScope.usedTags : []),
     ...(plan.rights ? [plan.rights] : []),
     ...plan.locations,
     ...plan.contributors.flatMap(({ identity, details }) =>
       details ? [identity, details] : [identity],
     ),
-  ];
+  ]);
 }
 
 /**
  * Creates an Activity (`org.hypercerts.claim.activity`) together with the rights, locations,
- * contributor-information and contribution records it needs, in one atomic write.
+ * contributor-information, contribution and work-scope tag records it needs, in one atomic write.
  *
  * @remarks
- * Each supporting field says what you want with a tagged choice, so intent is never guessed:
- * - the fields of a record (a plain object) create a new record;
- * - `{ uri }` reuses an existing record, whose current CID is read and which is never rewritten.
- *   Its type must match the field, for example only `org.hypercerts.claim.rights` for `rights`;
- * - `{ inline: "..." }`, for a contributor's `identity` and `details` only, stores that string in
- *   the Activity itself (the lexicon's `contributorIdentity` and `contributorRole`) without a
- *   record.
+ * Each supporting field takes one of:
+ * - a new record's fields, to create it;
+ * - `{ uri }` of an existing record of the right type, reused as it is;
+ * - `{ inline: "..." }` (a contributor's `identity` and `details` only), stored in the Activity
+ *   itself without a record.
  *
- * Nothing is searched for or deduplicated: two calls with the same data create two sets of records.
+ * Nothing is deduplicated: two calls with the same data create two sets of records.
  *
- * Every record's key and CID are worked out locally before anything is sent, so the Activity can
- * reference the new records by strong reference, and one `com.atproto.repo.applyWrites` request
- * then creates the Activity and every new supporting record. The PDS commits that request as a
- * whole: all of the records exist afterwards or none do. This is the PDS's guarantee; the SDK's
- * end-to-end tests check it by making one record of the request fail on a real PDS.
+ * `workScope` is a string or a CEL scope, `{ expression, usedTags }` (see {@link CelWorkScopeInput}).
+ * The expression is stored as written; the SDK does not check it.
  *
- * Metadata defaults: `createdAt` is the time of the call (one timestamp for all the records the
- * call creates) unless you set it on a record. Every new record gets a new TID as its record key,
- * chosen by the SDK.
+ * Everything is created in one write: all the records exist afterwards, or none do. One write holds
+ * at most 200 records, the Activity included. `createdAt` defaults to the time of the call.
  *
- * Not supported: the lexicon's `signatures`, `shortDescriptionFacets`, a `description` that is not
- * a string and a `workScope` that is not a free-form string (CEL scopes).
+ * Not supported: `signatures`, `shortDescriptionFacets` and a non-string `description`.
  *
- * Blobs (`Blob` or `File` values for `image` and attachments) are uploaded before the write, and
- * URL strings are stored as they are and never fetched. Uploads are outside the atomic write: if
- * the PDS rejects the write, this call leaves the uploaded blobs unreferenced. A PDS usually deletes unreferenced blobs after a while, but this is not guaranteed, and a blob
- * with the same content that another record already uses stays.
- * After {@link WriteOutcomeUnknownError} or {@link WriteResultMismatchError} the records may exist,
- * so the blobs may be referenced and publicly readable. The order is: validate the input, read the existing records, upload blobs, validate each
- * record against its lexicon, write. A failed read or an input error stops before any upload; a
- * lexicon rule that rejects a record is only found after the blobs are uploaded.
+ * Files (`Blob` or `File` values) are uploaded before the write. If the write fails, they are left
+ * unused and the PDS may or may not delete them later. Input errors are found before any upload; a
+ * lexicon rule that rejects a record only after.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the records are created in that account's repo.
@@ -260,8 +319,9 @@ function allSlots(plan: ActivityPlan): Slot[] {
  * @returns The new Activity's URI and CID, and the references of the supporting records that
  * were created. See {@link CreateActivityResult}.
  * @throws {@link TypeError} If `input` has an unknown field, a mixed or wrongly typed choice (a
- * rights URI that points at another record type, `{ uri }` combined with record fields), an
- * invalid weight, an `endDate` before its `startDate`, or any value the lexicons do not allow.
+ * rights URI that points at another record type, `{ uri }` combined with record fields, a
+ * `workScope.usedTags` URI that is not a work-scope tag), an invalid weight, an `endDate` before
+ * its `startDate`, more new records than one write holds, or any value the lexicons do not allow.
  * The message names the field. Nothing was written. Blobs may already have been uploaded when a
  * lexicon rule rejects a record.
  * @throws {@link Error} If the client is not authenticated, an existing record cannot be read, or
@@ -303,6 +363,23 @@ function allSlots(plan: ActivityPlan): Slot[] {
  * console.log(result.uri, result.locations[0]); // { uri, cid, created: true }
  * ```
  *
+ * @example A structured work scope with a new and an existing tag
+ * ```ts
+ * import { createActivity } from "@hypercerts-org/sdk/activity";
+ *
+ * await createActivity(context, {
+ *   title: "Mangrove restoration in Kenya",
+ *   shortDescription: "Replanting 20 hectares of mangrove.",
+ *   workScope: {
+ *     expression: "scope.hasAll(['mangrove_restoration', 'environmental_education'])",
+ *     usedTags: [
+ *       { key: "mangrove_restoration", name: "Mangrove restoration" }, // created
+ *       { uri: "at://did:plc:abc123/org.hypercerts.workscope.tag/3k2a4b5c6d7e8" }, // reused
+ *     ],
+ *   },
+ * });
+ * ```
+ *
  * @example Handling an unknown outcome
  * ```ts
  * import { createActivity, WriteOutcomeUnknownError } from "@hypercerts-org/sdk/activity";
@@ -326,6 +403,19 @@ function allSlots(plan: ActivityPlan): Slot[] {
  *   rights: { uri: "at://did:plc:abc123/app.certified.location/3k2a4b5c6d7e8" }, // TypeError
  * });
  * ```
+ *
+ * @example A vocabulary tag is not a work-scope tag
+ * ```ts
+ * await createActivity(context, {
+ *   title: "…",
+ *   shortDescription: "…",
+ *   workScope: {
+ *     expression: "scope.has('site')",
+ *     // TypeError: this field holds org.hypercerts.workscope.tag
+ *     usedTags: [{ uri: "at://did:plc:abc123/org.hypercerts.vocab.tag/zone-role.site" }],
+ *   },
+ * });
+ * ```
  */
 export async function createActivity(
   context: SDKContext,
@@ -335,12 +425,16 @@ export async function createActivity(
   const parsed = parseInput(build, "input", activityInput, input);
   const plan = planActivity(build, parsed);
   const slots = allSlots(plan);
+  const fresh = newSlots(slots);
+  assertDistinctKeys(build, fresh);
+  // The Activity itself is one more record in the write.
+  assertWithinWriteLimit("createActivity", fresh.length + 1);
 
   // Reads first, then uploads: a URI that cannot be resolved fails before anything is uploaded.
-  const existing = await resolveExisting(build, slots);
+  const existing = await readBeforeWriting(build, slots, { checkKeys: true });
   const [image, created] = await Promise.all([
     parsed.image === undefined ? undefined : mediaValue(build, "image", parsed.image, "image"),
-    prepareNew(slots),
+    prepareNew(slots, existing),
   ]);
 
   const refOf = referenceLookup(existing, created);
@@ -352,22 +446,6 @@ export async function createActivity(
   );
   await submitWrites(context, build.did, [...created.values(), record], "createActivity");
   return { ...record.ref, ...summarise(plan, created, refOf) };
-}
-
-type ReferenceOf = (slot: Slot) => StrongRef;
-
-// The reference a slot has once the reads and the builds are done: the resolved CID of an existing
-// record, or the CID computed for a new one.
-function referenceLookup(
-  existing: ReadonlyMap<Slot, StrongRef>,
-  created: ReadonlyMap<Slot, PreparedRecord>,
-): ReferenceOf {
-  return (slot) => {
-    const ref = existing.get(slot) ?? created.get(slot)?.ref;
-    if (ref === undefined)
-      throw new Error(`createActivity: no reference was prepared for ${slot.field}.`);
-    return ref;
-  };
 }
 
 function activityRecord(
@@ -386,10 +464,7 @@ function activityRecord(
         : defs.descriptionString.build({ value: input.description }),
     langs: input.langs as l.LanguageString[] | undefined,
     image,
-    workScope:
-      input.workScope === undefined
-        ? undefined
-        : activity.workScopeString.build({ scope: input.workScope }),
+    workScope: plan.workScope && workScopeValue(plan.workScope, refOf),
     startDate: input.startDate as l.DatetimeString | undefined,
     endDate: input.endDate as l.DatetimeString | undefined,
     rights: plan.rights && refOf(plan.rights),
@@ -399,6 +474,16 @@ function activityRecord(
         ? undefined
         : plan.contributors.map((contributor) => contributorEntry(contributor, refOf)),
     createdAt: (input.createdAt ?? build.createdAt) as l.DatetimeString,
+  });
+}
+
+function workScopeValue(scope: WorkScopePlan, refOf: ReferenceOf) {
+  if (scope.kind === "text") return activity.workScopeString.build({ scope: scope.scope });
+  return cel.main.build({
+    expression: scope.expression,
+    usedTags: scope.usedTags.map(refOf),
+    version: scope.version,
+    createdAt: scope.createdAt as l.DatetimeString,
   });
 }
 
@@ -429,15 +514,21 @@ function summarise(
   created: ReadonlyMap<Slot, PreparedRecord>,
   refOf: ReferenceOf,
 ): Omit<CreateActivityResult, "uri" | "cid"> {
-  const recordRef = (slot: Slot): SupportingRecordRef => ({
-    ...refOf(slot),
-    created: created.has(slot),
-  });
+  const reference = (slot: Slot): SupportingRecordRef => recordRef(slot, created, refOf);
   const entry = (slot: Slot): SupportingRecordRef | InlineValue =>
-    slot.choice.kind === "inline" ? { inline: slot.choice.value } : recordRef(slot);
+    slot.choice.kind === "inline" ? { inline: slot.choice.value } : reference(slot);
+  const { workScope } = plan;
   return compact({
-    rights: plan.rights && recordRef(plan.rights),
-    locations: plan.locations.map(recordRef),
+    rights: plan.rights && reference(plan.rights),
+    workScope:
+      workScope?.kind === "cel"
+        ? {
+            usedTags: workScope.usedTags.map((tag) =>
+              resultOf<WorkScopeTagResult>(tag, created, refOf),
+            ),
+          }
+        : undefined,
+    locations: plan.locations.map(reference),
     contributors: plan.contributors.map(({ identity, details }) =>
       compact({ identity: entry(identity), details: details && entry(details) }),
     ),

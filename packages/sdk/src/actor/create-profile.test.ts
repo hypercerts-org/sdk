@@ -4,6 +4,7 @@ import { fakeRepo, methods, refTo } from "../test-utils/fake-repo.js";
 import {
   createProfile,
   ProfileAlreadyExistsError,
+  RecordAlreadyExistsError,
   WriteOutcomeUnknownError,
   WriteRejectedError,
 } from "./index.js";
@@ -65,8 +66,9 @@ describe("createProfile", () => {
     const error = await createProfile(context, { displayName: "Alice" }).catch((e) => e);
 
     expect(error).toBeInstanceOf(ProfileAlreadyExistsError);
+    expect(error).toBeInstanceOf(RecordAlreadyExistsError);
     expect(error).toBeInstanceOf(WriteRejectedError);
-    expect(error).toMatchObject({ status: 400, code: "InvalidSwap" });
+    expect(error).toMatchObject({ uri: SELF_URI, status: 400, code: "InvalidSwap" });
     expect(error.attempted.map((ref: { uri: string }) => ref.uri)).toEqual([SELF_URI]);
     expect(error.message).toContain("never overwrites");
     expect(puts).toHaveLength(0);

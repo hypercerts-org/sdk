@@ -50,6 +50,7 @@ pnpm test:e2e
 
 - The tests leave their records and blobs in the two accounts. Each test counts records only around its own call, so earlier runs do not matter. Destroy the sandbox (`deno task sandbox destroy --accept-destructive`) to start clean.
 - An account has one profile, so the `createProfile` tests delete the first account's profile (the `self` record) before each test.
+- A vocabulary tag's key is chosen by the caller and cannot be reused, so the tag tests give every tag a key that is different on every run.
 - To reuse another account's record, the SDK finds that account's PDS in the `plc.directory` DID document, and it cannot be pointed at another directory. The sandbox's accounts exist only in its own PLC directory, so `e2e/plc.ts` redirects requests for `https://plc.directory` to `SDK_E2E_PLC_URL` while those tests run.
 - One test uploads a 6 MiB file and expects the PDS to refuse it, which relies on the PDS's default upload limit of 5 MiB (`PDS_BLOB_UPLOAD_LIMIT`). Raise that limit in the sandbox and the test fails.
 - The test files run one after the other because the tests count the records of the two shared accounts.
