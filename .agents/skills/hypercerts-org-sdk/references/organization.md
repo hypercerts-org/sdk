@@ -75,11 +75,11 @@ The write is conditional on the account not having changed since the profile and
 
 ## After `WriteOutcomeUnknownError`
 
-`attempted` lists the profile (if it would be created), the new locations and, last, the organization. Calling `createOrganization` again is safe, even though new locations get fresh record keys: the call reads the organization first, so if the first attempt succeeded it throws `OrganizationAlreadyExistsError` before writing anything (no second set of locations or profile), and if it did not, nothing exists and the call creates everything. The records are those of the first error's `attempted`, not of the second call.
+`attempted` lists the profile (if it would be created), the new locations and, last, the organization. Calling `createOrganization` again is safe even though new locations get fresh record keys: it reads the organization first, so it either creates everything or throws `OrganizationAlreadyExistsError`, which means the first attempt succeeded (no second set of locations or profile). The new records are those of the first error's `attempted`.
 
 ## Uploads are outside the commit
 
-A `Blob`/`File` logo, a new location's `{ blob }` and (when the profile is created) the profile's images are uploaded after the reads and before the write. If the write is refused, they stay unreferenced (a PDS usually deletes them later, not guaranteed). An invalid input, an existing organization, a missing profile without `profileIfMissing`, a failed read, an unreadable `{ uri }` or more than 200 new records fails before any upload. A lexicon rule that rejects a record (for example more than three `langs`) is only found after the uploads.
+A `Blob`/`File` logo, a new location's `{ blob }` and (when the profile is created) the profile's images are uploaded after the reads and before the write and are not rolled back if it fails; see [Uploads are not part of the atomic write](../SKILL.md#uploads-are-not-part-of-the-atomic-write). An invalid input, an existing organization, a missing profile without `profileIfMissing`, a failed read, an unreadable `{ uri }` or more than 200 new records fails before any upload. A lexicon rule that rejects a record (for example more than three `langs`) is only found after the uploads.
 
 ## Pitfalls
 

@@ -137,12 +137,8 @@ const inputSchema = strictObject({
  * read the existing records the input points at, upload blobs, write. An invalid input, an existing
  * organization, a missing profile without `profileIfMissing`, a read that fails, or too many records
  * stops before any upload. Blobs (a `Blob` or `File` logo, a new location's `{ blob }`, and the
- * profile's images when the profile is created) are uploaded outside the atomic write: if a lexicon
- * rule or the PDS then rejects the write, they stay unreferenced. A PDS usually deletes unreferenced
- * blobs after a while, but this is not guaranteed, and a blob with the same content that another
- * record already uses stays. After {@link WriteOutcomeUnknownError} or
- * {@link WriteResultMismatchError} the records may exist, so the blobs may be referenced and publicly
- * readable.
+ * profile's images when the profile is created) are uploaded before the write and are not rolled
+ * back if it fails; see {@link uploadBlob}.
  *
  * The OAuth session needs `create` on `app.certified.actor.organization`, and on
  * `app.certified.actor.profile` and `app.certified.location` when this call creates them. Unlike
@@ -166,20 +162,17 @@ const inputSchema = strictObject({
  * was written.
  * @throws {@link OrganizationAlreadyExistsError} If the account already has an organization.
  * Nothing was uploaded or written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). Nothing was created
- * or changed. With `code` `"InvalidSwap"` the repository changed after it was read; call again.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). With `code`
+ * `"InvalidSwap"` the repository changed after it was read; call again.
  * {@link OrganizationAlreadyExistsError} has the same `code` but is not retryable: rule out
  * `instanceof RecordAlreadyExistsError` first.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS (network
- * failure, timeout, a server error), so the records may or may not exist. It lists the URI and CID of
- * every record the request would have created. The SDK does not retry. Calling again is safe, even
- * though new locations get fresh record keys: the call reads the organization first, so if the first
- * attempt succeeded it throws {@link OrganizationAlreadyExistsError} before writing anything, and no
- * second set of locations (or profile) is created; if it did not, nothing exists and the call
- * creates everything. Its records are the ones in `attempted` of the first error, not of the
- * second call.
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is safe even though new locations get fresh record keys: the call reads the organization first,
+ * so it either creates everything or throws {@link OrganizationAlreadyExistsError}, which then
+ * means the first attempt succeeded and no second set of locations or profile is created. The new
+ * records are the ones in `attempted` of the first error.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
- * computed, so the references between the new records may not match what is stored.
+ * computed.
  *
  * @example Creating an organization and, if the account has none, its profile
  * ```ts
