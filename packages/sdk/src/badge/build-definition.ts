@@ -1,11 +1,10 @@
-import { type DidString, l, parseCid } from "@atproto/lex";
+import { type DidString, l } from "@atproto/lex";
 import * as definition from "@hypercerts-org/lexicon/app/certified/badge/definition";
 import * as certifiedDefs from "@hypercerts-org/lexicon/app/certified/defs";
-import { uploadBlob } from "../blob/upload-blob.js";
 import type { BuildContext } from "../internal/build-context.js";
 import { createStandalone, type StandaloneCreator } from "../internal/create-record.js";
-import { describeError } from "../internal/describe.js";
 import { blob, optionalText } from "../internal/input.js";
+import { assertFileAllowed, uploadField } from "../internal/media.js";
 import { type RecordKind, recordKind } from "../internal/record-kind.js";
 
 /** The data of a new `app.certified.badge.definition` record. */
@@ -34,41 +33,20 @@ export interface BadgeDefinitionInput {
   createdAt?: string | undefined;
 }
 
-// The lexicon decides which types and sizes an icon may have, so the check runs its own schema on a
-// definition that holds a blob reference built from the file's type and size, with a well-formed CID
-// standing in for the one the upload will return. A Blob with no type is left to `uploadBlob`, which
-// explains how to supply one.
-function assertIconAllowed(build: BuildContext, field: string, file: Blob): void {
-  if (file.type === "") return;
-  const placeholder = parseCid("bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq", {
-    flavor: "raw",
-  });
-  const result = definition.main.safeValidate({
-    $type: definition.main.$type,
-    title: "icon check",
-    badgeType: "icon check",
-    createdAt: build.createdAt,
-    icon: { $type: "blob", ref: placeholder, mimeType: file.type, size: file.size },
-  });
-  if (!result.success) {
-    throw new TypeError(
-      `${build.operation}: ${field} cannot be used as a badge icon (${file.type}, ${file.size} bytes): ${result.message}. Nothing was uploaded.`,
-      { cause: result },
-    );
-  }
-}
-
 // `icon` is a blob field of the definition itself, not a wrapper object like the images of the
-// other records, so the shared media helper does not apply and the reference is stored as it is.
+// other records, so `mediaValue` does not apply and the reference is stored as it is. The lexicon
+// decides which types and sizes an icon may have, so the check runs the definition's own schema.
 async function uploadIcon(build: BuildContext, field: string, file: Blob) {
-  assertIconAllowed(build, field, file);
-  try {
-    return await uploadBlob(build.context, file);
-  } catch (error) {
-    throw new Error(`${build.operation}: could not upload ${field}: ${describeError(error)}`, {
-      cause: error,
-    });
-  }
+  assertFileAllowed(build, field, file, "used as a badge icon", (icon) =>
+    definition.main.safeValidate({
+      $type: definition.main.$type,
+      title: "icon check",
+      badgeType: "icon check",
+      createdAt: build.createdAt,
+      icon,
+    }),
+  );
+  return uploadField(build, field, file);
 }
 
 export const badgeDefinitionKind: RecordKind<BadgeDefinitionInput> = recordKind(
