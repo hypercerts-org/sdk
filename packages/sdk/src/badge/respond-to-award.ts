@@ -94,8 +94,7 @@ function recipientOf({ subject }: award.Main, uri: string): DidString {
  * Nothing is deduplicated or overwritten: every call creates a response under a new record key, so
  * responding twice, even with a different answer, leaves two responses. The SDK has no operation
  * that changes or removes one, and does not check for an earlier response; how to read several
- * responses to one award is up to the consumer. A write that failed with an unknown outcome is not
- * safe to repeat for the same reason.
+ * responses to one award is up to the consumer.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated as the recipient.
@@ -108,10 +107,9 @@ function recipientOf({ subject }: award.Main, uri: string): DidString {
  * @throws {@link Error} If the client is not authenticated; the award cannot be read or is not a
  * valid `app.certified.badge.award`; its recipient cannot be determined; or the signed-in account is
  * not the recipient. Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the
- * response may or may not exist. It carries the URI to check. The SDK does not retry, because
- * calling again would create a second response if the first attempt had succeeded.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create a second response if the first attempt had succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *

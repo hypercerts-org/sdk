@@ -83,9 +83,8 @@ export const badgeDefinitionKind: RecordKind<BadgeDefinitionInput> = recordKind(
  *
  * `icon` is uploaded before the record is written. The SDK checks its type and size against the
  * lexicon (PNG, JPEG, WebP or SVG, at most 1 MiB) first, so a file the record would reject is not
- * uploaded. The upload is not part of the write: if the write fails, the uploaded blob is left
- * unreferenced. A PDS usually deletes unreferenced blobs after a while, but this is not guaranteed,
- * and a blob with the same content that another record already uses stays.
+ * uploaded. Blobs are uploaded before the write and are not rolled back if it fails; see
+ * {@link uploadBlob}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
@@ -96,10 +95,9 @@ export const badgeDefinitionKind: RecordKind<BadgeDefinitionInput> = recordKind(
  * does not allow (for example a `title` over 256 characters). Nothing was written. Blobs may
  * already have been uploaded when a lexicon rule other than the icon's rejects the record.
  * @throws {@link Error} If the client is not authenticated, or the icon upload fails.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the
- * definition may or may not exist. It carries the URI to check. The SDK does not retry, because
- * calling again would create a second definition if the first attempt had succeeded.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create a second definition if the first attempt had succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *
