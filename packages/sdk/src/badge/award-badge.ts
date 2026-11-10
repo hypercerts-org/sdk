@@ -84,19 +84,24 @@ const awardInput = strictObject({
   createdAt: optionalText,
 });
 
+function describeStart(
+  start: string,
+  { validFrom, createdAt }: Pick<l.InferOutput<typeof awardInput>, "validFrom" | "createdAt">,
+): string {
+  if (validFrom !== undefined) return `validFrom (${start})`;
+  const defaulted =
+    createdAt === undefined ? " and createdAt defaults to the time of the call" : "";
+  return `createdAt (${start}), which is when the badge starts to apply because validFrom is left out${defaulted}`;
+}
+
 // The effective start is the one the lexicon documents: `validFrom`, else `createdAt` (which, left
 // out, is the time of the call). A date that does not parse is not judged here: the lexicon
 // rejects it when the award is validated.
-function assertValidityRange(
-  build: BuildContext,
-  { validFrom, validUntil, createdAt }: l.InferOutput<typeof awardInput>,
-): void {
+function assertValidityRange(build: BuildContext, input: l.InferOutput<typeof awardInput>): void {
+  const { validFrom, validUntil, createdAt } = input;
   const start = validFrom ?? createdAt ?? build.createdAt;
   if (!endsBeforeStart({ startDate: start, endDate: validUntil })) return;
-  const startsAt =
-    validFrom === undefined
-      ? `createdAt (${start}), which is when the badge starts to apply because validFrom is left out${createdAt === undefined ? " and createdAt defaults to the time of the call" : ""}`
-      : `validFrom (${start})`;
+  const startsAt = describeStart(start, input);
   throw new TypeError(
     `${build.operation}: validUntil (${validUntil}) is earlier than ${startsAt}, so the badge would end before it starts. Nothing was written.`,
   );
