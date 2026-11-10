@@ -113,7 +113,7 @@ The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor
 | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | `TypeError`                | Bad input. The message names the field (e.g. `contributors[1].weight`). Nothing written.       | Fix the input.                                |
 | `Error`                    | Not authenticated, a `{ uri }` record could not be read, or an upload failed. Nothing written. | Fix auth or the URI, then retry.              |
-| `WriteRejectedError`       | PDS answered 4xx. Nothing created or changed. `status`, `code`.                                | Safe to fix and retry. `InvalidSwap` (collection and organization writes): the account was written to after it was read; call again. `OrganizationAlreadyExistsError` and `ProfileAlreadyExistsError` carry the same code but are not retryable (see the next row). |
+| `WriteRejectedError`       | PDS answered 4xx. Nothing created or changed. `status`, `code`.                                | Safe to fix and retry. `InvalidSwap`: see [Concurrent changes](#concurrent-changes-invalidswap). |
 | `RecordAlreadyExistsError` | A key you chose is taken (a `WriteRejectedError`). `uri` names the record. Nothing written.    | Use it as `{ uri }`, or choose another key.   |
 | `WriteOutcomeUnknownError` | Network error, timeout or 5xx. The records may exist. `attempted` lists every URI.             | Check before retrying.                        |
 | `WriteResultMismatchError` | Created, but the PDS reported other URIs/CIDs (`reported` vs `attempted`).                     | Do not retry. Log it and inspect the records. |
@@ -145,6 +145,35 @@ try {
 ```
 
 `recordExists` is your own helper around `com.atproto.repo.getRecord`, which returns `RecordNotFound` when the record is missing.
+
+### Concurrent changes (`InvalidSwap`)
+
+`applyWrites` cannot say "only if this record is absent" or "only if it is unchanged". `createOrganization` and `createActivityInCollection` decide something from what they read, so they read the account's latest commit first, then the records, and send the write conditional on that commit. If **anything** wrote to the account in between (even an unrelated record, such as a post), the PDS refuses the whole request: `WriteRejectedError` with `code === "InvalidSwap"`. Nothing was written and nothing is wrong with the input. The SDK never retries or merges. Calling again reads everything afresh, so it is safe.
+
+A taken key has the same `code`, but calling again cannot fix it. `RecordAlreadyExistsError` (and its subclasses `OrganizationAlreadyExistsError` and `ProfileAlreadyExistsError`) is a `WriteRejectedError` too, so rule it out first:
+
+```ts
+import {
+  createOrganization,
+  RecordAlreadyExistsError,
+  WriteRejectedError,
+} from "@hypercerts-org/sdk/organization";
+
+try {
+  return await createOrganization(context, input);
+} catch (error) {
+  if (
+    error instanceof WriteRejectedError &&
+    error.code === "InvalidSwap" &&
+    !(error instanceof RecordAlreadyExistsError)
+  ) {
+    return await createOrganization(context, input); // reads everything afresh
+  }
+  throw error;
+}
+```
+
+`createActivityInCollection` uses the same check, with `WriteRejectedError` from `@hypercerts-org/sdk/collection`. Calling again does not help when the cause is a taken `key` of a new tag in its `activity`: pass `{ uri }` or choose another key.
 
 ## Pitfalls
 

@@ -128,14 +128,10 @@ const inputSchema = strictObject({
  * `com.atproto.repo.applyWrites` request, which the PDS commits as a whole: all of them exist
  * afterwards, or none does. One write holds at most 200 records.
  *
- * Concurrent changes: `applyWrites` cannot say "only if this record is absent", so the SDK reads
- * the latest commit of the repository first, then the profile and the organization, and asks the PDS
- * to apply the write only if the repository is still at that commit (`swapCommit`). If anything
- * else wrote to the account in between, the PDS rejects the whole request, nothing is written, and
- * this throws {@link WriteRejectedError} with `code` `"InvalidSwap"`. That covers another call
- * creating the organization or the profile in the meantime, and keeps the decision "reuse or create
- * the profile" from going stale. It is coarse: an unrelated write to the same account (a post, a
- * like) causes it too. The SDK does not retry or merge; call again, which reads everything afresh.
+ * Concurrent changes: the write is conditional on the account not having changed since the profile
+ * and the organization were read, so another call creating either one in the meantime cannot make
+ * the decision "reuse or create the profile" stale. If it did change, this throws
+ * {@link WriteRejectedError} with `code` `"InvalidSwap"`; see there.
  *
  * The order is: validate the input, read the latest commit, read the profile and the organization,
  * read the existing records the input points at, upload blobs, write. An invalid input, an existing

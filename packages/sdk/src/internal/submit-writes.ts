@@ -28,9 +28,19 @@ export abstract class WriteError extends Error {
  * needs cleaning up, except any blobs uploaded before the write (see {@link uploadBlob}).
  *
  * `status` and `code` are the HTTP status and the XRPC error code (for example `InvalidRequest`).
- * `code` is `InvalidSwap` when the repository changed after the SDK read it (see the operation's
- * documentation): nothing is wrong with the input, and calling again reads the repository afresh.
  * `cause` is the client's original error.
+ *
+ * @remarks
+ * Concurrent changes (`InvalidSwap`): `applyWrites` cannot say "only if this record is absent" or
+ * "only if it is unchanged". An operation that decides something from what it read (whether a
+ * record exists, what a record holds) therefore reads the repository's latest commit first, then
+ * those records, and asks the PDS to apply the write only if the repository is still at that
+ * commit (`swapCommit`). If anything else wrote to the account in between, the PDS rejects the
+ * whole request with `code` `"InvalidSwap"` and nothing is written. The check is coarse: an
+ * unrelated write to the same account (a post, a like, another call) causes it too, so an account
+ * that writes often will see it now and then. Nothing is wrong with the input. The SDK does not
+ * retry or merge; call again, which reads everything afresh. {@link RecordAlreadyExistsError} has
+ * the same `code`, but calling again cannot fix a taken key: rule it out first.
  */
 export class WriteRejectedError extends WriteError {
   override readonly name: string = "WriteRejectedError";

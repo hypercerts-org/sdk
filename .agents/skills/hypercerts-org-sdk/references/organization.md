@@ -71,29 +71,7 @@ A failed read of the profile or the organization (network error, 5xx, 403) throw
 
 ## Concurrent writes (`InvalidSwap`)
 
-`applyWrites` cannot say "only if this record is absent". The SDK reads the repository's latest commit first, then the profile and the organization, and sends the write conditional on that commit. If **anything** wrote to the account in between (another call creating the organization or the profile, or an unrelated record), the PDS refuses the whole request: `WriteRejectedError` with `code === "InvalidSwap"`. Nothing was written. The SDK never retries or merges; calling again reads everything afresh (and then throws `OrganizationAlreadyExistsError` if the other writer created it). `OrganizationAlreadyExistsError` has the same `code`, so exclude `RecordAlreadyExistsError` in a retry guard, as below.
-
-```ts
-import {
-  createOrganization,
-  RecordAlreadyExistsError,
-  WriteRejectedError,
-} from "@hypercerts-org/sdk/organization";
-
-try {
-  return await createOrganization(context, input);
-} catch (error) {
-  if (
-    error instanceof WriteRejectedError &&
-    error.code === "InvalidSwap" &&
-    // OrganizationAlreadyExistsError has the same code, but calling again cannot fix it.
-    !(error instanceof RecordAlreadyExistsError)
-  ) {
-    return await createOrganization(context, input);
-  }
-  throw error;
-}
-```
+The write is conditional on the account not having changed since the profile and the organization were read, so another call creating either one in between cannot make "reuse or create the profile" stale. When it did change you get `WriteRejectedError` with `code === "InvalidSwap"`: see [Concurrent changes](../SKILL.md#concurrent-changes-invalidswap) for the rule and the retry example. Calling again reads everything afresh and then throws `OrganizationAlreadyExistsError` if the other writer created the organization.
 
 ## After `WriteOutcomeUnknownError`
 

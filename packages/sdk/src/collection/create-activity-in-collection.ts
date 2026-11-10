@@ -72,15 +72,10 @@ const inputSchema = strictObject({
  * `createdAt` and the existing items with their order, weights and references. The existing items
  * are not read again or checked. The new item is appended at the end.
  *
- * Concurrent changes: `applyWrites` cannot say "only if this record is unchanged", so the SDK
- * reads the latest commit of the repository, then the Collection, and asks the PDS to apply the
- * write only if the repository is still at that commit (`swapCommit`). If anything else wrote to
- * the account in between, the PDS rejects the whole request, nothing is written, and this throws
- * {@link WriteRejectedError} with `code` `"InvalidSwap"`. That guards against a lost update, but it
- * is coarse: it also fires for an unrelated write to the same account (a post, a like, another
- * call of this function), so an account that writes often will see it now and then. The window is
- * short, because the uploads happen before the repository is read. The SDK does not retry or
- * merge; call again and it reads the Collection afresh.
+ * Concurrent changes: the write is conditional on the account not having changed since the
+ * Collection was read, so a concurrent change to its `items` cannot be overwritten with a stale
+ * list. If it did change, this throws {@link WriteRejectedError} with `code` `"InvalidSwap"`; see
+ * there.
  *
  * Signatures: the Collection's `signatures` field is neither checked nor changed. Appending an
  * item changes the record's content, so any signature that was made over the previous content no
