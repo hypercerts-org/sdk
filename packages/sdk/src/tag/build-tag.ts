@@ -137,8 +137,8 @@ export const vocabularyTagKind: RecordKind<VocabularyTagInput> = recordKind(
  * with only `create` it throws {@link WriteRejectedError}. Creating nested tags too needs only
  * `create`, and everything is created in one write of at most 200 records.
  *
- * `createdAt` defaults to the time of the call. A `Blob` in `referenceDocument` is uploaded before
- * the write; if the write fails, it is left unused and the PDS may or may not delete it later.
+ * `createdAt` defaults to the time of the call. A `Blob` in `referenceDocument` is uploaded. Blobs
+ * are uploaded before the write and are not rolled back if it fails; see {@link uploadBlob}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
@@ -274,8 +274,8 @@ export const workScopeTagKind: RecordKind<WorkScopeTagInput> = recordKind(
  * nested to any depth. Everything is created in one write of at most 200 records: all of it exists
  * afterwards, or none does. `createdAt` defaults to the time of the call.
  *
- * A `Blob` in `referenceDocument` is uploaded before the write; if the write fails, it is left
- * unused and the PDS may or may not delete it later.
+ * A `Blob` in `referenceDocument` is uploaded. Blobs are uploaded before the write and are not
+ * rolled back if it fails; see {@link uploadBlob}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.

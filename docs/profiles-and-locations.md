@@ -57,7 +57,7 @@ Because the write is a `putRecord`, an OAuth session needs both the `create` and
 
 If a call ends in `WriteOutcomeUnknownError` (no usable answer from the PDS), you can call `createProfile` again: the profile is only created if absent, so the retry either creates it or throws `ProfileAlreadyExistsError`, which then means the profile exists, most likely from the first attempt. This differs from `createActivity`, where a retry after an unknown outcome could duplicate records.
 
-`ProfileAlreadyExistsError` extends `WriteRejectedError`, so code that handles rejected writes handles it too. A `Blob` image is uploaded before the write, so a rejected call (including this one) leaves the upload unreferenced; see [Atomicity and uploads](./creating-activities.md#atomicity-and-uploads).
+`ProfileAlreadyExistsError` extends `WriteRejectedError`, so code that handles rejected writes handles it too. A `Blob` image is uploaded before the write and is not rolled back if it fails, including with this error; see [Atomicity and uploads](./creating-activities.md#atomicity-and-uploads).
 
 ## Create a location
 

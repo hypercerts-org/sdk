@@ -96,7 +96,9 @@ const ref = await uploadBlob(context, await readFile("report.pdf"), {
 - It returns the blob ref (`ref`, `mimeType`, `size`) to embed in a record.
 - The SDK does not check size or type limits. The PDS checks them on upload, and the record's lexicon checks them on write.
 
-Uploads happen before the write and are not rolled back. If the PDS rejects the write, this call leaves its blobs unreferenced. A PDS usually deletes unreferenced blobs after a while, but that is not guaranteed, and a blob with the same content that another record already uses stays. After `WriteOutcomeUnknownError` or `WriteResultMismatchError` the records may exist, so the blobs may be referenced and publicly readable.
+### Uploads are not part of the atomic write
+
+Uploads happen before the write and are not rolled back, so a call that throws can leave blobs that no record references. A PDS usually deletes unreferenced blobs after a while, but that is not guaranteed, and a blob with the same content that another record already uses stays. After `WriteOutcomeUnknownError` or `WriteResultMismatchError` the records may exist, so the blobs may be referenced and publicly readable.
 
 ## 6. Handle failures
 

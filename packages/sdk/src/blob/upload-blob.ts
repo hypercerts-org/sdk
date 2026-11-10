@@ -32,10 +32,18 @@ export interface UploadBlobOptions {
  * @remarks
  * The upload goes through the context's client; the SDK opens no connection of its own.
  *
- * The blob is not part of any record yet. A PDS may delete blobs that no record references after a
- * short time, so write the record that uses the reference soon after uploading. If that write
- * fails, the upload is not rolled back. Deletion of unreferenced blobs is not guaranteed, and a
- * blob with the same content that another record already uses stays.
+ * Uploads are not part of the atomic write. A blob is stored as soon as it is uploaded, before any
+ * record refers to it, and a record write that fails afterwards does not undo it. The `create*`
+ * operations upload the `Blob` and `File` values in their input before they write, so a call that
+ * throws can leave blobs that no record references. A PDS usually deletes unreferenced blobs after
+ * a while, but this is not guaranteed, and a blob with the same content that another record already
+ * uses stays. After {@link WriteOutcomeUnknownError} or {@link WriteResultMismatchError} the records
+ * may exist (after a mismatch they do), so the blobs may be referenced and publicly readable: check
+ * the attempted records before relying on cleanup.
+ *
+ * The blob is not part of any record yet when you call this function yourself, and a PDS may delete
+ * blobs that no record references after a short time. Write the record that uses the reference
+ * soon after uploading.
  *
  * The SDK does not fetch external URLs (a URL in a record stays a URL), read file paths, resize or
  * convert content, or check MIME type and size limits. The PDS enforces its limits when it

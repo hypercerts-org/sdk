@@ -39,9 +39,8 @@ export const rightsKind: RecordKind<RightsInput> = recordKind(
  * @remarks
  * The record key is a new TID chosen by the SDK, and `createdAt` defaults to the time of the call.
  * A `Blob` attachment is uploaded before the record is written; a URL string is stored as it is
- * and never fetched. An upload is not part of the write: if the PDS rejects the write, this call
- * leaves the uploaded blob unreferenced. A PDS usually deletes unreferenced blobs after a while, but this is not guaranteed, and a blob
- * with the same content that another record already uses stays.
+ * and never fetched. Blobs are uploaded before the write and are not rolled back if it fails; see
+ * {@link uploadBlob}.
  *
  * Nothing is looked up or deduplicated: calling this twice creates two records. To use a rights
  * record that already exists, pass its URI as `rights` to {@link createActivity} instead.

@@ -125,10 +125,8 @@ function isGeoJsonPoint(value: string): boolean {
  * The record key is a new TID chosen by the SDK, and `createdAt` defaults to the time of the call.
  * `location` says where the data is: `{ string }` stores it in the record, `{ uri }` points at
  * external data that is stored as a URL and never fetched, and `{ blob }` uploads a file (any type,
- * up to 10 MB) before the record is written. An upload is not part of the write: if the PDS
- * rejects the write, this call leaves the uploaded blob unreferenced. A PDS usually deletes
- * unreferenced blobs after a while, but this is not guaranteed, and a blob with the same content
- * that another record already uses stays.
+ * up to 10 MB) before the record is written. Blobs are uploaded before the write and are not
+ * rolled back if it fails; see {@link uploadBlob}.
  *
  * The data is stored as you give it and nothing is geocoded. Only two types are checked:
  * `country-code` must be `{ string }` with an uppercase ISO 3166-1 alpha-2 code, as the lexicon

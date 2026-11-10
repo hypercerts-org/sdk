@@ -84,10 +84,9 @@ export class ProfileAlreadyExistsError extends RecordAlreadyExistsError {
  * HTTP 403 and this function throws {@link WriteRejectedError}.
  *
  * `createdAt` defaults to the time of the call. A `Blob` avatar or banner is uploaded before the
- * record is written; a URL string is stored as it is and never fetched. An upload is not part of
- * the write: if the write fails, including when the profile already exists, this call leaves the
- * uploaded blob unreferenced. A PDS usually deletes unreferenced blobs after a while, but this is
- * not guaranteed, and a blob with the same content that another record already uses stays.
+ * record is written; a URL string is stored as it is and never fetched. Blobs are uploaded before
+ * the write and are not rolled back if it fails, including when the profile already exists; see
+ * {@link uploadBlob}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.

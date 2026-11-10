@@ -18,7 +18,7 @@ export type BlobKind = "image" | "largeImage" | "blob";
  * Internal. Boundaries:
  * - Never fetches a URL, and does not validate it here; the record's lexicon does.
  * - Checks a blob's type and size against the lexicon's limits before uploading, so a file the
- *   record would reject is not left behind as an unreferenced upload.
+ *   record would reject is never uploaded.
  *
  * Throws TypeError for a file the lexicon does not allow, and Error when the upload fails.
  */

@@ -48,7 +48,7 @@ Any other `WriteRejectedError` (4xx) is not fixed by calling again. After `Write
 
 ## Uploads are outside the commit
 
-`Blob`/`File` values are uploaded before the repository is read. If the write is refused, the blobs stay unreferenced (a PDS usually deletes them later, not guaranteed). A bad URI, another account's Collection, a missing, invalid or full Collection, or an invalid `activity` fails before any upload (the Collection is read once up front, then again after the latest commit for the guarded write).
+`Blob`/`File` values are uploaded before the repository is read and are not rolled back if the write fails; see [Uploads are not part of the atomic write](../SKILL.md#uploads-are-not-part-of-the-atomic-write). A bad URI, another account's Collection, a missing, invalid or full Collection, or an invalid `activity` fails before any upload (the Collection is read once up front, then again after the latest commit for the guarded write).
 
 ## `CreateActivityInCollectionInput`
 

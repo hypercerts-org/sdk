@@ -142,8 +142,9 @@ type FeatureTree = SupportingRecordRef & {
  * at most 200 records. The OAuth session needs `create` on the Feature, tag and location
  * collections it writes to.
  *
- * Files (`Blob` values) are uploaded before the write. If the write fails, they are left unused and
- * the PDS may or may not delete them later.
+ * Files (`Blob` values) are uploaded: a new tag's `referenceDocument` and a new location's
+ * `{ blob }`. Blobs are uploaded before the write and are not rolled back if it fails; see
+ * {@link uploadBlob}.
  *
  * Not supported: the lexicon's `signatures`, a blob that was uploaded already, and updating a
  * Feature.
@@ -169,7 +170,7 @@ type FeatureTree = SupportingRecordRef & {
  * was attempted. The SDK does not retry, because a retry would create a second Feature under a new
  * key if the first attempt had succeeded. Check the URIs, then decide.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
- * computed, so the references between the new records may not match what is stored.
+ * computed.
  *
  * @example A Feature with a new tag, an existing tag and a new location
  * ```ts
