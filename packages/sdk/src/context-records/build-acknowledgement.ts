@@ -113,10 +113,10 @@ const acknowledgementKind: RecordKind<AcknowledgementInput> = recordKind(
  * `context` string that is not a URI. The message names the field. Nothing was written.
  * @throws {@link Error} If the client is not authenticated, or the `subject` or `context` record
  * cannot be read. Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the record
- * may or may not exist. It carries the URI to check; the SDK does not retry, because a retry would
- * create a second acknowledgement under a new key if the first attempt had succeeded.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create a second acknowledgement under a new key if the first attempt had
+ * succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *

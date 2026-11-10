@@ -129,6 +129,9 @@ export const measurementKind: RecordKind<MeasurementInput> = recordKind(
  * with no new location is a write of one record. One write holds at most 200 records. The OAuth
  * session needs `create` on the measurement and location collections it writes to.
  *
+ * A `{ blob }` in a new location is uploaded. Blobs are uploaded before the write and are not
+ * rolled back if it fails; see {@link uploadBlob}.
+ *
  * Not supported: the lexicon's `signatures` and `commentFacets`.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
@@ -144,12 +147,9 @@ export const measurementKind: RecordKind<MeasurementInput> = recordKind(
  * may already have been uploaded when a lexicon rule rejects a record.
  * @throws {@link Error} If the client is not authenticated, an existing record cannot be read, or
  * an upload fails.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). None of the records
- * was created and nothing needs cleaning up.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS (network
- * failure, timeout, a server error), so the records may or may not exist. It lists every URI that
- * was attempted. The SDK does not retry, because a retry would create duplicates under new keys
- * if the first attempt had succeeded. Check the URIs, then decide.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create duplicates under new keys if the first attempt had succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *
