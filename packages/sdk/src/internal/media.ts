@@ -69,7 +69,7 @@ export async function uploadField(
 
 /**
  * Checks a file against a lexicon's rules before it is uploaded, so a file the record would reject
- * is not left behind as an unreferenced upload.
+ * is never uploaded.
  *
  * Internal. `validate` runs the lexicon's own schema on a blob reference built from the file's type
  * and size, with a well-formed CID standing in for the one the upload will return; that reference

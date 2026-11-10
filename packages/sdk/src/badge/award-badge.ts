@@ -138,9 +138,9 @@ function assertValidityRange(build: BuildContext, input: l.InferOutput<typeof aw
  * The order is: validate the input, read the subject record, read an existing definition or upload
  * a new definition's icon, validate the records against their lexicons, write. Invalid input, a
  * refused issuer and an unreadable subject or definition stop before any upload. A rule of the
- * award's or the new definition's lexicon (for example a `note` over 500 characters) is only found
- * after the icon is uploaded. If the PDS rejects the write, or a lexicon rule does, the uploaded icon
- * stays unreferenced; see {@link createBadgeDefinition}.
+ * award's or the new definition's lexicon (for example a `note` over 500 characters) is found only
+ * after the icon is uploaded. A new definition's `icon` is the only file uploaded. Blobs are
+ * uploaded before the write and are not rolled back if it fails; see {@link uploadBlob}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the award, and a new definition, are created in that account's repo.
@@ -156,13 +156,12 @@ function assertValidityRange(build: BuildContext, input: l.InferOutput<typeof aw
  * @throws {@link Error} If the client is not authenticated; the signed-in account is not allowed to
  * award the badge; the subject or the existing definition cannot be read, or the definition is not a
  * valid `app.certified.badge.definition`; or the icon upload fails. Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the award
- * and a new definition may or may not exist. It lists their URIs, the definition first. The SDK does
- * not retry, because a retry would create a second award if the first attempt had succeeded. Check
- * the URIs, then decide.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. `attempted`
+ * lists a new definition, if any, then the award. Calling again is not safe: it would create a
+ * second award if the first attempt had succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
- * computed, so the award's reference to the definition may not match what is stored.
+ * computed.
  *
  * @example Awarding an existing badge to an account
  * ```ts

@@ -54,7 +54,7 @@ await awardBadge(context, {
 - `validFrom` defaults to `createdAt` (which defaults to the time of the call). A `validUntil` earlier than `validFrom`, or than `createdAt` when `validFrom` is omitted, throws `TypeError`. Timestamps are stored as given. `validUntil` marks the award expired; it is not revocation.
 - Awarding does not accept the badge for the recipient; they use `respondToBadgeAward`.
 - The new definition and the award are one `applyWrites` commit: both exist afterwards, or neither does.
-- `WriteOutcomeUnknownError.attempted` lists the new definition (if any) first, then the award. Do not call again blindly: it would create a second award. Check the URIs with `com.atproto.repo.getRecord` first.
+- After `WriteOutcomeUnknownError`, `attempted` lists the new definition (if any) first, then the award. Calling again is not safe: it would create a second award.
 - Nothing is deduplicated: awarding the same badge to the same subject twice creates two awards.
 
 ## respondToBadgeAward
@@ -74,11 +74,11 @@ await respondToBadgeAward(context, { awardUri, response: "rejected" });
 
 - The recipient of an award to an account is that account. For an award to a record it is the account whose repository holds the record (the SDK's rule; the lexicon does not say). Any other signed-in account, the issuer included, gets an `Error` and nothing is written.
 - `weight` only goes with `"accepted"`; with `"rejected"` it throws `TypeError`. It must be a positive decimal number written as a string and is stored exactly as written (`"007.50"` stays `"007.50"`).
-- Nothing is deduplicated or overwritten: every call creates a response under a new key. Responding twice leaves two responses. Do not repeat after `WriteOutcomeUnknownError` without checking `attempted`.
+- Nothing is deduplicated or overwritten: every call creates a response under a new key. Responding twice leaves two responses. Calling again after `WriteOutcomeUnknownError` is not safe: it would create a second response.
 
 ## Uploads are outside the commit
 
-A new definition's `icon` is uploaded before the write. Invalid input, a refused issuer and an unreadable subject or definition fail before any upload; a rule of the award's or the new definition's lexicon (for example a `note` over 500 characters) is only found after it. If the write or such a rule fails, the blob stays unreferenced (a PDS usually deletes it later, not guaranteed).
+A new definition's `icon` is the only file uploaded, before the write, and is not rolled back if it fails; see [Uploads are not part of the atomic write](../SKILL.md#uploads-are-not-part-of-the-atomic-write). Invalid input, a refused issuer and an unreadable subject or definition fail before any upload; a rule of the award's or the new definition's lexicon (for example a `note` over 500 characters) is found only after it.
 
 ## Input fields
 
