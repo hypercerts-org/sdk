@@ -280,7 +280,7 @@ function checkCollection(stored: StoredRecord): collection.Main {
   const items = current.value.items ?? [];
   if (items.length >= MAX_ITEMS) {
     throw new Error(
-      `${OPERATION}: the Collection ${uri} already lists ${items.length} items, the most a Collection can hold (${MAX_ITEMS}). No record was written. Add the Activity to another Collection.`,
+      `${OPERATION}: the Collection ${uri} already lists ${items.length} items, the most a Collection can hold (${MAX_ITEMS}). No record was written.`,
     );
   }
   return current.value;
