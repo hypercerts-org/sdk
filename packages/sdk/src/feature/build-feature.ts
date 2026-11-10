@@ -1,16 +1,16 @@
 import { l } from "@atproto/lex";
-import * as defs from "@hypercerts-org/lexicon/org/hypercerts/defs";
 import * as feature from "@hypercerts-org/lexicon/org/hypercerts/entity/feature";
-import * as linearDocument from "@hypercerts-org/lexicon/pub/leaflet/pages/linearDocument";
 import type { SDKContext } from "../context.js";
 import { createRecordTree } from "../internal/create-record.js";
 import { optionalText } from "../internal/input.js";
-import { type RecordKind, recordKind, references } from "../internal/record-kind.js";
 import {
-  type ExistingRecord,
-  isExistingRecord,
-  type SupportingRecordRef,
-} from "../internal/slots.js";
+  type LeafletDocument,
+  longDescription,
+  longDescriptionReference,
+  longDescriptionTransform,
+} from "../internal/long-description.js";
+import { type RecordKind, recordKind, references } from "../internal/record-kind.js";
+import type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 import { type LocationInput, locationKind } from "../location/build-location.js";
 import {
   type VocabularyTagInput,
@@ -18,11 +18,7 @@ import {
   vocabularyTagKind,
 } from "../tag/build-tag.js";
 
-/**
- * A Leaflet document (`pub.leaflet.pages.linearDocument`): rich text in blocks. Passed to the record
- * as it is; the lexicon validates it.
- */
-export type LeafletDocument = l.$Typed<linearDocument.Main>;
+export type { LeafletDocument };
 
 /** The data of a new `org.hypercerts.entity.feature` record. */
 export interface FeatureInput {
@@ -80,39 +76,21 @@ export interface CreateFeatureResult {
   locations: readonly SupportingRecordRef[];
 }
 
-const isLeafletDocument = (value: unknown): value is LeafletDocument =>
-  typeof value === "object" &&
-  value !== null &&
-  "$type" in value &&
-  value.$type === linearDocument.$type;
-
-const featureDescription = l.custom<string | LeafletDocument | ExistingRecord>(
-  (value): value is string | LeafletDocument | ExistingRecord =>
-    typeof value === "string" || isExistingRecord(value) || isLeafletDocument(value),
-  `must be a string, { uri } of an existing record, or a Leaflet document with $type "${linearDocument.$type}"`,
-);
-
 const featureKind: RecordKind<FeatureInput> = recordKind(
   feature.main,
   {
     type: optionalText,
     title: l.string(),
-    description: l.optional(featureDescription),
+    description: l.optional(longDescription),
     langs: l.optional(l.array(l.string())),
     sameAs: l.optional(l.array(l.string())),
   },
-  {
-    // A reference arrives here already stored with its `$type` (see `typed` below).
-    description: (_build, _field, value: string | object) =>
-      Promise.resolve(typeof value === "string" ? defs.descriptionString.build({ value }) : value),
-  },
+  { description: longDescriptionTransform },
   {
     references: {
       locations: references.many(() => locationKind),
       tags: references.many(() => vocabularyTagKind),
-      // Only `{ uri }` is a reference. The description's union has the strong reference as a member,
-      // so it is stored with its `$type`.
-      description: { kind: undefined, many: false, when: isExistingRecord, typed: true },
+      description: longDescriptionReference,
     },
   },
 );

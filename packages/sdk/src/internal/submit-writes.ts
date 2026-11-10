@@ -87,7 +87,9 @@ export class RecordAlreadyExistsError extends WriteRejectedError {
  * attempt had succeeded. The exception is a record whose key is fixed or decided by its data and
  * that is only created if absent (`createProfile`, and `createVocabularyTag`, whose nested tags are
  * checked before the write): calling again either creates it or is refused because it already
- * exists, most likely from the first attempt, so it cannot duplicate.
+ * exists, most likely from the first attempt, so it cannot duplicate. `createOrganization` is
+ * another: it reads its organization, which has a fixed key, before every attempt, so calling again
+ * either creates everything or is refused because the organization already exists.
  */
 export class WriteOutcomeUnknownError extends WriteError {
   override readonly name = "WriteOutcomeUnknownError";
@@ -124,11 +126,18 @@ export interface SubmitOptions {
    */
   readonly swapCommit?: CidString;
   /**
-   * Whether calling again after an unknown outcome cannot duplicate records: every record has a key
-   * the input decided, and the caller checks none exists before sending. Only changes the advice in
-   * the error message.
+   * Whether calling again after an unknown outcome cannot duplicate records: either every record has
+   * a key the input decided and the caller checks none exists before sending, or the caller reads a
+   * record with a fixed key before every attempt, which a first attempt that succeeded would have
+   * created, and gives `retrySafeReason`. Only changes the advice in the error message.
    */
   readonly retrySafe?: boolean;
+  /**
+   * With `retrySafe`, why calling again is safe when that is not "every record has a fixed key". It
+   * completes the sentence "calling <operation> again is safe: ...", so it must read as a clause
+   * without a final period. Absent: the message says every record has a fixed key.
+   */
+  readonly retrySafeReason?: string;
 }
 
 /** What one request tried to write, for messages and for the errors' `attempted`. */
@@ -169,8 +178,8 @@ export function assertWithinWriteLimit(operation: string, count: number): void {
  * Internal. Boundaries:
  * - Never retries and never splits the request; the caller decides what to do about a failure.
  *   `options.retrySafe` says whether calling again after an unknown outcome cannot duplicate records
- *   (every record has a key the input decided, and the caller checks none exists before sending);
- *   it only changes the advice in the error message.
+ *   (see `SubmitOptions.retrySafe`, and `retrySafeReason` for the wording); it only changes the
+ *   advice in the error message.
  * - Does not pass `validate`, so the PDS applies its own default; records are validated by the
  *   builders against their lexicons before they get here.
  * - Classifies a failure as definite only when the PDS answered with an HTTP 4xx other than 408.
@@ -224,6 +233,7 @@ export async function submitWrites(
       return response.body.results;
     },
     options.retrySafe ?? false,
+    options.retrySafeReason,
   );
 }
 
@@ -301,12 +311,13 @@ async function submit(
   request: Request,
   send: () => Promise<readonly unknown[] | undefined>,
   retrySafe: boolean,
+  retrySafeReason?: string,
 ): Promise<void> {
   let results: readonly unknown[] | undefined;
   try {
     results = await send();
   } catch (error) {
-    throw classifyFailure(operation, error, request, retrySafe);
+    throw classifyFailure(operation, error, request, retrySafe, retrySafeReason);
   }
   assertReportedRefs(operation, request, results);
 }
@@ -338,7 +349,13 @@ const newRecordsOf = (refs: readonly StrongRef[]) =>
 const NOT_WRITTEN = { created: "not created", changed: "not changed" };
 const MAYBE_WRITTEN = { created: "created", changed: "changed" };
 
-function classifyFailure(operation: string, error: unknown, request: Request, retrySafe: boolean) {
+function classifyFailure(
+  operation: string,
+  error: unknown,
+  request: Request,
+  retrySafe: boolean,
+  retrySafeReason?: string,
+) {
   const status = property(error, "status");
   const code = property(error, "error");
   const reason = describeError(error);
@@ -354,18 +371,24 @@ function classifyFailure(operation: string, error: unknown, request: Request, re
   }
   return new WriteOutcomeUnknownError(
     `${operation}: no usable answer from the PDS (${reason}), so it is not known whether ${describeEffects(request, MAYBE_WRITTEN)}: ${attempted.map((ref) => ref.uri).join(", ")}. ` +
-      retryAdvice(operation, request, retrySafe),
+      retryAdvice(operation, request, retrySafe, retrySafeReason),
     attempted,
     { cause: error },
   );
 }
 
-function retryAdvice(operation: string, request: Request, retrySafe: boolean): string {
+function retryAdvice(
+  operation: string,
+  request: Request,
+  retrySafe: boolean,
+  retrySafeReason?: string,
+): string {
   if (retrySafe) {
     const subject =
-      attemptedOf(request).length !== 1
+      retrySafeReason ??
+      (attemptedOf(request).length !== 1
         ? "every record has a fixed key and none is created if it exists, so the call either creates them or fails because one already exists"
-        : "the record has a fixed key and is only created if absent, so the call either creates it or fails because it already exists";
+        : "the record has a fixed key and is only created if absent, so the call either creates it or fails because it already exists");
     return `The SDK does not retry, but calling ${operation} again is safe: ${subject}, most likely from the first attempt. To check first, use com.atproto.repo.getRecord.`;
   }
   const check =
