@@ -2,7 +2,7 @@ import type { CidString, DidString, NsidString, TypedLexMap } from "@atproto/lex
 import type { SDKContext } from "../context.js";
 import { describeError } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
-import type { StrongRef } from "./resolve-record-ref.js";
+import { parseRecordUri, type StrongRef } from "./resolve-record-ref.js";
 
 /**
  * Base class of the errors thrown when the single request that writes records did not succeed.
@@ -309,6 +309,64 @@ function alreadyExists(
     rejected.attempted,
     { status: rejected.status, code: rejected.code },
     { cause: rejected.cause },
+  );
+}
+
+/**
+ * Deletes one record from `did`'s repo, only if it still has the CID in `ref`, with
+ * `com.atproto.repo.deleteRecord` and `swapRecord: ref.cid`.
+ *
+ * Internal. Boundaries:
+ * - Never retries, and never deletes without the CID guard: if the record changed since the caller
+ *   read it, the PDS refuses and nothing is deleted.
+ * - Classifies a failure as the other write functions do: definite only when the PDS answered with
+ *   an HTTP 4xx other than 408 (and then nothing was deleted), outcome-unknown otherwise.
+ * - Has no reported result to compare: `deleteRecord` answers with a commit, not with references.
+ *   A PDS that treats an already-missing record as a no-op answers success, which is
+ *   indistinguishable from this call having deleted it.
+ *
+ * Throws WriteRejectedError (with `code` `InvalidSwap` when the record no longer has the CID in
+ * `ref`, so it was not deleted) or WriteOutcomeUnknownError. In both, `attempted` is `[ref]`: for a
+ * delete it holds the record the request tried to delete, with the CID it had. Throws TypeError
+ * when `ref.uri` is not a record URI.
+ */
+export async function submitDelete(
+  context: SDKContext,
+  did: DidString,
+  ref: StrongRef,
+  operation: string,
+): Promise<void> {
+  const { collection, rkey } = parseRecordUri(ref.uri, operation);
+  try {
+    await context.client.deleteRecord(collection, rkey, { repo: did, swapRecord: ref.cid });
+  } catch (error) {
+    throw classifyDeleteFailure(operation, error, ref);
+  }
+}
+
+function classifyDeleteFailure(operation: string, error: unknown, ref: StrongRef) {
+  const status = property(error, "status");
+  const reason = describeError(error);
+  // As in `classifyFailure`: definite only for an HTTP 4xx other than 408.
+  const rejected = typeof status === "number" && status >= 400 && status < 500 && status !== 408;
+  if (!rejected) {
+    return new WriteOutcomeUnknownError(
+      `${operation}: no usable answer from the PDS (${reason}), so it is not known whether ${ref.uri} was deleted. ` +
+        `The SDK does not retry. Check whether it still exists (for example with com.atproto.repo.getRecord) before trying again.`,
+      [ref],
+      { cause: error },
+    );
+  }
+  const code = property(error, "error");
+  const message =
+    code === "InvalidSwap"
+      ? `${operation}: ${ref.uri} no longer has the version (CID ${ref.cid}) that was read, so the PDS refused to delete it (HTTP ${status}: ${reason}). It was not deleted: something changed or replaced it in between. The SDK neither retries nor deletes without that check. Call ${operation} again to read the repository afresh.`
+      : `${operation}: the PDS rejected the request (HTTP ${status}: ${reason}), so ${ref.uri} was not deleted. Fix the cause (for example the session's permissions or a rate limit) and call again.`;
+  return new WriteRejectedError(
+    message,
+    [ref],
+    { status, code: typeof code === "string" ? code : undefined },
+    { cause: error },
   );
 }
 

@@ -6,6 +6,7 @@ import { fakeRepo, HEAD, methods } from "../test-utils/fake-repo.js";
 import { prepareRecord, prepareUpdate } from "./prepare-record.js";
 import {
   submitCreateOnly,
+  submitDelete,
   submitWrites,
   WriteOutcomeUnknownError,
   WriteRejectedError,
@@ -181,5 +182,39 @@ describe("submitCreateOnly", () => {
 
     expect(error).toBeInstanceOf(WriteResultMismatchError);
     expect(error.reported).toEqual([{ uri: record.ref.uri, cid: CID }]);
+  });
+});
+
+describe("submitDelete", () => {
+  const ref = { uri: `at://${DID}/app.certified.feed.like/3k2a4b5c6d7e8` as const, cid: CID };
+
+  it("treats an HTTP 4xx other than a conflict as a definite rejection, naming what was not deleted", async () => {
+    const { context } = fakeRepo({
+      deleteRecord: () => json(403, { error: "Forbidden", message: "no delete permission" }),
+    });
+
+    const error = await submitDelete(context, DID, ref, "op").catch((e) => e);
+
+    expect(error).toBeInstanceOf(WriteRejectedError);
+    expect(error).toMatchObject({ status: 403, code: "Forbidden", attempted: [ref] });
+    expect(error.message).toContain(`${ref.uri} was not deleted`);
+  });
+
+  it.each([
+    ["HTTP 408", () => json(408, { error: "RequestTimeout", message: "slow" })],
+    [
+      "a network failure",
+      () => {
+        throw new TypeError("fetch failed");
+      },
+    ],
+  ])("treats %s as an unknown outcome", async (_, deleteRecord) => {
+    const { context } = fakeRepo({ deleteRecord });
+
+    const error = await submitDelete(context, DID, ref, "op").catch((e) => e);
+
+    expect(error).toBeInstanceOf(WriteOutcomeUnknownError);
+    expect(error.attempted).toEqual([ref]);
+    expect(error.message).toContain(`whether ${ref.uri} was deleted`);
   });
 });
