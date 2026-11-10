@@ -49,7 +49,7 @@ const tag = await createWorkScopeTag(context, {
 });
 ```
 
-TID key, so two calls create two tags, also with the same `key`. `status`, `supersededBy` and the same optional fields as above.
+TID key, so two calls create two tags, also with the same `key`. Optional fields: `category`, `parent`, `status`, `supersededBy`, `description`, `aliases` (≤ 50), `sameAs` (URIs, ≤ 20), `referenceDocument` (`Blob` up to 10 MB, uploaded, or a URL) and `createdAt`. There is no `broader`; use `parent` for hierarchy.
 
 ## Relationships
 
