@@ -276,12 +276,13 @@ function existing(
   collections: NsidString | readonly NsidString[] | undefined,
 ): Extract<SlotChoice, { kind: "existing" }> {
   const { uri } = parseInput(build, field, existingRecord, value);
-  const allowed = typeof collections === "string" ? [collections] : collections;
+  const allowed: readonly string[] | undefined =
+    typeof collections === "string" ? [collections] : collections;
   // `at-uri` alone also accepts other record types, handle authorities and URIs without a key. The
   // type is checked here so a wrong one fails before any request; `resolveRecordRef` rejects the
   // rest.
   const actual = collectionOf(uri);
-  if (actual === undefined || (allowed !== undefined && !allowed.some((c) => c === actual))) {
+  if (actual === undefined || (allowed !== undefined && !allowed.includes(actual))) {
     const target =
       actual === undefined ? "something that is not a record" : `a record of type ${actual}`;
     throw new TypeError(
