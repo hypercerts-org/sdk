@@ -39,9 +39,8 @@ export const rightsKind: RecordKind<RightsInput> = recordKind(
  * @remarks
  * The record key is a new TID chosen by the SDK, and `createdAt` defaults to the time of the call.
  * A `Blob` attachment is uploaded before the record is written; a URL string is stored as it is
- * and never fetched. An upload is not part of the write: if the PDS rejects the write, this call
- * leaves the uploaded blob unreferenced. A PDS usually deletes unreferenced blobs after a while, but this is not guaranteed, and a blob
- * with the same content that another record already uses stays.
+ * and never fetched. Blobs are uploaded before the write and are not rolled back if it fails; see
+ * {@link uploadBlob}.
  *
  * Nothing is looked up or deduplicated: calling this twice creates two records. To use a rights
  * record that already exists, pass its URI as `rights` to {@link createActivity} instead.
@@ -53,9 +52,8 @@ export const rightsKind: RecordKind<RightsInput> = recordKind(
  * @throws {@link TypeError} If `input` has an unknown field or a value the lexicon does not
  * allow, for example a `rightsName` over 100 characters. Nothing was written. Blobs may already have been uploaded when a lexicon rule rejects the record.
  * @throws {@link Error} If the client is not authenticated, or the attachment upload fails.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the record
- * may or may not exist. It carries the URI to check; the SDK does not retry.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *

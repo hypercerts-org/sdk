@@ -170,11 +170,8 @@ Blobs are uploaded before the write and are not part of it; see [Atomicity and u
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `TypeError`                | The input is invalid, including a dot in a key, a wrong record type, duplicate new keys and too many records. Nothing was written. |
 | `RecordAlreadyExistsError` | A new vocabulary tag's key is taken. Nothing was written; `uri` names the tag in the way.                                          |
-| `WriteRejectedError`       | The PDS answered with a 4xx. No record was created.                                                                                |
-| `WriteOutcomeUnknownError` | No usable answer (network, timeout, 5xx). The records may exist. `attempted` lists every URI. The SDK does not retry.              |
-| `WriteResultMismatchError` | The PDS committed the records but reported different URIs or CIDs than the SDK computed.                                           |
 
-After a `WriteOutcomeUnknownError` from `createFeature`, check the URIs before trying again: a second call creates a second Feature under a new key. See [Failures](./creating-activities.md#failures).
+`WriteRejectedError`, `WriteOutcomeUnknownError` and `WriteResultMismatchError` mean the same as for `createActivity`; see [Failures](./creating-activities.md#failures). After a `WriteOutcomeUnknownError` from `createFeature`, check the URIs before trying again: a second call creates a second Feature under a new key.
 
 ## Not covered
 

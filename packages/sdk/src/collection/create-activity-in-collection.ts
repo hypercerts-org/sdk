@@ -94,18 +94,14 @@ const inputSchema = strictObject({
  * Activity with the same content (nothing is deduplicated), and anything about the existing items.
  * Adding to another account's Collection is not supported.
  *
- * Blobs (`Blob` or `File` values) are uploaded before the write, as in {@link createActivity},
- * and the uploads are outside the atomic write. The order is: validate the input and the
- * Collection's URI, read and check the Collection, read the existing supporting records, upload
- * blobs, read the repository's latest commit, read the Collection again, validate the updated
- * Collection, write. A bad URI, a Collection of another account or one that is missing, full or
- * invalid, an input error or an unreadable supporting record stops before any upload. The
- * Collection is read twice because only the second read, after the latest commit, is guarded by
- * `swapCommit`. If the PDS rejects the write, the uploaded blobs stay unreferenced.
- * A PDS usually deletes unreferenced blobs after a while, but this is not guaranteed, and a blob
- * with the same content that another record already uses stays. After
- * {@link WriteOutcomeUnknownError} or {@link WriteResultMismatchError} the records may exist, so the
- * blobs may be referenced and publicly readable.
+ * Blobs (`Blob` or `File` values) are uploaded for the same fields as in {@link createActivity}.
+ * The order is: validate the input and the Collection's URI, read and check the Collection, read
+ * the existing supporting records, upload blobs, read the repository's latest commit, read the
+ * Collection again, validate the updated Collection, write. A bad URI, a Collection of another
+ * account or one that is missing, full or invalid, an input error or an unreadable supporting
+ * record stops before any upload. The Collection is read twice because only the second read, after
+ * the latest commit, is guarded by `swapCommit`. Blobs are uploaded before the write and are not
+ * rolled back if it fails; see {@link uploadBlob}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the Activity is created in that account's repo, and the Collection must be in it.
@@ -123,13 +119,12 @@ const inputSchema = strictObject({
  * Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). Nothing was created or
  * changed. With `code` `"InvalidSwap"` the repository changed after it was read; call again.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS (network
- * failure, timeout, a server error), so the records may or may not exist and the Collection may or
- * may not have changed. It lists the URI of the Collection and of every new record. The SDK does
- * not retry, because a retry would create a second Activity if the first attempt had succeeded.
- * Check the URIs, then decide.
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. The
+ * Collection may or may not have changed; `attempted` lists the new records and, last, the
+ * Collection. Calling again is not safe: it would create a second Activity if the first attempt had
+ * succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
- * computed, so the references between the records may not match what is stored.
+ * computed.
  *
  * @example Adding a new Activity to a Collection
  * ```ts

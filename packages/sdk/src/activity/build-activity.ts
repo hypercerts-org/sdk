@@ -305,9 +305,10 @@ function allSlots(plan: ActivityPlan): Slot[] {
  *
  * Not supported: `signatures`, `shortDescriptionFacets` and a non-string `description`.
  *
- * Files (`Blob` or `File` values) are uploaded before the write. If the write fails, they are left
- * unused and the PDS may or may not delete them later. Input errors are found before any upload; a
- * lexicon rule that rejects a record only after.
+ * Files (`Blob` or `File` values) are uploaded: the Activity's `image`, a new rights record's
+ * `attachment`, a new contributor's `image` and a new location's `{ blob }`. Blobs are uploaded
+ * before the write and are not rolled back if it fails; see {@link uploadBlob}. Input errors are
+ * found before any upload; a lexicon rule that rejects a record is found only after.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the records are created in that account's repo.
@@ -322,14 +323,11 @@ function allSlots(plan: ActivityPlan): Slot[] {
  * lexicon rule rejects a record.
  * @throws {@link Error} If the client is not authenticated, an existing record cannot be read, or
  * an upload fails.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). None of the records
- * was created and nothing needs cleaning up.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS (network
- * failure, timeout, a server error), so the records may or may not exist. It lists every URI that
- * was attempted. The SDK does not retry, because a retry would create duplicates under new keys
- * if the first attempt had succeeded. Check the URIs, then decide.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create duplicates under new keys if the first attempt had succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
- * computed, so the references between the new records may not match what is stored.
+ * computed.
  *
  * @example Creating an Activity with new and existing supporting records
  * ```ts

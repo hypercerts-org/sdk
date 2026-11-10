@@ -84,10 +84,9 @@ export class ProfileAlreadyExistsError extends RecordAlreadyExistsError {
  * HTTP 403 and this function throws {@link WriteRejectedError}.
  *
  * `createdAt` defaults to the time of the call. A `Blob` avatar or banner is uploaded before the
- * record is written; a URL string is stored as it is and never fetched. An upload is not part of
- * the write: if the write fails, including when the profile already exists, this call leaves the
- * uploaded blob unreferenced. A PDS usually deletes unreferenced blobs after a while, but this is
- * not guaranteed, and a blob with the same content that another record already uses stays.
+ * record is written; a URL string is stored as it is and never fetched. Blobs are uploaded before
+ * the write and are not rolled back if it fails, including when the profile already exists; see
+ * {@link uploadBlob}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
@@ -101,10 +100,8 @@ export class ProfileAlreadyExistsError extends RecordAlreadyExistsError {
  * @throws {@link ProfileAlreadyExistsError} If the account already has a profile. Nothing was
  * changed.
  * @throws {@link WriteRejectedError} If the PDS rejected the write for another reason (HTTP 4xx).
- * Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the
- * profile may or may not exist. It carries the URI to check; the SDK does not retry, but calling
- * again is safe: the profile is only created if absent, so the call either creates it or throws
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is safe: the profile is only created if absent, so the call either creates it or throws
  * {@link ProfileAlreadyExistsError}, which then means the profile exists, most likely from the
  * first attempt.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK

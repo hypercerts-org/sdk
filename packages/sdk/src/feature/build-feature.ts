@@ -142,8 +142,9 @@ type FeatureTree = SupportingRecordRef & {
  * at most 200 records. The OAuth session needs `create` on the Feature, tag and location
  * collections it writes to.
  *
- * Files (`Blob` values) are uploaded before the write. If the write fails, they are left unused and
- * the PDS may or may not delete them later.
+ * Files (`Blob` values) are uploaded: a new tag's `referenceDocument` and a new location's
+ * `{ blob }`. Blobs are uploaded before the write and are not rolled back if it fails; see
+ * {@link uploadBlob}.
  *
  * Not supported: the lexicon's `signatures`, a blob that was uploaded already, and updating a
  * Feature.
@@ -162,14 +163,12 @@ type FeatureTree = SupportingRecordRef & {
  * @throws {@link Error} If the client is not authenticated, an existing record cannot be read, the
  * key of a new tag cannot be checked, or an upload fails.
  * @throws {@link RecordAlreadyExistsError} If a new tag's key is taken. Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). None of the records
- * was created and nothing needs cleaning up.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS (network
- * failure, timeout, a server error), so the records may or may not exist. It lists every URI that
- * was attempted. The SDK does not retry, because a retry would create a second Feature under a new
- * key if the first attempt had succeeded. Check the URIs, then decide.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create a second Feature under a new key if the first attempt had
+ * succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
- * computed, so the references between the new records may not match what is stored.
+ * computed.
  *
  * @example A Feature with a new tag, an existing tag and a new location
  * ```ts

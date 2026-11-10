@@ -25,7 +25,7 @@ export abstract class WriteError extends Error {
 /**
  * The PDS answered with a client error (HTTP 4xx) and so did not apply any of the writes: no
  * record was created and none was changed. The request can be corrected and sent again; nothing
- * needs cleaning up.
+ * needs cleaning up, except any blobs uploaded before the write (see {@link uploadBlob}).
  *
  * `status` and `code` are the HTTP status and the XRPC error code (for example `InvalidRequest`).
  * `code` is `InvalidSwap` when the repository changed after the SDK read it (see the operation's
@@ -79,8 +79,9 @@ export class RecordAlreadyExistsError extends WriteRejectedError {
 
 /**
  * No usable answer came back (network failure, timeout, a server error or an unreadable response),
- * so it is not known whether the PDS applied the writes. `attempted` lists every URI that may
- * now exist or have changed.
+ * so it is not known whether the PDS applied the writes. `attempted` lists the URI and CID of every
+ * record that may now exist or have changed; check them (for example with
+ * `com.atproto.repo.getRecord`) before deciding what to do.
  *
  * The SDK does not retry. Retrying with new record keys would duplicate every record if the first
  * attempt had succeeded. The exception is a record whose key is fixed or decided by its data and
@@ -96,7 +97,8 @@ export class WriteOutcomeUnknownError extends WriteError {
  * The PDS applied the writes but reported different URIs or CIDs than the SDK computed. Records
  * that were written with references to each other (an Activity and its rights, for example) may
  * therefore point at CIDs that do not match what is stored. `attempted` holds the references the
- * SDK computed and `reported` the ones the PDS returned, both in request order.
+ * SDK computed and `reported` the ones the PDS returned, both in request order. Compare them and
+ * inspect what was stored before calling again.
  */
 export class WriteResultMismatchError extends WriteError {
   override readonly name = "WriteResultMismatchError";

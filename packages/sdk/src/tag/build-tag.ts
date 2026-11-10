@@ -137,8 +137,8 @@ export const vocabularyTagKind: RecordKind<VocabularyTagInput> = recordKind(
  * with only `create` it throws {@link WriteRejectedError}. Creating nested tags too needs only
  * `create`, and everything is created in one write of at most 200 records.
  *
- * `createdAt` defaults to the time of the call. A `Blob` in `referenceDocument` is uploaded before
- * the write; if the write fails, it is left unused and the PDS may or may not delete it later.
+ * `createdAt` defaults to the time of the call. A `Blob` in `referenceDocument` is uploaded. Blobs
+ * are uploaded before the write and are not rolled back if it fails; see {@link uploadBlob}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
@@ -157,10 +157,8 @@ export const vocabularyTagKind: RecordKind<VocabularyTagInput> = recordKind(
  * @throws {@link RecordAlreadyExistsError} If a new tag's key is taken. Nothing was written and the
  * existing tag is unchanged.
  * @throws {@link WriteRejectedError} If the PDS rejected the write for another reason (HTTP 4xx).
- * Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the
- * records may or may not exist. It lists every URI that was attempted. The SDK does not retry.
- * Calling again cannot create duplicates, because every tag it creates has a fixed key, but a
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling
+ * again cannot create duplicates, because every tag it creates has a fixed key, but a
  * {@link RecordAlreadyExistsError} from the retry only means one key is taken, and a retry that
  * races the first write can throw {@link WriteOutcomeUnknownError} again. Check each attempted URI
  * before treating the tags as created.
@@ -274,8 +272,8 @@ export const workScopeTagKind: RecordKind<WorkScopeTagInput> = recordKind(
  * nested to any depth. Everything is created in one write of at most 200 records: all of it exists
  * afterwards, or none does. `createdAt` defaults to the time of the call.
  *
- * A `Blob` in `referenceDocument` is uploaded before the write; if the write fails, it is left
- * unused and the PDS may or may not delete it later.
+ * A `Blob` in `referenceDocument` is uploaded. Blobs are uploaded before the write and are not
+ * rolled back if it fails; see {@link uploadBlob}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
@@ -288,11 +286,9 @@ export const workScopeTagKind: RecordKind<WorkScopeTagInput> = recordKind(
  * was written. Blobs may already have been uploaded when a lexicon rule rejects a record.
  * @throws {@link Error} If the client is not authenticated, an existing record cannot be read, or
  * an upload fails.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). None of the records
- * was created.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS, so the
- * records may or may not exist. It lists every URI that was attempted; the SDK does not retry,
- * because a retry would create duplicates under new keys if the first attempt had succeeded.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create duplicates under new keys if the first attempt had succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *

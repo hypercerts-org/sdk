@@ -29,7 +29,6 @@ feature.locations[0]; // { uri, cid, created: true }
 - `locations` are alternative representations of one subject, **most preferred first**; order is kept, empty is allowed.
 - Before uploading or writing, the SDK reads each new vocabulary tag's key. A taken key throws `RecordAlreadyExistsError` naming the URI and nothing is written. Two new tags with the same key in one call are a `TypeError`; create the shared tag first and pass its `uri`.
 - One `applyWrites` creates everything. The session needs `create` on the Feature, vocabulary tag and location collections.
-- `createFeature` is not safe to repeat after `WriteOutcomeUnknownError`: check the attempted URIs first.
 
 ## Relationships
 

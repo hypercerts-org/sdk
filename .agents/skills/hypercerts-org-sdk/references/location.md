@@ -127,7 +127,7 @@ Exactly one key:
 - Nothing is geocoded. Apart from `country-code` and inline `geojson-point`, `location` is not checked against `locationType`. Values outside the lexicon's known list are accepted.
 - Nothing is deduplicated: calling `createLocation` twice creates two records. Keep the returned `uri` and reuse it.
 - A `{ blob }` needs a MIME type. A `File` the browser could not type (common for `.geojson`) fails with "could not upload location"; wrap it as shown in [Upload a file](#upload-a-file).
-- A `{ blob }` upload is not rolled back if the write fails. See "Images and files" in [SKILL.md](../SKILL.md).
+- A `{ blob }` is uploaded before the write and is not rolled back if it fails; see [Uploads are not part of the atomic write](../SKILL.md#uploads-are-not-part-of-the-atomic-write).
 
 ## `LocationInput` (`app.certified.location`)
 
