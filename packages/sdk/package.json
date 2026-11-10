@@ -39,6 +39,10 @@
       "types": "./dist/location/index.d.ts",
       "default": "./dist/location/index.js"
     },
+    "./organization": {
+      "types": "./dist/organization/index.d.ts",
+      "default": "./dist/organization/index.js"
+    },
     "./tag": {
       "types": "./dist/tag/index.d.ts",
       "default": "./dist/tag/index.js"
