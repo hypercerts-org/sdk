@@ -97,6 +97,10 @@ try {
 }
 ```
 
+## Adding the new Activity to a Collection
+
+`createActivityInCollection` from `@hypercerts-org/sdk/collection` takes the same `activity` input as `createActivity` and appends the new Activity to one of your existing Collections in the same commit. Uploads and failures work as described above; it can also fail with `WriteRejectedError` and `code === "InvalidSwap"` when the account was written to while the call ran, and calling again is safe. See its TSDoc for details.
+
 ## Not covered
 
-Collections and projects, updating or deleting records, linking an existing Activity to new records, deduplication and signatures are not part of these functions.
+Creating or editing Collections and projects, any other update or delete of a record, linking an existing Activity to new records, adding an Activity to someone else's Collection, deduplication and signatures are not part of these functions.

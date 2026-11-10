@@ -56,7 +56,7 @@ export async function createRecordTree<T extends { createdAt?: string | undefine
   } else {
     // Calling again cannot duplicate records when every one has a key the input decided.
     const retrySafe = fresh.every((slot) => slot.choice.key !== undefined);
-    await submitWrites(context, build.did, records, operation, retrySafe);
+    await submitWrites(context, build.did, records, operation, { retrySafe });
   }
 
   return resultOf(root, created, referenceLookup(existing, created));

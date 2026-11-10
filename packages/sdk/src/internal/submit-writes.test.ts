@@ -2,8 +2,8 @@ import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
 import * as rights from "@hypercerts-org/lexicon/org/hypercerts/claim/rights";
 import { describe, expect, it } from "vitest";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
-import { fakeRepo, methods } from "../test-utils/fake-repo.js";
-import { prepareRecord } from "./prepare-record.js";
+import { fakeRepo, HEAD, methods } from "../test-utils/fake-repo.js";
+import { prepareRecord, prepareUpdate } from "./prepare-record.js";
 import {
   submitCreateOnly,
   submitWrites,
@@ -19,6 +19,21 @@ async function prepared() {
     rightsDescription: "Share with credit",
     createdAt: "2024-01-01T00:00:00.000Z",
   });
+}
+
+// A rights record that already exists at `rkey`, with a new description.
+async function updated() {
+  return prepareUpdate(
+    DID,
+    rights.main,
+    {
+      rightsName: "CC BY",
+      rightsType: "CC-BY",
+      rightsDescription: "Share with credit and a link",
+      createdAt: "2024-01-01T00:00:00.000Z",
+    },
+    "3k2a4b5c6d7e8",
+  );
 }
 
 describe("submitWrites", () => {
@@ -77,6 +92,77 @@ describe("submitWrites", () => {
 
     expect(error).toBeInstanceOf(WriteResultMismatchError);
     expect(error.reported).toEqual([{ uri: record.ref.uri, cid: CID }]);
+  });
+
+  describe("with an update", () => {
+    it("applies the update after the creates in one request, conditional on the head", async () => {
+      const { context, requests, creates, updates, swapCommits } = fakeRepo();
+      const [created, update] = [await prepared(), await updated()];
+
+      await submitWrites(context, DID, [created], "op", { updates: [update], swapCommit: HEAD });
+
+      expect(methods(requests)).toEqual(["com.atproto.repo.applyWrites"]);
+      expect(creates[0]?.map((write) => write.rkey)).toEqual([created.rkey]);
+      expect(updates[0]?.map((write) => [write.rkey, write.cid])).toEqual([
+        [update.rkey, update.ref.cid],
+      ]);
+      expect(swapCommits).toEqual([HEAD]);
+    });
+
+    it("reports a CID for the updated record that differs from the computed one", async () => {
+      const [created, update] = [await prepared(), await updated()];
+      const { context } = fakeRepo({
+        applyWrites: () =>
+          json(200, {
+            results: [
+              { $type: "com.atproto.repo.applyWrites#createResult", ...created.ref },
+              { $type: "com.atproto.repo.applyWrites#updateResult", uri: update.ref.uri, cid: CID },
+            ],
+          }),
+      });
+
+      const error = await submitWrites(context, DID, [created], "op", {
+        updates: [update],
+      }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(WriteResultMismatchError);
+      expect(error.attempted).toEqual([created.ref, update.ref]);
+      expect(error.message).toMatch(/applied the writes/);
+    });
+
+    it("says the update was not changed when the PDS rejects the request", async () => {
+      const { context } = fakeRepo({
+        applyWrites: () => json(400, { error: "InvalidRequest", message: "no" }),
+      });
+      const update = await updated();
+
+      const error = await submitWrites(context, DID, [await prepared()], "op", {
+        updates: [update],
+      }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(WriteRejectedError);
+      expect(error.message).toContain(
+        `the new record was not created and ${update.ref.uri} was not changed`,
+      );
+    });
+
+    it("explains InvalidSwap only when the request was conditional on a commit", async () => {
+      const { context } = fakeRepo({
+        applyWrites: () => json(400, { error: "InvalidSwap", message: "Commit was at x" }),
+      });
+      const options = { updates: [await updated()] };
+
+      const conditional = await submitWrites(context, DID, [], "op", {
+        ...options,
+        swapCommit: HEAD,
+      }).catch((e) => e);
+      const unconditional = await submitWrites(context, DID, [], "op", options).catch((e) => e);
+
+      expect(conditional).toMatchObject({ code: "InvalidSwap" });
+      expect(conditional.message).toMatch(/the repository changed since it was read/);
+      expect(unconditional).toMatchObject({ code: "InvalidSwap" });
+      expect(unconditional.message).toMatch(/the PDS rejected the request/);
+    });
   });
 });
 

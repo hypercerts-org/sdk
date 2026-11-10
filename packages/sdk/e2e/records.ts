@@ -16,6 +16,7 @@ import * as activity from "@hypercerts-org/lexicon/org/hypercerts/claim/activity
 import * as contribution from "@hypercerts-org/lexicon/org/hypercerts/claim/contribution";
 import * as contributorInformation from "@hypercerts-org/lexicon/org/hypercerts/claim/contributorInformation";
 import * as rights from "@hypercerts-org/lexicon/org/hypercerts/claim/rights";
+import * as collection from "@hypercerts-org/lexicon/org/hypercerts/collection";
 import * as feature from "@hypercerts-org/lexicon/org/hypercerts/entity/feature";
 import * as vocabularyTag from "@hypercerts-org/lexicon/org/hypercerts/vocab/tag";
 import * as workScopeTag from "@hypercerts-org/lexicon/org/hypercerts/workscope/tag";
@@ -85,6 +86,7 @@ export const collections = {
   vocabularyTag: vocabularyTag.main.$type,
   workScopeTag: workScopeTag.main.$type,
   feature: feature.main.$type,
+  collection: collection.main.$type,
 } as const;
 
 /** The number of records of `collection` in the client's repo. */

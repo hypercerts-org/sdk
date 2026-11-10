@@ -4,6 +4,7 @@ import {
   isDidString,
   isNsidString,
   isRecordKeyString,
+  type LexMap,
   l,
   type NsidString,
   type RecordKeyString,
@@ -18,10 +19,31 @@ export type StrongRef = strongRef.Main;
 
 const atUri = l.string({ format: "at-uri" });
 
+/** A record as its PDS stores it: the reference that pins this version, and the full value. */
+export interface StoredRecord {
+  readonly ref: StrongRef;
+  readonly value: LexMap;
+}
+
 /**
  * Reads the record at `uri` and returns its URI and current CID, for a record that references it.
  *
  * Internal: creation operations call this; it is not part of the public API.
+ *
+ * Boundaries: the same as `readRecord`, which does the reading. This keeps only the reference.
+ *
+ * Throws what `readRecord` throws.
+ */
+export async function resolveRecordRef(context: SDKContext, uri: string): Promise<StrongRef> {
+  return (await readRecord(context, uri, "resolveRecordRef")).ref;
+}
+
+/**
+ * Reads the record at `uri` and returns its reference and its full value, for an operation that
+ * needs more than the CID (one that rewrites the record, for example).
+ *
+ * Internal: operations call this; it is not part of the public API. `operation` names the caller
+ * in error messages.
  *
  * Boundaries:
  * - Reads with `com.atproto.repo.getRecord` from the PDS that hosts the record, the authoritative
@@ -31,16 +53,20 @@ const atUri = l.string({ format: "at-uri" });
  *   public records resolve. The client's PDS is not used for those reads because it would forward
  *   them to its AppView, which may not index the record or may return an outdated CID.
  * - Never falls back to an indexer: a failed read throws.
- * - Does not check the record's type or whether the caller may reference it. That is the calling
- *   operation's decision, and it imposes no same-owner restriction.
+ * - Does not check the record's type or value, or whether the caller may reference it. That is
+ *   the calling operation's decision, and it imposes no same-owner restriction.
  *
  * Throws TypeError for a URI that is not `at://<did>/<collection>/<rkey>` (handle authorities are
  * rejected because a stored reference must not change when the handle does), and Error when the
  * owner's PDS cannot be resolved, the record does not exist, the read fails, or the PDS returns
  * no CID.
  */
-export async function resolveRecordRef(context: SDKContext, uri: string): Promise<StrongRef> {
-  const { atUri: requested, did, collection, rkey } = parseRecordUri(uri);
+export async function readRecord(
+  context: SDKContext,
+  uri: string,
+  operation: string,
+): Promise<StoredRecord> {
+  const { atUri: requested, did, collection, rkey } = parseRecordUri(uri, operation);
   let response: Awaited<ReturnType<Client["getRecord"]>>;
   try {
     const client = await clientForRepo(context, did);
@@ -49,22 +75,22 @@ export async function resolveRecordRef(context: SDKContext, uri: string): Promis
     const reason = isRecordNotFound(error)
       ? "the record was not found"
       : `the read failed (${describeError(error)})`;
-    throw new Error(`resolveRecordRef: cannot resolve ${uri}: ${reason}.`, { cause: error });
+    throw new Error(`${operation}: cannot resolve ${uri}: ${reason}.`, { cause: error });
   }
   // Checked here as well as by the client, because an application can turn off the client's
   // response validation and an unchecked reference would be written into a record.
   const body: unknown = response.body;
   if (!strongRef.main.matches(body)) {
     throw new Error(
-      `resolveRecordRef: cannot resolve ${uri}: the PDS returned the record without a valid URI and CID.`,
+      `${operation}: cannot resolve ${uri}: the PDS returned the record without a valid URI and CID.`,
     );
   }
   if (body.uri !== requested) {
     throw new Error(
-      `resolveRecordRef: cannot resolve ${uri}: the PDS returned a different record (${body.uri}).`,
+      `${operation}: cannot resolve ${uri}: the PDS returned a different record (${body.uri}).`,
     );
   }
-  return { uri: requested, cid: body.cid };
+  return { ref: { uri: requested, cid: body.cid }, value: response.body.value };
 }
 
 /**
@@ -98,9 +124,14 @@ async function clientForRepo(context: SDKContext, did: DidString): Promise<Clien
   return new Client(await resolvePds(did));
 }
 
-function parseRecordUri(uri: string) {
+/**
+ * Splits a record URI into its parts without sending any request.
+ *
+ * Internal. Throws TypeError, naming `operation`, unless `uri` is `at://<did>/<collection>/<rkey>`.
+ */
+export function parseRecordUri(uri: string, operation: string) {
   // `at-uri` alone also accepts handle authorities and URIs without a collection or record key.
-  if (!atUri.matches(uri)) throw notARecordUri(uri);
+  if (!atUri.matches(uri)) throw notARecordUri(uri, operation);
   const [did, collection, rkey, ...rest] = uri.slice("at://".length).split("/");
   if (
     rest.length === 0 &&
@@ -113,11 +144,11 @@ function parseRecordUri(uri: string) {
   ) {
     return { atUri: uri, did, collection, rkey };
   }
-  throw notARecordUri(uri);
+  throw notARecordUri(uri, operation);
 }
 
-function notARecordUri(uri: string): TypeError {
+function notARecordUri(uri: string, operation: string): TypeError {
   return new TypeError(
-    `resolveRecordRef: ${JSON.stringify(uri)} is not a record URI. Expected at://<did>/<collection>/<rkey>, for example at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8. Handles are not accepted as the authority.`,
+    `${operation}: ${JSON.stringify(uri)} is not a record URI. Expected at://<did>/<collection>/<rkey>, for example at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8. Handles are not accepted as the authority.`,
   );
 }

@@ -47,14 +47,33 @@ export async function prepareRecord<S extends l.RecordSchema>(
   input: Omit<l.InferInput<S>, "$type">,
   chosenKey?: RecordKeyString,
 ): Promise<PreparedRecord> {
-  const result = schema.safeValidate(schema.build(input));
-  if (!result.success) throw result.reason;
-  const value: LexMap = result.value;
   if (chosenKey !== undefined) {
     const key = schema.keySchema.safeValidate(chosenKey);
     if (!key.success) throw key.reason;
   }
-  const rkey = chosenKey ?? fixedRecordKey(schema) ?? nextTid();
+  return prepareUpdate(did, schema, input, chosenKey ?? fixedRecordKey(schema) ?? nextTid());
+}
+
+/**
+ * Like `prepareRecord`, but for replacing the existing record at `rkey` with `input` as its whole
+ * new value.
+ *
+ * Internal. `rkey` is not checked against the lexicon's key rule: it is the key the record already
+ * has, which another app may have chosen, and rejecting it would make the record impossible to
+ * update.
+ *
+ * Throws LexValidationError when the record does not satisfy the schema, and Error when the value
+ * cannot be encoded.
+ */
+export async function prepareUpdate<S extends l.RecordSchema>(
+  did: DidString,
+  schema: S,
+  input: Omit<l.InferInput<S>, "$type">,
+  rkey: RecordKeyString,
+): Promise<PreparedRecord> {
+  const result = schema.safeValidate(schema.build(input));
+  if (!result.success) throw result.reason;
+  const value: LexMap = result.value;
   const uri: AtUriString = `at://${did}/${schema.$type}/${rkey}`;
   const cid = (await cidForLex(value)).toString();
   return { collection: schema.$type, rkey, value, ref: { uri, cid } };

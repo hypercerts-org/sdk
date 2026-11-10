@@ -27,6 +27,10 @@
       "types": "./dist/blob/index.d.ts",
       "default": "./dist/blob/index.js"
     },
+    "./collection": {
+      "types": "./dist/collection/index.d.ts",
+      "default": "./dist/collection/index.js"
+    },
     "./feature": {
       "types": "./dist/feature/index.d.ts",
       "default": "./dist/feature/index.js"
