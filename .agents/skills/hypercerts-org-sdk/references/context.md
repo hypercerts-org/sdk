@@ -21,7 +21,7 @@ All four write a TID-keyed record to the signed-in account's repo. The first thr
 | `{ uri }` in `location`, `locations`, `tags`, `measurements` | An existing record of that field's type (`app.certified.location`, `org.hypercerts.vocab.tag`, `org.hypercerts.context.measurement`). Another type throws `TypeError`. |
 | The fields of a record, in those same four       | A new record, created in the same write. Never mixed with `uri`.                                     |
 | A string in `content`, an acknowledgement's `context` | A URL/URI stored as it is, never fetched, no CID.                                                |
-| A `Blob`/`File` in `content`                     | Uploaded for you before the write (any type, up to 10 MB; a `Blob` needs a `type`).                  |
+| A `Blob`/`File` in `content`                     | Uploaded for you (any type, up to 10 MB; a `Blob` needs a `type`).                                   |
 
 A subject is not limited to an Activity and is not changed: it does not learn about the attachment, measurement or evaluation, and nothing here links an existing record to its subject afterwards. Subject URIs must use a DID, not a handle. A bare string where `{ uri }` is required throws `TypeError`.
 
@@ -139,7 +139,9 @@ Not supported: `signatures`, `shortDescriptionFacets`, `commentFacets`, and a no
 
 ## Failures
 
-Input errors, unresolved or wrongly typed `{ uri }` records and files the lexicon would reject fail before anything is sent. Files are uploaded before the write and are not rolled back: after a failed write they stay unreferenced. `WriteRejectedError` means nothing was created. After `WriteOutcomeUnknownError` the records may exist and `attempted` lists every URI (the primary record is last). Calling again would create new records under new keys: check the URIs first. The SDK never retries.
+Input errors, unresolved or wrongly typed `{ uri }` records and files the lexicon would reject fail before anything is sent. See [Handle failures](../SKILL.md#6-handle-failures) for the write errors. After `WriteOutcomeUnknownError` the primary record is last in `attempted`, and calling again would create new records under new keys: check the URIs first.
+
+Files (`content`, a new tag's `referenceDocument`, a new location's `{ blob }`) are uploaded before the write and are not rolled back if it fails; see [Uploads are not part of the atomic write](../SKILL.md#uploads-are-not-part-of-the-atomic-write).
 
 ## Pitfalls
 

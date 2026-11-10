@@ -135,9 +135,10 @@ const attachmentKind: RecordKind<AttachmentInput> = recordKind(
  * with no new location or tag is a write of one record. One write holds at most 200 records. The
  * OAuth session needs `create` on the attachment, tag and location collections it writes to.
  *
- * Files are uploaded before the write and outside it. If the write fails, they are left unused and
- * the PDS may or may not delete them later. A lexicon rule that rejects the record (for example
- * more than 100 `content` entries) is found only after the uploads.
+ * Files (`Blob` or `File` values) are uploaded: the `content` entries, a new tag's
+ * `referenceDocument` and a new location's `{ blob }`. Blobs are uploaded before the write and are
+ * not rolled back if it fails; see {@link uploadBlob}. A lexicon rule that rejects a record (for
+ * example more than 100 `content` entries) is found only after the uploads.
  *
  * Not supported: the lexicon's `signatures` and `shortDescriptionFacets`, a `description` that is
  * not a string, and a blob that was uploaded already.
@@ -156,12 +157,10 @@ const attachmentKind: RecordKind<AttachmentInput> = recordKind(
  * @throws {@link Error} If the client is not authenticated, a `subjects` or other existing record
  * cannot be read, the key of a new tag cannot be checked, or an upload fails. Nothing was written.
  * @throws {@link RecordAlreadyExistsError} If a new tag's key is taken. Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). None of the records
- * was created and nothing needs cleaning up.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS (network
- * failure, timeout, a server error), so the records may or may not exist. It lists every URI that
- * was attempted. The SDK does not retry, because a retry would create a second Attachment under a
- * new key if the first attempt had succeeded. Check the URIs, then decide.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create a second Attachment under a new key if the first attempt had
+ * succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *

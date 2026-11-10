@@ -119,9 +119,10 @@ const evaluationKind: RecordKind<EvaluationInput> = recordKind(
  * records. The OAuth session needs `create` on the evaluation, measurement and location collections
  * it writes to.
  *
- * Files are uploaded before the write and outside it. If the write fails, they are left unused and
- * the PDS may or may not delete them later. A lexicon rule that rejects the record is found only
- * after the uploads.
+ * Files (`Blob` or `File` values) are uploaded: the `content` entries and a `{ blob }` in a new
+ * location, whether it is the evaluation's or a new measurement's. Blobs are uploaded before the
+ * write and are not rolled back if it fails; see {@link uploadBlob}. A lexicon rule that rejects a
+ * record is found only after the uploads.
  *
  * Not supported: the lexicon's `signatures`.
  *
@@ -138,12 +139,9 @@ const evaluationKind: RecordKind<EvaluationInput> = recordKind(
  * when a lexicon rule rejects a record.
  * @throws {@link Error} If the client is not authenticated, an existing record cannot be read, or
  * an upload fails. Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). None of the records
- * was created and nothing needs cleaning up.
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS (network
- * failure, timeout, a server error), so the records may or may not exist. It lists every URI that
- * was attempted. The SDK does not retry, because a retry would create duplicates under new keys
- * if the first attempt had succeeded. Check the URIs, then decide.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
+ * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
+ * is not safe: it would create duplicates under new keys if the first attempt had succeeded.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *
