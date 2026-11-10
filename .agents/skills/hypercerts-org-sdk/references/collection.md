@@ -49,3 +49,11 @@ Any other `WriteRejectedError` (4xx) is not fixed by calling again. After `Write
 ## Uploads are outside the commit
 
 `Blob`/`File` values are uploaded before the repository is read. If the write is refused, the blobs stay unreferenced (a PDS usually deletes them later, not guaranteed). A bad URI, another account's Collection, a missing, invalid or full Collection, or an invalid `activity` fails before any upload (the Collection is read once up front, then again after the latest commit for the guarded write).
+
+## `CreateActivityInCollectionInput`
+
+| Field           | Type            | Notes                                                                                                   |
+| --------------- | --------------- | ------------------------------------------------------------------------------------------------------- |
+| `collectionUri` | `string`        | Required. `at://<your did>/org.hypercerts.collection/<rkey>`. Must already exist and hold under 1000 items. |
+| `activity`      | `ActivityInput` | Required. The same input as `createActivity`; see [activity.md](activity.md). Always creates a new Activity. |
+| `itemWeight`    | `string`        | Optional. Positive decimal string, like a contributor's weight. Left out of the item when omitted.      |
