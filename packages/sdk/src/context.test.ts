@@ -1,4 +1,6 @@
 import { Client } from "@atproto/lex";
+import { createDidResolver, type DidResolver, DidResolverCommon } from "@atproto-labs/did-resolver";
+import type { IdentityResolver } from "@atproto-labs/identity-resolver";
 import { describe, expect, it } from "vitest";
 import { createSDKContext } from "./context.js";
 
@@ -45,6 +47,36 @@ describe("createSDKContext", () => {
       expect(create).toThrow(TypeError);
       expect(create).toThrow(/must be an @atproto\/lex Client/);
       expect(create).toThrow(/new Client\(session\)/);
+    },
+  );
+
+  it("accepts a DidResolver or an oauth client's IdentityResolver as they are", () => {
+    // These assignments are the test: they fail to compile if either type stops fitting.
+    const didResolvers: DidResolver<"plc" | "web">[] = [
+      new DidResolverCommon(),
+      createDidResolver({}),
+    ];
+    const identityResolver: IdentityResolver = {
+      resolve: () => Promise.reject(new Error("not called")),
+    };
+
+    for (const didResolver of [...didResolvers, identityResolver]) {
+      expect(createSDKContext({ client, didResolver }).didResolver).toBe(didResolver);
+    }
+  });
+
+  it.each([
+    ["the oauth client instead of its identityResolver", { identityResolver: { resolve() {} } }],
+    ["a function", () => undefined],
+  ])(
+    "rejects a didResolver that is %s with a message that says how to fix it",
+    (_, didResolver) => {
+      // @ts-expect-error Deliberately not a `DidDocumentResolver`.
+      const create = () => createSDKContext({ client, didResolver });
+
+      expect(create).toThrow(TypeError);
+      expect(create).toThrow(/`didResolver` must be an object with a resolve\(did\) method/);
+      expect(create).toThrow(/oauthClient\.identityResolver/);
     },
   );
 });

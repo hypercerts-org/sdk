@@ -1,8 +1,45 @@
+import type { AtprotoDidDocument } from "@atproto-labs/did-resolver";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createSDKContext, type DidDocumentResolver } from "../context.js";
 import { CID, DID, fakePds, json } from "../test-utils/fake-pds.js";
 import { resolveRecordRef } from "./resolve-record-ref.js";
 
 const URI = `at://${DID}/org.hypercerts.claim.activity/3k2a4b5c6d7e8`;
+
+const OWNER = "did:plc:ewvi7nxzyoun6zhxrhs64oiz";
+const OWNER_PDS = "https://owner-pds.test";
+
+function ownerUri(rkey: string): string {
+  return `at://${OWNER}/org.hypercerts.claim.activity/${rkey}`;
+}
+
+function ownerDocument(): AtprotoDidDocument {
+  return {
+    id: OWNER,
+    service: [
+      { id: "#atproto_pds", type: "AtprotoPersonalDataServer", serviceEndpoint: OWNER_PDS },
+    ],
+  };
+}
+
+/**
+ * Replaces the global `fetch`: plc.directory serves the owner's DID document and the owner's PDS
+ * serves any record asked for. Returns the URLs requested, in order.
+ */
+function stubOwnerNetwork(): URL[] {
+  const requested: URL[] = [];
+  vi.stubGlobal("fetch", async (input: Request | string | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    requested.push(url);
+    if (url.origin === "https://plc.directory") return json(200, ownerDocument());
+    return json(200, { uri: ownerUri(url.searchParams.get("rkey") ?? ""), cid: CID, value: {} });
+  });
+  return requested;
+}
+
+function didLookups(requested: URL[]): number {
+  return requested.filter((url) => url.origin === "https://plc.directory").length;
+}
 
 describe("resolveRecordRef", () => {
   afterEach(() => {
@@ -59,36 +96,75 @@ describe("resolveRecordRef", () => {
   });
 
   it("resolves an owner's PDS once for concurrent reads that share a client map", async () => {
-    const owner = "did:plc:ewvi7nxzyoun6zhxrhs64oiz";
-    const uris = ["3k2a4b5c6d7e8", "3k2a4b5c6d7e9"].map(
-      (rkey) => `at://${owner}/org.hypercerts.claim.activity/${rkey}`,
-    );
-    let didFetches = 0;
-    vi.stubGlobal("fetch", async (input: Request | string | URL) => {
-      const url = new URL(input instanceof Request ? input.url : String(input));
-      if (url.origin === "https://plc.directory") {
-        didFetches += 1;
-        return json(200, {
-          id: owner,
-          service: [
-            {
-              id: "#atproto_pds",
-              type: "AtprotoPersonalDataServer",
-              serviceEndpoint: "https://owner-pds.test",
-            },
-          ],
-        });
-      }
-      const rkey = url.searchParams.get("rkey");
-      return json(200, { uri: uris.find((u) => u.endsWith(`/${rkey}`)), cid: CID, value: {} });
+    // A resolver that does not cache, so only the shared client map can make this one lookup.
+    const lookups: string[] = [];
+    const didResolver: DidDocumentResolver = {
+      resolve: async (did) => {
+        lookups.push(did);
+        return ownerDocument();
+      },
+    };
+    stubOwnerNetwork();
+    const context = createSDKContext({
+      client: fakePds(() => json(500, {})).context.client,
+      didResolver,
     });
-    const { context } = fakePds(() => json(500, {}));
+    const uris = [ownerUri("3k2a4b5c6d7e8"), ownerUri("3k2a4b5c6d7e9")];
     const pdsClients = new Map();
 
     const refs = await Promise.all(uris.map((uri) => resolveRecordRef(context, uri, pdsClients)));
 
     expect(refs).toEqual(uris.map((uri) => ({ uri, cid: CID })));
-    expect(didFetches).toBe(1);
+    expect(lookups).toEqual([OWNER]);
+  });
+
+  it("looks up an owner's DID once across separate calls on one context", async () => {
+    // Created before the stub, so this also covers the default resolver using the `fetch` that is
+    // global when it makes a request, not when the context was created.
+    const { context } = fakePds(() => json(500, {}));
+    const requested = stubOwnerNetwork();
+
+    await resolveRecordRef(context, ownerUri("3k2a4b5c6d7e8"));
+    await resolveRecordRef(context, ownerUri("3k2a4b5c6d7e9"));
+
+    expect(didLookups(requested)).toBe(1);
+  });
+
+  it("does not share looked-up DIDs between contexts", async () => {
+    const requested = stubOwnerNetwork();
+
+    await resolveRecordRef(fakePds(() => json(500, {})).context, ownerUri("3k2a4b5c6d7e8"));
+    await resolveRecordRef(fakePds(() => json(500, {})).context, ownerUri("3k2a4b5c6d7e8"));
+
+    expect(didLookups(requested)).toBe(2);
+  });
+
+  it.each([
+    ["a DidResolver, which returns the document", (document: AtprotoDidDocument) => document],
+    [
+      "an IdentityResolver, which returns { did, didDoc, handle }",
+      (document: AtprotoDidDocument) => ({ did: document.id, didDoc: document, handle: "o.test" }),
+    ],
+  ])("finds the owner's PDS with the application's resolver: %s", async (_, answer) => {
+    const requested = stubOwnerNetwork();
+    const lookups: string[] = [];
+    const didResolver: DidDocumentResolver = {
+      resolve: async (did) => {
+        lookups.push(did);
+        return answer(ownerDocument());
+      },
+    };
+    const context = createSDKContext({
+      client: fakePds(() => json(500, {})).context.client,
+      didResolver,
+    });
+    const uri = ownerUri("3k2a4b5c6d7e8");
+
+    const ref = await resolveRecordRef(context, uri);
+
+    expect(ref).toEqual({ uri, cid: CID });
+    expect(lookups).toEqual([OWNER]);
+    expect(requested.map((url) => url.origin)).toEqual([OWNER_PDS]);
   });
 
   it("fails without asking the client's PDS when the owner's PDS cannot be resolved", async () => {

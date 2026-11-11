@@ -3,7 +3,7 @@ name: hypercerts-org-sdk
 description: "Write Hypercerts and Certified records (org.hypercerts.*, app.certified.*) to a PDS from an app with @hypercerts-org/sdk: setting up the SDK context from an authenticated @atproto/lex Client, choosing the right operation and subpath, uploading blobs, and handling write errors without duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create, link or write hypercert-related records from an app. Not for changing the SDK's own source."
 metadata:
   author: hypercerts-org
-  version: "4"
+  version: "5"
 ---
 
 # @hypercerts-org/sdk
@@ -40,11 +40,22 @@ export const context = createSDKContext({ client: new Client(session) });
 
 Make a new context when the signed-in account changes. Records are always written to the account behind `client`.
 
+To read another account's record (a `{ uri }` that is not in your repo), the SDK looks up that account's DID document to find its PDS. By default it uses its own resolver and keeps each document in memory for up to an hour per context. If the app has an `@atproto/oauth-client` (or `@atproto/oauth-client-node`) client, pass its resolver to reuse the cache it already has:
+
+```ts
+export const context = createSDKContext({
+  client: new Client(session),
+  didResolver: oauthClient.identityResolver, // the resolver, not `oauthClient` itself
+});
+```
+
+`didResolver` accepts any object with `resolve(did)` that returns a DID document or `{ didDoc }`.
+
 ## 3. Import from subpaths
 
 | Import from                    | Exports                                                                                                                                                                                                |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@hypercerts-org/sdk`          | `createSDKContext`, `SDKContext`                                                                                                                                                                       |
+| `@hypercerts-org/sdk`          | `createSDKContext`, `SDKContext`, `DidDocumentResolver`                                                                                                                                                 |
 | `@hypercerts-org/sdk/activity` | `createActivity`, `createRights`, `createContribution`, `createContributorInformation`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types |
 | `@hypercerts-org/sdk/actor`    | `createProfile`, `ProfileAlreadyExistsError`, `RecordAlreadyExistsError`, the same `Write*` errors, `ProfileInput`                                                                                     |
 | `@hypercerts-org/sdk/location` | `createLocation`, the same `Write*` errors, `LocationInput`, `LocationValue`                                                                                                                           |
@@ -178,6 +189,7 @@ try {
 ## Pitfalls
 
 - `createSDKContext({ client: session })` or passing an `@atproto/api` `Agent` throws. Wrap it: `new Client(session)`.
+- `didResolver: oauthClient` throws. Pass `oauthClient.identityResolver`.
 - Passing an `uploadBlob` result as `image` throws. Pass the `Blob`/`File`.
 - Retrying blindly after `WriteOutcomeUnknownError` duplicates every record under new keys. The exception is a call whose records all have a fixed key and are only created if absent: `createProfile` and `createVocabularyTag`. `createOrganization` is also safe to repeat: the organization exists at most once, so a second call creates it or throws `OrganizationAlreadyExistsError`. `createFeature`, `createCollection` and `createWorkScopeTag` are not safe to repeat.
 - An item of `createCollection` is `{ activity }`, `{ feature }`, `{ collection }` or `{ uri }`, never a bare Activity input; `{ uri }` must be an Activity, Feature or Collection.
