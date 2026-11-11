@@ -52,9 +52,10 @@ export async function resolveRecordRef(
  * Boundaries:
  * - Reads with `com.atproto.repo.getRecord` from the PDS that hosts the record, the authoritative
  *   copy. A record in the client's own repo is read through `context.client`. For another
- *   account's record the owner's PDS is found from their DID document (plc.directory for
- *   `did:plc`, `/.well-known/did.json` for `did:web`) and read without authentication, so only
- *   public records resolve. The client's PDS is not used for those reads because it would forward
+ *   account's record the owner's PDS is found from their DID document, through
+ *   `context.didResolver` (by default plc.directory for `did:plc` and `/.well-known/did.json` for
+ *   `did:web`, cached per context), and read without authentication, so only public records
+ *   resolve. The client's PDS is not used for those reads because it would forward
  *   them to its AppView, which may not index the record or may return an outdated CID.
  * - Never falls back to an indexer: a failed read throws.
  * - Does not check the record's type or value, or whether the caller may reference it. That is
@@ -139,7 +140,7 @@ async function clientForRepo(
   if (context.client.did === did) return context.client;
   let pending = pdsClients?.get(did);
   if (pending === undefined) {
-    pending = resolvePds(did).then((pds) => new Client(pds));
+    pending = resolvePds(context, did).then((pds) => new Client(pds));
     pdsClients?.set(did, pending);
   }
   return pending;
