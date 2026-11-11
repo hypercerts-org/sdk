@@ -72,6 +72,7 @@
     "@hypercerts-org/lexicon": "^2.0.1"
   },
   "devDependencies": {
+    "@atproto-labs/identity-resolver": "0.4.13",
     "@atproto/lex": "0.4.4",
     "@hypercerts-org/lexicon": "2.0.1"
   },
