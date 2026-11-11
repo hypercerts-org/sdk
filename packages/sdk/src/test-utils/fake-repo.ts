@@ -40,6 +40,10 @@ export interface FakeRepoOptions {
   putRecord?: (request: RecordedRequest) => Response;
   /** Replaces the fake's answer to `getLatestCommit`, to simulate failures. */
   getLatestCommit?: (request: RecordedRequest) => Response;
+  /** Answers `listRecords`; without it the fake answers HTTP 404, as it does for any method it does not know. */
+  listRecords?: (request: RecordedRequest) => Response | Promise<Response>;
+  /** Answers `deleteRecord`; without it the fake answers HTTP 404, as it does for any method it does not know. */
+  deleteRecord?: (request: RecordedRequest) => Response | Promise<Response>;
   /** Replaces the fake's answer to `uploadBlob`, to simulate failures. */
   uploadBlob?: (request: RecordedRequest) => Response;
   /** Replaces the fake's answer to `applyWrites`, to simulate failures. */
@@ -79,6 +83,12 @@ export function fakeRepo(options: FakeRepoOptions = {}) {
     }
     if (path.endsWith("com.atproto.repo.applyWrites")) {
       return options.applyWrites?.(request) ?? applyWrites(request, received, state);
+    }
+    if (path.endsWith("com.atproto.repo.listRecords") && options.listRecords) {
+      return options.listRecords(request);
+    }
+    if (path.endsWith("com.atproto.repo.deleteRecord") && options.deleteRecord) {
+      return options.deleteRecord(request);
     }
     if (path.endsWith("com.atproto.repo.putRecord")) {
       return options.putRecord?.(request) ?? putRecord(request, puts, options.existing);
