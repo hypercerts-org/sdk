@@ -4,7 +4,12 @@ import { type BuildContext, parseInput } from "./build-context.js";
 import { describeError, describeValue } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import { buildRecord, type RecordKind, type ReferenceField, recordKeyOf } from "./record-kind.js";
-import { recordExists, resolveRecordRef, type StrongRef } from "./resolve-record-ref.js";
+import {
+  parseRecordUri,
+  recordExists,
+  resolveRecordRef,
+  type StrongRef,
+} from "./resolve-record-ref.js";
 import { assertWithinWriteLimit, RecordAlreadyExistsError } from "./submit-writes.js";
 
 /**
@@ -278,9 +283,8 @@ function existing(
   const { uri } = parseInput(build, field, existingRecord, value);
   const allowed: readonly string[] | undefined =
     typeof collections === "string" ? [collections] : collections;
-  // `at-uri` alone also accepts other record types, handle authorities and URIs without a key. The
-  // authority and type are checked here so a wrong one fails before any request, naming the field;
-  // `resolveRecordRef` rejects the rest.
+  // `at-uri` alone also accepts other record types, handle authorities and URIs without a key. All
+  // are checked here so a wrong one fails before any request, naming the field.
   const authority = uri.split("/")[2];
   if (authority === undefined || !isDidString(authority)) {
     throw new TypeError(
@@ -293,6 +297,13 @@ function existing(
       actual === undefined ? "something that is not a record" : `a record of type ${actual}`;
     throw new TypeError(
       `${build.operation}: ${field} points at ${target}, but this field holds ${allowed?.join(", ") ?? "a record"}: ${uri}. Expected at://<did>/${allowed?.join("|") ?? "<collection>"}/<rkey>.`,
+    );
+  }
+  try {
+    parseRecordUri(uri, build.operation);
+  } catch {
+    throw new TypeError(
+      `${build.operation}: ${field} is not a record URI: ${uri}. Expected at://<did>/${actual}/<rkey>.`,
     );
   }
   return { kind: "existing", uri };
@@ -338,7 +349,7 @@ export function assertDistinctKeys(build: BuildContext, slots: readonly NewSlot[
 
 /**
  * Reads, before anything is uploaded or written, what the call depends on: every `existing` slot
- * from the PDS that hosts it, in parallel, and (with `checkKeys`) that no record exists yet at the
+ * from the PDS that hosts it (each URI once), in parallel, and (with `checkKeys`) that no record exists yet at the
  * key a new record chose. A failure here has no side effects.
  *
  * Throws what `resolveRecordRef` throws, and RecordAlreadyExistsError when a chosen key is taken.
@@ -348,10 +359,18 @@ export async function readBeforeWriting(
   slots: readonly Slot[],
   { checkKeys }: { checkKeys: boolean },
 ): Promise<Map<Slot, StrongRef>> {
+  // A URI repeated across slots is read once, so every slot gets the same CID.
+  const reads = new Map<string, Promise<StrongRef>>();
+  const read = (uri: string): Promise<StrongRef> => {
+    let pending = reads.get(uri);
+    if (pending === undefined) {
+      pending = resolveRecordRef(build.context, uri);
+      reads.set(uri, pending);
+    }
+    return pending;
+  };
   const [resolved] = await Promise.all([
-    settle(slots, ({ choice }) =>
-      choice.kind === "existing" ? resolveRecordRef(build.context, choice.uri) : undefined,
-    ),
+    settle(slots, ({ choice }) => (choice.kind === "existing" ? read(choice.uri) : undefined)),
     checkKeys ? assertKeysFree(build, newSlots(slots)) : undefined,
   ]);
   return resolved;

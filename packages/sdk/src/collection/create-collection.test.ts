@@ -60,9 +60,9 @@ describe("createCollection with existing records only", () => {
       ],
     });
 
-    // The records are read, nothing is uploaded, and the Collection is the only write.
+    // Each record is read once, nothing is uploaded, and the Collection is the only write.
     expect(methods(requests)).toEqual([
-      ...Array(4).fill("com.atproto.repo.getRecord"),
+      ...Array(3).fill("com.atproto.repo.getRecord"),
       "com.atproto.repo.applyWrites",
     ]);
     expect(creates).toHaveLength(1);
@@ -319,6 +319,11 @@ describe("createCollection when the input is wrong", () => {
       "an item URI with a handle as the authority",
       item({ uri: `at://alice.example.com/${ACTIVITY}/3k2a4b5c6d7e8` }),
       /input\.items\[0\]\.uri must use a DID as the authority, not a handle/,
+    ],
+    [
+      "an item URI without a record key",
+      item({ uri: `at://did:plc:abc123/${ACTIVITY}` }),
+      /input\.items\[0\]\.uri is not a record URI/,
     ],
     ["an invalid weight", item({ uri: uriOf(ACTIVITY), weight: "0" }), /positive decimal number/],
     [
