@@ -1,4 +1,4 @@
-import { l, type NsidString, type RecordKeyString } from "@atproto/lex";
+import { isDidString, l, type NsidString, type RecordKeyString } from "@atproto/lex";
 import * as strongRef from "@hypercerts-org/lexicon/com/atproto/repo/strongRef";
 import { type BuildContext, parseInput } from "./build-context.js";
 import { describeError, describeValue } from "./describe.js";
@@ -279,8 +279,14 @@ function existing(
   const allowed: readonly string[] | undefined =
     typeof collections === "string" ? [collections] : collections;
   // `at-uri` alone also accepts other record types, handle authorities and URIs without a key. The
-  // type is checked here so a wrong one fails before any request; `resolveRecordRef` rejects the
-  // rest.
+  // authority and type are checked here so a wrong one fails before any request, naming the field;
+  // `resolveRecordRef` rejects the rest.
+  const authority = uri.split("/")[2];
+  if (authority === undefined || !isDidString(authority)) {
+    throw new TypeError(
+      `${build.operation}: ${field} must use a DID as the authority, not a handle: ${uri}. Expected at://<did>/<collection>/<rkey>.`,
+    );
+  }
   const actual = collectionOf(uri);
   if (actual === undefined || (allowed !== undefined && !allowed.includes(actual))) {
     const target =

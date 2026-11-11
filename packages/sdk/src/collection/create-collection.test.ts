@@ -315,6 +315,11 @@ describe("createCollection when the input is wrong", () => {
       item({ uri: uriOf(LOCATION) }),
       /input\.items\[0\]\.uri points at a record of type app\.certified\.location, but this field holds org\.hypercerts\.claim\.activity, org\.hypercerts\.entity\.feature, org\.hypercerts\.collection/,
     ],
+    [
+      "an item URI with a handle as the authority",
+      item({ uri: `at://alice.example.com/${ACTIVITY}/3k2a4b5c6d7e8` }),
+      /input\.items\[0\]\.uri must use a DID as the authority, not a handle/,
+    ],
     ["an invalid weight", item({ uri: uriOf(ACTIVITY), weight: "0" }), /positive decimal number/],
     [
       "a work-scope tag where a vocabulary tag is needed",
