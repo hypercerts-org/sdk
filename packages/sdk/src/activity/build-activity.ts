@@ -16,23 +16,18 @@ import { mediaValue } from "../internal/media.js";
 import type { PreparedRecord } from "../internal/prepare-record.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import {
-  assertDistinctKeys,
   type ExistingRecord,
-  flattenSlots,
   isInputObject,
   type NewSlot,
-  newSlots,
-  prepareNew,
+  prepareSlots,
   type ReferenceOf,
-  readBeforeWriting,
   recordRef,
-  referenceLookup,
   resultOf,
   type Slot,
   type SupportingRecordRef,
   toSlot,
 } from "../internal/slots.js";
-import { assertWithinWriteLimit, submitWrites } from "../internal/submit-writes.js";
+import { submitWrites } from "../internal/submit-writes.js";
 import { type LocationInput, locationKind } from "../location/build-location.js";
 import {
   type WorkScopeTagInput,
@@ -521,19 +516,13 @@ export async function prepareActivity(
 ): Promise<PreparedActivity> {
   const { path, otherWrites = 0 } = options;
   const planned = planActivitySlot(build, input, path);
-  const slots = flattenSlots([planned.slot]);
-  const fresh = newSlots(slots);
-  assertDistinctKeys(build, fresh);
-  // `fresh` holds the Activity itself too.
-  assertWithinWriteLimit(build.operation, fresh.length + otherWrites);
-
   // Reads first, then uploads: a URI that cannot be resolved fails before anything is uploaded.
-  const existing = await readBeforeWriting(build, slots, { checkKeys: true });
-  const created = await prepareNew(slots, existing);
-  return {
-    writes: [...created.values()],
-    result: planned.result(created, referenceLookup(existing, created)),
-  };
+  // The write limit counts the Activity itself too.
+  const { created, refOf } = await prepareSlots(build, [planned.slot], {
+    checkKeys: true,
+    otherWrites,
+  });
+  return { writes: [...created.values()], result: planned.result(created, refOf) };
 }
 
 function activityRecord(

@@ -5,7 +5,7 @@ import { describeError, describeValue } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import { buildRecord, type RecordKind, type ReferenceField, recordKeyOf } from "./record-kind.js";
 import { recordExists, resolveRecordRef, type StrongRef } from "./resolve-record-ref.js";
-import { RecordAlreadyExistsError } from "./submit-writes.js";
+import { assertWithinWriteLimit, RecordAlreadyExistsError } from "./submit-writes.js";
 
 /**
  * Points at a record that already exists, to reuse it as it is.
@@ -444,6 +444,35 @@ export function referenceLookup(
     if (ref === undefined) throw new Error(`no reference was prepared for ${slot.field}.`);
     return ref;
   };
+}
+
+/** What `prepareSlots` returns: the reads, the records to write, and every slot's reference. */
+export interface PreparedSlots {
+  existing: Map<Slot, StrongRef>;
+  created: Map<Slot, PreparedRecord>;
+  refOf: ReferenceOf;
+}
+
+/**
+ * Plans, reads and prepares every record `roots` writes or points at, in the order every caller
+ * needs: input checks first, then the reads, then the uploads, so a bad input or a failed read has
+ * no side effects. `otherWrites` counts the writes the caller adds to the same request.
+ *
+ * Throws TypeError for two new records with the same key or more records than one write holds, and
+ * what `readBeforeWriting` and `prepareNew` throw.
+ */
+export async function prepareSlots(
+  build: BuildContext,
+  roots: readonly Slot[],
+  { checkKeys, otherWrites = 0 }: { checkKeys: boolean; otherWrites?: number },
+): Promise<PreparedSlots> {
+  const slots = flattenSlots(roots);
+  const fresh = newSlots(slots);
+  assertDistinctKeys(build, fresh);
+  assertWithinWriteLimit(build.operation, fresh.length + otherWrites);
+  const existing = await readBeforeWriting(build, slots, { checkKeys });
+  const created = await prepareNew(slots, existing);
+  return { existing, created, refOf: referenceLookup(existing, created) };
 }
 
 /** The reference of the record in `slot`, with whether this call created it. */

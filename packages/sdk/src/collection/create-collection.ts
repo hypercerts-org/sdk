@@ -1,14 +1,7 @@
 import type { SDKContext } from "../context.js";
 import { createBuildContext } from "../internal/build-context.js";
-import {
-  assertDistinctKeys,
-  flattenSlots,
-  newSlots,
-  prepareNew,
-  readBeforeWriting,
-  referenceLookup,
-} from "../internal/slots.js";
-import { assertWithinWriteLimit, submitWrites } from "../internal/submit-writes.js";
+import { prepareSlots } from "../internal/slots.js";
+import { submitWrites } from "../internal/submit-writes.js";
 import {
   type CollectionInput,
   type CreateCollectionResult,
@@ -155,15 +148,9 @@ export async function createCollection(
 ): Promise<CreateCollectionResult> {
   const build = createBuildContext(context, OPERATION);
   const planned = planCollection(build, "input", input);
-  const slots = flattenSlots([planned.slot]);
-  const fresh = newSlots(slots);
-  assertDistinctKeys(build, fresh);
-  assertWithinWriteLimit(OPERATION, fresh.length);
-
   // Reads first, then uploads: a URI that cannot be resolved, or a taken tag key, fails before
   // anything is uploaded.
-  const existing = await readBeforeWriting(build, slots, { checkKeys: true });
-  const created = await prepareNew(slots, existing);
+  const { created, refOf } = await prepareSlots(build, [planned.slot], { checkKeys: true });
   await submitWrites(context, build.did, [...created.values()], OPERATION);
-  return planned.result(created, referenceLookup(existing, created));
+  return planned.result(created, refOf);
 }
