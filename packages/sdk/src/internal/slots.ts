@@ -5,6 +5,7 @@ import { describeError, describeValue } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import { buildRecord, type RecordKind, type ReferenceField, recordKeyOf } from "./record-kind.js";
 import {
+  type PdsClients,
   parseRecordUri,
   recordExists,
   resolveRecordRef,
@@ -361,10 +362,12 @@ export async function readBeforeWriting(
 ): Promise<Map<Slot, StrongRef>> {
   // A URI repeated across slots is read once, so every slot gets the same CID.
   const reads = new Map<string, Promise<StrongRef>>();
+  // Records from one remote account share one resolution of its PDS.
+  const pdsClients: PdsClients = new Map();
   const read = (uri: string): Promise<StrongRef> => {
     let pending = reads.get(uri);
     if (pending === undefined) {
-      pending = resolveRecordRef(build.context, uri);
+      pending = resolveRecordRef(build.context, uri, pdsClients);
       reads.set(uri, pending);
     }
     return pending;

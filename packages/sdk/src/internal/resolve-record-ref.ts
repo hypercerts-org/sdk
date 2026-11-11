@@ -34,8 +34,12 @@ export interface StoredRecord {
  *
  * Throws what `readRecord` throws.
  */
-export async function resolveRecordRef(context: SDKContext, uri: string): Promise<StrongRef> {
-  return (await readRecord(context, uri, "resolveRecordRef")).ref;
+export async function resolveRecordRef(
+  context: SDKContext,
+  uri: string,
+  pdsClients?: PdsClients,
+): Promise<StrongRef> {
+  return (await readRecord(context, uri, "resolveRecordRef", pdsClients)).ref;
 }
 
 /**
@@ -65,11 +69,12 @@ export async function readRecord(
   context: SDKContext,
   uri: string,
   operation: string,
+  pdsClients?: PdsClients,
 ): Promise<StoredRecord> {
   const { atUri: requested, did, collection, rkey } = parseRecordUri(uri, operation);
   let response: Awaited<ReturnType<Client["getRecord"]>>;
   try {
-    const client = await clientForRepo(context, did);
+    const client = await clientForRepo(context, did, pdsClients);
     response = await client.getRecord(collection, rkey, { repo: did });
   } catch (error) {
     const reason = isRecordNotFound(error)
@@ -119,9 +124,25 @@ export async function recordExists(
   }
 }
 
-async function clientForRepo(context: SDKContext, did: DidString): Promise<Client> {
+/**
+ * Clients for other accounts' PDSes, keyed by DID, so that reads of several records from one
+ * account share a single DID resolution, including reads still in flight. Scope one map to one
+ * operation: a DID's PDS can change.
+ */
+export type PdsClients = Map<DidString, Promise<Client>>;
+
+async function clientForRepo(
+  context: SDKContext,
+  did: DidString,
+  pdsClients?: PdsClients,
+): Promise<Client> {
   if (context.client.did === did) return context.client;
-  return new Client(await resolvePds(did));
+  let pending = pdsClients?.get(did);
+  if (pending === undefined) {
+    pending = resolvePds(did).then((pds) => new Client(pds));
+    pdsClients?.set(did, pending);
+  }
+  return pending;
 }
 
 /**
