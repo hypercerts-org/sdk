@@ -1,6 +1,6 @@
 ---
 name: hypercerts-org-sdk
-description: Write Hypercerts and Certified records (org.hypercerts.*, app.certified.*) to a PDS from an app with @hypercerts-org/sdk: setting up the SDK context from an authenticated @atproto/lex Client, choosing the right operation and subpath, uploading blobs, and handling write errors without duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create, link or write hypercert-related records from an app. Not for changing the SDK's own source.
+description: "Write Hypercerts and Certified records (org.hypercerts.*, app.certified.*) to a PDS from an app with @hypercerts-org/sdk: setting up the SDK context from an authenticated @atproto/lex Client, choosing the right operation and subpath, uploading blobs, and handling write errors without duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create, link or write hypercert-related records from an app. Not for changing the SDK's own source."
 metadata:
   author: hypercerts-org
   version: "3"
