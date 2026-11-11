@@ -30,7 +30,7 @@ collection.items[3]; // { uri, cid, type: "activity", created: false }
 ```
 
 - An item is **exactly one** of `{ activity }`, `{ feature }`, `{ collection }` (the data of a new record, same input as `createActivity`, `createFeature` and `createCollection`) or `{ uri }`, plus an optional `weight`. The SDK never guesses from the fields: a bare Activity (`{ title, shortDescription }`) is a `TypeError`.
-- `{ uri }` must be an Activity, Feature or Collection with a DID (`at://<did>/<collection>/<rkey>`). It is read for its CID and reused unchanged; it may belong to another account if public. Another record type, or a handle, is a `TypeError` naming the item.
+- `{ uri }` must be an Activity, Feature or Collection with a DID (`at://<did>/<collection>/<rkey>`). It is read for its CID and reused unchanged; it may belong to another account if public. Another account's PDS is found with the context's `didResolver` ([SKILL.md](../SKILL.md#2-create-the-context-once)). Another record type, or a handle, is a `TypeError` naming the item.
 - `weight` is a positive decimal string (`"2"`, `"0.50"`), stored exactly as you pass it. Weights need not add up to anything.
 - Order is kept. Nothing is deduplicated or searched for: the same `{ uri }` twice gives two items, the same data twice gives two records.
 - `location` and `tags` take new records or `{ uri }` like in `createFeature`. A new tag's key is `<category>.<key>`: a taken key throws `RecordAlreadyExistsError` before anything is uploaded or written, and two new tags with the same key anywhere in the call are a `TypeError` (create it first and pass its `uri`).
