@@ -38,7 +38,7 @@ export interface ProfileInput {
   createdAt?: string | undefined;
 }
 
-const profileKind: RecordKind<ProfileInput> = recordKind(
+export const profileKind: RecordKind<ProfileInput> = recordKind(
   profile.main,
   {
     displayName: optionalText,

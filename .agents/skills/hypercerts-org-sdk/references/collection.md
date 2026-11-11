@@ -29,20 +29,7 @@ const { activity, collection } = await createActivityInCollection(context, {
 
 ## Concurrent writes (`InvalidSwap`)
 
-`applyWrites` cannot guard a single record, so the SDK reads the repository's latest commit, then the Collection, and sends the write conditional on that commit. If **anything** wrote to the account in between (even an unrelated record), the PDS refuses the whole request: `WriteRejectedError` with `code === "InvalidSwap"`. Nothing was written, so calling again is safe. The SDK never retries or merges.
-
-```ts
-import { createActivityInCollection, WriteRejectedError } from "@hypercerts-org/sdk/collection";
-
-try {
-  return await createActivityInCollection(context, input);
-} catch (error) {
-  if (error instanceof WriteRejectedError && error.code === "InvalidSwap") {
-    return await createActivityInCollection(context, input); // reads the Collection afresh
-  }
-  throw error;
-}
-```
+The write is conditional on the account not having changed since the Collection was read, so a concurrent change to its `items` cannot be overwritten with a stale list. When it did change you get `WriteRejectedError` with `code === "InvalidSwap"`: see [Concurrent changes](../SKILL.md#concurrent-changes-invalidswap) for the rule and the retry example.
 
 Any other `WriteRejectedError` (4xx) is not fixed by calling again. After `WriteOutcomeUnknownError`, `attempted` lists the new records and, last, the Collection: check the Activity and whether the Collection lists it before retrying, or you create a second Activity.
 
