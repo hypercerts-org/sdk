@@ -50,14 +50,9 @@ const OPERATION = "createCollection";
  * throws {@link RecordAlreadyExistsError} if one does; use the existing tag's `uri` instead. Two
  * new tags with the same key in one call are a `TypeError`.
  *
- * Files (`Blob` or `File` values) are uploaded for the `avatar` and `banner` of the Collection and
- * of every child Collection, and for the same fields as in the operations that create the other new
- * records. The order of work is: validate all the input, count the records, read every existing
- * record and every new tag's key, upload the blobs, build the records, write. Input errors, a wrong
- * record type, too many records and an unreadable `{ uri }` stop before any upload. A file that the
- * image limits reject, and a lexicon rule that rejects a record (a title that is too long, say),
- * are only found when that record is built, so the files of other records may already be uploaded
- * by then. Blobs are uploaded before the write and are not rolled back if it fails; see
+ * Order: validate input, count records, read existing records and tag keys, upload blobs, build,
+ * write. Input and read errors stop before any upload; a rejected file or lexicon rule is found
+ * at build time, after other files may have uploaded. Uploaded blobs are not rolled back; see
  * {@link uploadBlob}.
  *
  * Not supported: the lexicon's `signatures`, a blob that was uploaded already, adding items to a
@@ -78,10 +73,8 @@ const OPERATION = "createCollection";
  * key of a new tag cannot be checked, or an upload fails. Nothing was written.
  * @throws {@link RecordAlreadyExistsError} If a new tag's key is taken. Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. `attempted`
- * lists every new record, children before the records that point at them and the Collection last.
- * Calling again is not safe: it would create every record again under new keys if the first attempt
- * had succeeded.
+ * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to retry:
+ * a successful first attempt would be duplicated. `attempted` lists the new records, Collection last.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *
