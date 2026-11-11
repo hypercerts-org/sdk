@@ -119,8 +119,10 @@ describe("resolveRecordRef", () => {
   });
 
   it("looks up an owner's DID once across separate calls on one context", async () => {
-    const requested = stubOwnerNetwork();
+    // Created before the stub, so this also covers the default resolver using the `fetch` that is
+    // global when it makes a request, not when the context was created.
     const { context } = fakePds(() => json(500, {}));
+    const requested = stubOwnerNetwork();
 
     await resolveRecordRef(context, ownerUri("3k2a4b5c6d7e8"));
     await resolveRecordRef(context, ownerUri("3k2a4b5c6d7e9"));
