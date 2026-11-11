@@ -282,7 +282,7 @@ describe("awardBadge input and references", () => {
     [
       "a definition URI with a handle",
       { definition: { uri: `at://alice.test/${DEFINITION}/3k2a4b5c6d7e8` } },
-      /not a record URI/,
+      /definition must use a DID as the authority, not a handle/,
     ],
     [
       "a new definition without a title",
