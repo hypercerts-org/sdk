@@ -3,7 +3,7 @@ name: hypercerts-org-sdk
 description: "Write Hypercerts and Certified records (org.hypercerts.*, app.certified.*) to a PDS from an app with @hypercerts-org/sdk: setting up the SDK context from an authenticated @atproto/lex Client, choosing the right operation and subpath, uploading blobs, and handling write errors without duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create, link or write hypercert-related records from an app. Not for changing the SDK's own source."
 metadata:
   author: hypercerts-org
-  version: "4"
+  version: "7"
 ---
 
 # @hypercerts-org/sdk
@@ -51,6 +51,7 @@ Make a new context when the signed-in account changes. Records are always writte
 | `@hypercerts-org/sdk/tag`      | `createVocabularyTag`, `createWorkScopeTag`, `RecordAlreadyExistsError`, the same `Write*` errors, input/result types                                                                                  |
 | `@hypercerts-org/sdk/feature`  | `createFeature`, `RecordAlreadyExistsError`, the same `Write*` errors, `FeatureInput`, `CreateFeatureResult`, `LeafletDocument`                                                                        |
 | `@hypercerts-org/sdk/organization` | `createOrganization`, `OrganizationAlreadyExistsError`, `RecordAlreadyExistsError`, the same `Write*` errors, `OrganizationInput`, `CreateOrganizationInput`, `CreateOrganizationResult`, `LeafletDocument` |
+| `@hypercerts-org/sdk/context`  | `createAttachment`, `createMeasurement`, `createEvaluation`, `createAcknowledgement`, `RecordAlreadyExistsError`, the same `Write*` errors, input/result types |
 | `@hypercerts-org/sdk/blob`     | `uploadBlob`                                                                                                                                                                                           |
 | `@hypercerts-org/sdk/collection` | `createCollection`, `createActivityInCollection`, `RecordAlreadyExistsError`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types                                                         |
 
@@ -69,16 +70,18 @@ Operations are grouped by domain, each under its own subpath. Read the domain's 
 | Feature (`org.hypercerts.entity.feature`, with its tags and locations) | `@hypercerts-org/sdk/feature` | [references/feature.md](references/feature.md) |
 | Collection (create a Collection with items; add a new Activity to an existing Collection) | `@hypercerts-org/sdk/collection` | [references/collection.md](references/collection.md) |
 | Organization (`app.certified.actor.organization`, with its profile and locations) | `@hypercerts-org/sdk/organization` | [references/organization.md](references/organization.md) |
+| Context (attachments, measurements, evaluations, acknowledgements) | `@hypercerts-org/sdk/context` | [references/context.md](references/context.md) |
 
-Three things to know before opening a reference:
+Things to know before opening a reference:
 
 - `createProfile` needs an OAuth scope with both `create` and `update` on `app.certified.actor.profile`. With only `create` it fails with `WriteRejectedError` (403).
 - `location: { uri }` inside a location is a link to external data; a whole location given as `{ uri }` in `createActivity` reuses an existing record.
 - `createOrganization` takes the name, avatar, banner and website in `profileIfMissing`, not in `organization`, and an existing location as `{ uri }`, never a bare string.
+- `createAttachment`, `createMeasurement`, `createEvaluation` and `createAcknowledgement` take a subject as `{ uri }`, never a bare string, and a measured value or score as a decimal string, never a number.
 
 ## 5. Images and files
 
-- `create*` operations upload `Blob`/`File` values for you (`image`, `attachment`, a profile's `avatar` and `banner`, a location's `{ blob }`). Pass the file, not an upload result.
+- `create*` operations upload `Blob`/`File` values for you (`image`, a rights record's `attachment`, `content` of `createAttachment` and `createEvaluation`, a profile's `avatar` and `banner`, a location's `{ blob }`). Pass the file, not an upload result.
 - A string is stored as a URL and never fetched.
 - Use `uploadBlob` only when writing a record yourself with the client:
 
@@ -107,7 +110,7 @@ Uploads happen before the write and are not rolled back, so a call that throws c
 
 Order of work: validate input → read `{ uri }` records → upload blobs → validate against lexicons → one write. The SDK never retries.
 
-The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor`, `/location`, `/tag`, `/feature`, `/collection` and `/organization` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order: for `createActivity` the Activity is last; for `createActivityInCollection` the Collection is last and the Activity is just before it; for `createCollection` the Collection is last, after the records it points at; for `createOrganization` the organization is last. `instanceof WriteError` catches all three.
+The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor`, `/location`, `/tag`, `/feature`, `/collection`, `/context` and `/organization` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order: for `createActivity` the Activity is last; for `createActivityInCollection` the Collection is last and the Activity is just before it; for `createCollection` the Collection is last, after the records it points at; for `createOrganization` the organization is last. `instanceof WriteError` catches all three.
 
 | Error                      | Meaning                                                                                        | What to do                                    |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
@@ -188,6 +191,6 @@ try {
 
 ## Verify
 
-1. Imports come only from `@hypercerts-org/sdk`, `.../activity`, `.../actor`, `.../collection`, `.../feature`, `.../location`, `.../organization`, `.../tag` or `.../blob`.
+1. Imports come only from `@hypercerts-org/sdk`, `.../activity`, `.../actor`, `.../collection`, `.../context`, `.../feature`, `.../location`, `.../organization`, `.../tag` or `.../blob`.
 2. `tsc --noEmit` passes. The input types catch wrong field names and shapes.
 3. `com.atproto.repo.getRecord` on each returned `uri` returns the record, and any references it holds match the URIs and CIDs the SDK returned.

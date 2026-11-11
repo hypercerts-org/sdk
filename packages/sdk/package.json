@@ -31,6 +31,10 @@
       "types": "./dist/collection/index.d.ts",
       "default": "./dist/collection/index.js"
     },
+    "./context": {
+      "types": "./dist/context-records/index.d.ts",
+      "default": "./dist/context-records/index.js"
+    },
     "./feature": {
       "types": "./dist/feature/index.d.ts",
       "default": "./dist/feature/index.js"
