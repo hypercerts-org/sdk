@@ -1,6 +1,6 @@
 ---
 name: hypercerts-org-sdk
-description: Write Hypercerts records from an app with @hypercerts-org/sdk. Covers setting up the SDK context from an authenticated @atproto/lex Client, creating an Activity (hypercert claim) with its rights, locations, contributors and contributions in one atomic write, reusing existing records by URI, standalone supporting records, locations and account profiles, structured CEL work scopes, vocabulary and work-scope tags, Features (zones and strata), adding an Activity to an existing Collection (createActivityInCollection), organizations with their profile and locations (createOrganization), uploading images and files as blobs, and handling write failures without creating duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create a hypercert, activity claim, contributor, contribution, rights, location, vocabulary tag, work-scope tag, feature, organization or CEL work scope record on a PDS, or to add an activity to a collection. Not for changing the SDK's own source.
+description: "Write Hypercerts and Certified records (org.hypercerts.*, app.certified.*) to a PDS from an app with @hypercerts-org/sdk: setting up the SDK context from an authenticated @atproto/lex Client, choosing the right operation and subpath, uploading blobs, and handling write errors without duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create, link or write hypercert-related records from an app. Not for changing the SDK's own source."
 metadata:
   author: hypercerts-org
   version: "3"

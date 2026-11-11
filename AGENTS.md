@@ -59,7 +59,7 @@ When a change adds or changes a public operation, update the skill in the same P
 - Each domain (subpath) gets its own `references/<domain>.md` with examples for the common cases and the likely mistakes, pitfalls, and a field table. Do not put a domain's details in `SKILL.md`.
 - `SKILL.md` holds only what every domain shares: install, context, imports table, blobs, write errors, general pitfalls and Verify. Add one row per domain to its domain table, and at most a line for a mistake an agent would make before reading the reference.
 - Link every reference file from `SKILL.md`. Reference files may link to each other but must not be the only way to reach one.
-- Keep `SKILL.md` under 500 lines. Add the operation's trigger phrases to the `description` frontmatter; agents pick skills by that field alone.
+- Keep `SKILL.md` under 500 lines. List new operations in the `SKILL.md` tables and their reference file, not in the `description` frontmatter. Keep the description general (under the 1024-character limit) so it does not change with each operation.
 - Examples import only from public entry points and match the TSDoc. Do not describe operations that are not implemented yet.
 
 ## Generated files
