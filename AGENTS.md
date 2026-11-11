@@ -21,7 +21,7 @@ Put detailed guides, design notes and decision records in dedicated documentatio
 - Create a new package only when a domain has its own setup or dependencies (for example the planned `@hypercerts-org/auth`). `@hypercerts-org/sdk` must not depend on auth helpers; it receives an already-authenticated client.
 - Packages are ESM-only. Every public entry point must be listed in the package's `exports` field.
 - Keep packages free of import-time side effects so unused operations can be tree-shaken (`sideEffects: false`).
-- Helpers shared by several operations usually live in `packages/sdk/src/internal/` and are not exported. Check there, and search the package, before writing a private helper (see below for where shared code goes). `pnpm check:duplicates` (also run in CI) reports copied code, including renamed copies and functions with the same structure, and `pnpm check:duplicates:semantic` (report-only in CI because it has false matches; downloads a 548 MB model once) reports functions that do the same thing written differently. When `check:duplicates` finds a clone, share the code rather than loosening the check; review each semantic match and share the code when it is a real duplicate.
+- Helpers shared by several operations usually live in `packages/sdk/src/internal/` and are not exported. Check there, and search the package, before writing a private helper (see below for where shared code goes). `pnpm check:duplicates` (also run in CI) reports copied code, including renamed copies and functions with the same structure. When `check:duplicates` finds a clone, share the code rather than loosening the check.
 - Put code where a reader would look for it. Code shared by several domains usually belongs in `internal/`, but use judgement: if it is really one domain's logic that another domain builds on (for example `createActivityInCollection` reusing the activity domain's `prepareActivity`), keep it in its domain and import it from there. Move code when its home stops making sense, not by rule. Avoid circular imports between domains. When `internal/` grows too large to scan, group it into subfolders by concern (for example `internal/records/`, `internal/writes/`) rather than by domain.
 
 ## Tooling
@@ -79,7 +79,5 @@ pnpm test
 pnpm check:package
 pnpm check:duplicates
 ```
-
-Also run `pnpm check:duplicates:semantic` and review what it reports. It does not block CI.
 
 Add a changeset (`pnpm changeset`) for any change that affects a published package. Do not document SDK operations as available until they are implemented.

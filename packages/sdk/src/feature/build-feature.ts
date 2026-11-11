@@ -76,7 +76,7 @@ export interface CreateFeatureResult {
   locations: readonly SupportingRecordRef[];
 }
 
-const featureKind: RecordKind<FeatureInput> = recordKind(
+export const featureKind: RecordKind<FeatureInput> = recordKind(
   feature.main,
   {
     type: optionalText,
@@ -95,7 +95,7 @@ const featureKind: RecordKind<FeatureInput> = recordKind(
   },
 );
 
-type FeatureTree = SupportingRecordRef & {
+export type FeatureTree = SupportingRecordRef & {
   tags?: readonly VocabularyTagResult[];
   locations?: readonly SupportingRecordRef[];
 };
@@ -200,11 +200,12 @@ export async function createFeature(
   context: SDKContext,
   input: FeatureInput,
 ): Promise<CreateFeatureResult> {
-  const { uri, cid, tags, locations } = await createRecordTree<FeatureInput, FeatureTree>(
-    context,
-    "createFeature",
-    featureKind,
-    input,
+  return featureResult(
+    await createRecordTree<FeatureInput, FeatureTree>(context, "createFeature", featureKind, input),
   );
+}
+
+/** The public result of a Feature, from what `createRecordTree` reports for its record. */
+export function featureResult({ uri, cid, tags, locations }: FeatureTree): CreateFeatureResult {
   return { uri, cid, tags: tags ?? [], locations: locations ?? [] };
 }

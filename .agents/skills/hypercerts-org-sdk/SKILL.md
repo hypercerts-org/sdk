@@ -3,7 +3,7 @@ name: hypercerts-org-sdk
 description: "Write Hypercerts and Certified records (org.hypercerts.*, app.certified.*) to a PDS from an app with @hypercerts-org/sdk: setting up the SDK context from an authenticated @atproto/lex Client, choosing the right operation and subpath, uploading blobs, and handling write errors without duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create, link or write hypercert-related records from an app. Not for changing the SDK's own source."
 metadata:
   author: hypercerts-org
-  version: "3"
+  version: "4"
 ---
 
 # @hypercerts-org/sdk
@@ -52,7 +52,7 @@ Make a new context when the signed-in account changes. Records are always writte
 | `@hypercerts-org/sdk/feature`  | `createFeature`, `RecordAlreadyExistsError`, the same `Write*` errors, `FeatureInput`, `CreateFeatureResult`, `LeafletDocument`                                                                        |
 | `@hypercerts-org/sdk/organization` | `createOrganization`, `OrganizationAlreadyExistsError`, `RecordAlreadyExistsError`, the same `Write*` errors, `OrganizationInput`, `CreateOrganizationInput`, `CreateOrganizationResult`, `LeafletDocument` |
 | `@hypercerts-org/sdk/blob`     | `uploadBlob`                                                                                                                                                                                           |
-| `@hypercerts-org/sdk/collection` | `createActivityInCollection`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types                                                         |
+| `@hypercerts-org/sdk/collection` | `createCollection`, `createActivityInCollection`, `RecordAlreadyExistsError`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types                                                         |
 
 The root entry does not re-export operations. `import { createActivity } from "@hypercerts-org/sdk"` fails.
 
@@ -67,7 +67,7 @@ Operations are grouped by domain, each under its own subpath. Read the domain's 
 | Location (a standalone `app.certified.location`, shared by several activities) | `@hypercerts-org/sdk/location` | [references/location.md](references/location.md) |
 | Tag (`org.hypercerts.vocab.tag`, `org.hypercerts.workscope.tag`) | `@hypercerts-org/sdk/tag` | [references/tag.md](references/tag.md) |
 | Feature (`org.hypercerts.entity.feature`, with its tags and locations) | `@hypercerts-org/sdk/feature` | [references/feature.md](references/feature.md) |
-| Collection (add a new Activity to an existing Collection) | `@hypercerts-org/sdk/collection` | [references/collection.md](references/collection.md) |
+| Collection (create a Collection with items; add a new Activity to an existing Collection) | `@hypercerts-org/sdk/collection` | [references/collection.md](references/collection.md) |
 | Organization (`app.certified.actor.organization`, with its profile and locations) | `@hypercerts-org/sdk/organization` | [references/organization.md](references/organization.md) |
 
 Three things to know before opening a reference:
@@ -107,7 +107,7 @@ Uploads happen before the write and are not rolled back, so a call that throws c
 
 Order of work: validate input → read `{ uri }` records → upload blobs → validate against lexicons → one write. The SDK never retries.
 
-The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor`, `/location`, `/tag`, `/feature`, `/collection` and `/organization` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order: for `createActivity` the Activity is last; for `createActivityInCollection` the Collection is last and the Activity is just before it; for `createOrganization` the organization is last. `instanceof WriteError` catches all three.
+The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor`, `/location`, `/tag`, `/feature`, `/collection` and `/organization` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order: for `createActivity` the Activity is last; for `createActivityInCollection` the Collection is last and the Activity is just before it; for `createCollection` the Collection is last, after the records it points at; for `createOrganization` the organization is last. `instanceof WriteError` catches all three.
 
 | Error                      | Meaning                                                                                        | What to do                                    |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
@@ -179,7 +179,8 @@ try {
 
 - `createSDKContext({ client: session })` or passing an `@atproto/api` `Agent` throws. Wrap it: `new Client(session)`.
 - Passing an `uploadBlob` result as `image` throws. Pass the `Blob`/`File`.
-- Retrying blindly after `WriteOutcomeUnknownError` duplicates every record under new keys. The exception is a call whose records all have a fixed key and are only created if absent: `createProfile` and `createVocabularyTag`. `createOrganization` is also safe to repeat: the organization exists at most once, so a second call creates it or throws `OrganizationAlreadyExistsError`. `createFeature` and `createWorkScopeTag` are not safe to repeat.
+- Retrying blindly after `WriteOutcomeUnknownError` duplicates every record under new keys. The exception is a call whose records all have a fixed key and are only created if absent: `createProfile` and `createVocabularyTag`. `createOrganization` is also safe to repeat: the organization exists at most once, so a second call creates it or throws `OrganizationAlreadyExistsError`. `createFeature`, `createCollection` and `createWorkScopeTag` are not safe to repeat.
+- An item of `createCollection` is `{ activity }`, `{ feature }`, `{ collection }` or `{ uri }`, never a bare Activity input; `{ uri }` must be an Activity, Feature or Collection.
 - A vocabulary tag's key is `<category>.<key>` exactly as you pass it. A dot in either part throws a `TypeError`; the SDK does not normalise the parts.
 - A work-scope tag URI is not a vocabulary tag URI: each field accepts one collection, and a `{ uri }` of another throws a `TypeError`.
 - One write holds at most 200 records on the reference PDS. A larger call throws a `TypeError` before anything is written; the SDK does not split it. Create some records first and pass their URIs.

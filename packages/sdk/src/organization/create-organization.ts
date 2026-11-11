@@ -9,22 +9,14 @@ import { strictObject } from "../internal/input.js";
 import { readRepoHead } from "../internal/read-repo-head.js";
 import { readRecord, type StoredRecord, type StrongRef } from "../internal/resolve-record-ref.js";
 import {
-  flattenSlots,
   type NewSlot,
-  newSlots,
   planNew,
-  prepareNew,
-  readBeforeWriting,
+  prepareSlots,
   recordRef,
   referencedResults,
-  referenceLookup,
   type SupportingRecordRef,
 } from "../internal/slots.js";
-import {
-  assertWithinWriteLimit,
-  RecordAlreadyExistsError,
-  submitWrites,
-} from "../internal/submit-writes.js";
+import { RecordAlreadyExistsError, submitWrites } from "../internal/submit-writes.js";
 import { type OrganizationInput, organizationKind } from "./build-organization.js";
 
 const OPERATION = "createOrganization";
@@ -274,12 +266,13 @@ export async function createOrganization(
   const profilePlan = planProfile(build, start.profile, fallback);
 
   // A reused profile is not in the write, so its images are never uploaded.
-  const slots = flattenSlots(
+  // The organization and profile keys are `self`, and the organization was found absent above, so
+  // the keys are not checked again here.
+  const { created, refOf } = await prepareSlots(
+    build,
     profilePlan.kind === "created" ? [profilePlan.slot, organizationSlot] : [organizationSlot],
+    { checkKeys: false },
   );
-  assertWithinWriteLimit(OPERATION, newSlots(slots).length);
-  const existing = await readBeforeWriting(build, slots, { checkKeys: false });
-  const created = await prepareNew(slots, existing);
 
   // The organization has a fixed key and was found absent above, so calling again after an unknown
   // outcome creates everything or finds the organization, and never makes a copy.
@@ -289,7 +282,6 @@ export async function createOrganization(
     retrySafeReason: RETRY_SAFE_REASON,
   });
 
-  const refOf = referenceLookup(existing, created);
   return {
     organization: refOf(organizationSlot),
     profile:

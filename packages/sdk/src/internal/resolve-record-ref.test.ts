@@ -58,6 +58,39 @@ describe("resolveRecordRef", () => {
     expect(read.searchParams.get("repo")).toBe(owner);
   });
 
+  it("resolves an owner's PDS once for concurrent reads that share a client map", async () => {
+    const owner = "did:plc:ewvi7nxzyoun6zhxrhs64oiz";
+    const uris = ["3k2a4b5c6d7e8", "3k2a4b5c6d7e9"].map(
+      (rkey) => `at://${owner}/org.hypercerts.claim.activity/${rkey}`,
+    );
+    let didFetches = 0;
+    vi.stubGlobal("fetch", async (input: Request | string | URL) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.origin === "https://plc.directory") {
+        didFetches += 1;
+        return json(200, {
+          id: owner,
+          service: [
+            {
+              id: "#atproto_pds",
+              type: "AtprotoPersonalDataServer",
+              serviceEndpoint: "https://owner-pds.test",
+            },
+          ],
+        });
+      }
+      const rkey = url.searchParams.get("rkey");
+      return json(200, { uri: uris.find((u) => u.endsWith(`/${rkey}`)), cid: CID, value: {} });
+    });
+    const { context } = fakePds(() => json(500, {}));
+    const pdsClients = new Map();
+
+    const refs = await Promise.all(uris.map((uri) => resolveRecordRef(context, uri, pdsClients)));
+
+    expect(refs).toEqual(uris.map((uri) => ({ uri, cid: CID })));
+    expect(didFetches).toBe(1);
+  });
+
   it("fails without asking the client's PDS when the owner's PDS cannot be resolved", async () => {
     const uri = "at://did:plc:ewvi7nxzyoun6zhxrhs64oiz/org.hypercerts.claim.activity/3k2a4b5c6d7e8";
     vi.stubGlobal("fetch", async () => json(404, {}));

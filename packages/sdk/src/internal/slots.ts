@@ -1,11 +1,17 @@
-import { l, type NsidString, type RecordKeyString } from "@atproto/lex";
+import { isDidString, l, type NsidString, type RecordKeyString } from "@atproto/lex";
 import * as strongRef from "@hypercerts-org/lexicon/com/atproto/repo/strongRef";
 import { type BuildContext, parseInput } from "./build-context.js";
 import { describeError, describeValue } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import { buildRecord, type RecordKind, type ReferenceField, recordKeyOf } from "./record-kind.js";
-import { recordExists, resolveRecordRef, type StrongRef } from "./resolve-record-ref.js";
-import { RecordAlreadyExistsError } from "./submit-writes.js";
+import {
+  type PdsClients,
+  parseRecordUri,
+  recordExists,
+  resolveRecordRef,
+  type StrongRef,
+} from "./resolve-record-ref.js";
+import { assertWithinWriteLimit, RecordAlreadyExistsError } from "./submit-writes.js";
 
 /**
  * Points at a record that already exists, to reuse it as it is.
@@ -135,11 +141,26 @@ export function toSlot<T extends { createdAt?: string | undefined }>(
 }
 
 /**
- * Reads a field that accepts only an existing record, of any type: `{ uri }`.
+ * Reads a field that accepts only an existing record: `{ uri }`. Any record type is accepted,
+ * unless `collections` lists the ones that are, in which case the slot's `collection` is the one
+ * the URI points at.
  *
- * Throws TypeError, naming `field`, when `value` is not `{ uri }` of a record.
+ * Throws TypeError, naming `field`, when `value` is not `{ uri }` of a record, or of a record of
+ * another type than `collections`.
  */
-function toExistingSlot(build: BuildContext, field: string, value: unknown): Slot {
+export function toExistingSlot(build: BuildContext, field: string, value: unknown): Slot;
+export function toExistingSlot<TCollection extends NsidString>(
+  build: BuildContext,
+  field: string,
+  value: unknown,
+  collections: readonly TCollection[],
+): Slot & { readonly collection: TCollection };
+export function toExistingSlot(
+  build: BuildContext,
+  field: string,
+  value: unknown,
+  collections?: readonly NsidString[],
+): Slot {
   const expected = "{ uri } of an existing record";
   if (!isExistingRecord(value)) {
     throw new TypeError(
@@ -147,7 +168,9 @@ function toExistingSlot(build: BuildContext, field: string, value: unknown): Slo
     );
   }
   assertNotMixed(build, field, value, "uri", expected);
-  return { collection: undefined, field, choice: existing(build, field, value, undefined) };
+  const choice = existing(build, field, value, collections);
+  const collection = collections?.find((candidate) => candidate === collectionOf(choice.uri));
+  return { collection, field, choice };
 }
 
 /**
@@ -249,22 +272,39 @@ function assertNotMixed(
 const inlineValue = l.object({ inline: l.string() });
 const existingRecord = l.object({ uri: l.string({ format: "at-uri" }) });
 
+// The collection part of a record URI, which `at-uri` alone does not require.
+const collectionOf = (uri: string): string | undefined => uri.split("/")[3];
+
 function existing(
   build: BuildContext,
   field: string,
   value: object,
-  collection: NsidString | undefined,
-): SlotChoice {
+  collections: NsidString | readonly NsidString[] | undefined,
+): Extract<SlotChoice, { kind: "existing" }> {
   const { uri } = parseInput(build, field, existingRecord, value);
-  // `at-uri` alone also accepts other record types, handle authorities and URIs without a key. The
-  // type is checked here so a wrong one fails before any request; `resolveRecordRef` rejects the
-  // rest.
-  const actual = uri.split("/")[3];
-  if (actual === undefined || (collection !== undefined && actual !== collection)) {
+  const allowed: readonly string[] | undefined =
+    typeof collections === "string" ? [collections] : collections;
+  // `at-uri` alone also accepts other record types, handle authorities and URIs without a key. All
+  // are checked here so a wrong one fails before any request, naming the field.
+  const authority = uri.split("/")[2];
+  if (authority === undefined || !isDidString(authority)) {
+    throw new TypeError(
+      `${build.operation}: ${field} must use a DID as the authority, not a handle: ${uri}. Expected at://<did>/<collection>/<rkey>.`,
+    );
+  }
+  const actual = collectionOf(uri);
+  if (actual === undefined || (allowed !== undefined && !allowed.includes(actual))) {
     const target =
       actual === undefined ? "something that is not a record" : `a record of type ${actual}`;
     throw new TypeError(
-      `${build.operation}: ${field} points at ${target}, but this field holds ${collection ?? "a record"}: ${uri}. Expected at://<did>/${collection ?? "<collection>"}/<rkey>.`,
+      `${build.operation}: ${field} points at ${target}, but this field holds ${allowed?.join(", ") ?? "a record"}: ${uri}. Expected at://<did>/${allowed?.join("|") ?? "<collection>"}/<rkey>.`,
+    );
+  }
+  try {
+    parseRecordUri(uri, build.operation);
+  } catch {
+    throw new TypeError(
+      `${build.operation}: ${field} is not a record URI: ${uri}. Expected at://<did>/${actual}/<rkey>.`,
     );
   }
   return { kind: "existing", uri };
@@ -310,7 +350,7 @@ export function assertDistinctKeys(build: BuildContext, slots: readonly NewSlot[
 
 /**
  * Reads, before anything is uploaded or written, what the call depends on: every `existing` slot
- * from the PDS that hosts it, in parallel, and (with `checkKeys`) that no record exists yet at the
+ * from the PDS that hosts it (each URI once), in parallel, and (with `checkKeys`) that no record exists yet at the
  * key a new record chose. A failure here has no side effects.
  *
  * Throws what `resolveRecordRef` throws, and RecordAlreadyExistsError when a chosen key is taken.
@@ -320,10 +360,20 @@ export async function readBeforeWriting(
   slots: readonly Slot[],
   { checkKeys }: { checkKeys: boolean },
 ): Promise<Map<Slot, StrongRef>> {
+  // A URI repeated across slots is read once, so every slot gets the same CID.
+  const reads = new Map<string, Promise<StrongRef>>();
+  // Records from one remote account share one resolution of its PDS.
+  const pdsClients: PdsClients = new Map();
+  const read = (uri: string): Promise<StrongRef> => {
+    let pending = reads.get(uri);
+    if (pending === undefined) {
+      pending = resolveRecordRef(build.context, uri, pdsClients);
+      reads.set(uri, pending);
+    }
+    return pending;
+  };
   const [resolved] = await Promise.all([
-    settle(slots, ({ choice }) =>
-      choice.kind === "existing" ? resolveRecordRef(build.context, choice.uri) : undefined,
-    ),
+    settle(slots, ({ choice }) => (choice.kind === "existing" ? read(choice.uri) : undefined)),
     checkKeys ? assertKeysFree(build, newSlots(slots)) : undefined,
   ]);
   return resolved;
@@ -416,6 +466,35 @@ export function referenceLookup(
     if (ref === undefined) throw new Error(`no reference was prepared for ${slot.field}.`);
     return ref;
   };
+}
+
+/** What `prepareSlots` returns: the reads, the records to write, and every slot's reference. */
+export interface PreparedSlots {
+  existing: Map<Slot, StrongRef>;
+  created: Map<Slot, PreparedRecord>;
+  refOf: ReferenceOf;
+}
+
+/**
+ * Plans, reads and prepares every record `roots` writes or points at, in the order every caller
+ * needs: input checks first, then the reads, then the uploads, so a bad input or a failed read has
+ * no side effects. `otherWrites` counts the writes the caller adds to the same request.
+ *
+ * Throws TypeError for two new records with the same key or more records than one write holds, and
+ * what `readBeforeWriting` and `prepareNew` throw.
+ */
+export async function prepareSlots(
+  build: BuildContext,
+  roots: readonly Slot[],
+  { checkKeys, otherWrites = 0 }: { checkKeys: boolean; otherWrites?: number },
+): Promise<PreparedSlots> {
+  const slots = flattenSlots(roots);
+  const fresh = newSlots(slots);
+  assertDistinctKeys(build, fresh);
+  assertWithinWriteLimit(build.operation, fresh.length + otherWrites);
+  const existing = await readBeforeWriting(build, slots, { checkKeys });
+  const created = await prepareNew(slots, existing);
+  return { existing, created, refOf: referenceLookup(existing, created) };
 }
 
 /** The reference of the record in `slot`, with whether this call created it. */

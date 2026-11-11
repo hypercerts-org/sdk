@@ -16,22 +16,18 @@ import { mediaValue } from "../internal/media.js";
 import type { PreparedRecord } from "../internal/prepare-record.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import {
-  assertDistinctKeys,
   type ExistingRecord,
-  flattenSlots,
   isInputObject,
-  newSlots,
-  prepareNew,
+  type NewSlot,
+  prepareSlots,
   type ReferenceOf,
-  readBeforeWriting,
   recordRef,
-  referenceLookup,
   resultOf,
   type Slot,
   type SupportingRecordRef,
   toSlot,
 } from "../internal/slots.js";
-import { assertWithinWriteLimit, submitWrites } from "../internal/submit-writes.js";
+import { submitWrites } from "../internal/submit-writes.js";
 import { type LocationInput, locationKind } from "../location/build-location.js";
 import {
   type WorkScopeTagInput,
@@ -271,17 +267,18 @@ function planWorkScope(build: BuildContext, value: unknown, at: string): WorkSco
   };
 }
 
-// The slots the Activity points at, in the order their records are written, nested ones before the
-// records that point at them.
-function allSlots(plan: ActivityPlan): Slot[] {
-  return flattenSlots([
+// The slots of the records the Activity points at directly, in the order their records are written.
+// Records that those point at are found by `flattenSlots` and are written before them. An inline
+// value is stored in the Activity and is no record, so it is left out.
+function supportingSlots(plan: ActivityPlan): Slot[] {
+  return [
     ...(plan.workScope?.kind === "cel" ? plan.workScope.usedTags : []),
     ...(plan.rights ? [plan.rights] : []),
     ...plan.locations,
     ...plan.contributors.flatMap(({ identity, details }) =>
       details ? [identity, details] : [identity],
     ),
-  ]);
+  ].filter((slot) => slot.choice.kind !== "inline");
 }
 
 /**
@@ -430,6 +427,73 @@ export interface PreparedActivity {
 }
 
 /**
+ * An Activity whose input is validated and whose supporting records are planned, with nothing read,
+ * uploaded or written yet.
+ */
+export interface PlannedActivity {
+  /**
+   * The Activity as a record to create. The supporting records it points at are its references,
+   * so `flattenSlots` finds them, and they are prepared before it.
+   */
+  readonly slot: NewSlot;
+  /** What the caller gets back for the Activity, once its records are prepared. */
+  readonly result: (
+    created: ReadonlyMap<Slot, PreparedRecord>,
+    refOf: ReferenceOf,
+  ) => CreateActivityResult;
+}
+
+/**
+ * Validates the input of an Activity and plans it and its supporting records, without sending any
+ * request: no record is read, no file uploaded, no record written. The `image` is uploaded when the
+ * slot is prepared (see `prepareNew`), after the records it points at have been built.
+ *
+ * Internal. `prepareActivity` plans, reads and prepares one Activity on its own. A call that
+ * creates several Activities (see `createCollection`) plans them all, so that it can count the
+ * records and read every existing one before anything is uploaded.
+ *
+ * `path` names the Activity's data in messages when it is part of a larger input, for example
+ * `activity` gives `activity.locations[0]`; omit it when the input is the Activity itself.
+ *
+ * Throws TypeError, naming the field, for any problem in the input.
+ */
+export function planActivitySlot(
+  build: BuildContext,
+  input: unknown,
+  path?: string,
+): PlannedActivity {
+  const field = path ?? "input";
+  const at = path === undefined ? "" : `${path}.`;
+  const parsed = parseInput(build, field, activityInput, input);
+  const plan = planActivity(build, parsed, at);
+  const slot: NewSlot = {
+    collection: activity.main.$type,
+    field,
+    choice: {
+      kind: "new",
+      key: undefined,
+      references: { supporting: supportingSlots(plan) },
+      prepare: async (refOf) => {
+        const image =
+          parsed.image === undefined
+            ? undefined
+            : await mediaValue(build, `${at}image`, parsed.image, "image");
+        return prepareChecked(
+          build,
+          path ?? "the Activity",
+          activity.main,
+          activityRecord(build, parsed, plan, image, refOf),
+        );
+      },
+    },
+  };
+  return {
+    slot,
+    result: (created, refOf) => ({ ...refOf(slot), ...summarise(plan, created, refOf) }),
+  };
+}
+
+/**
  * Does everything `createActivity` does before it writes: validates the input, reads the existing
  * records it points at, uploads blobs and prepares every new record, the Activity last.
  *
@@ -451,33 +515,14 @@ export async function prepareActivity(
   options: { path?: string; otherWrites?: number } = {},
 ): Promise<PreparedActivity> {
   const { path, otherWrites = 0 } = options;
-  const at = path === undefined ? "" : `${path}.`;
-  const parsed = parseInput(build, path ?? "input", activityInput, input);
-  const plan = planActivity(build, parsed, at);
-  const slots = allSlots(plan);
-  const fresh = newSlots(slots);
-  assertDistinctKeys(build, fresh);
-  // The Activity itself is one more record in the write.
-  assertWithinWriteLimit(build.operation, fresh.length + 1 + otherWrites);
-
+  const planned = planActivitySlot(build, input, path);
   // Reads first, then uploads: a URI that cannot be resolved fails before anything is uploaded.
-  const existing = await readBeforeWriting(build, slots, { checkKeys: true });
-  const [image, created] = await Promise.all([
-    parsed.image === undefined ? undefined : mediaValue(build, `${at}image`, parsed.image, "image"),
-    prepareNew(slots, existing),
-  ]);
-
-  const refOf = referenceLookup(existing, created);
-  const record = await prepareChecked(
-    build,
-    "the Activity",
-    activity.main,
-    activityRecord(build, parsed, plan, image, refOf),
-  );
-  return {
-    writes: [...created.values(), record],
-    result: { ...record.ref, ...summarise(plan, created, refOf) },
-  };
+  // The write limit counts the Activity itself too.
+  const { created, refOf } = await prepareSlots(build, [planned.slot], {
+    checkKeys: true,
+    otherWrites,
+  });
+  return { writes: [...created.values()], result: planned.result(created, refOf) };
 }
 
 function activityRecord(
