@@ -81,3 +81,5 @@ pnpm check:duplicates
 ```
 
 Add a changeset (`pnpm changeset`) for any change that affects a published package. Do not document SDK operations as available until they are implemented.
+
+Add an end-to-end test in `packages/sdk/e2e` for every new public operation or call to the PDS. Unit tests against the fake PDS are not enough; see [docs/e2e-testing.md](./docs/e2e-testing.md) for what the tests cover and how to run them.
