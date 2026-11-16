@@ -21,7 +21,7 @@ const repostAction = recordRefAction({ create: "repost", undo: "unrepost" }, rep
  * chosen by the SDK, and `createdAt` defaults to the time of the call.
  *
  * Nothing is deduplicated: calling this again for the same record creates a second like, and a later
- * {@link unlike} then does nothing until the duplicate is removed (see {@link UndoResult}).
+ * {@link unlike} then throws {@link AmbiguousMatchError} until the duplicate is removed.
  *
  * `via` is optional: the URI of the record through which the target was encountered, typically a
  * repost. The SDK reads it the same way. See {@link ActionOptions}.
@@ -74,7 +74,7 @@ export const like = createAction(likeAction);
  * by the URI of the record they like, whatever CID they pin, so a like of an earlier version of an
  * edited target is found too. With no match it returns `not-found`. With exactly one it deletes that
  * record, only if it still has the CID the scan saw, and returns `deleted`. With several it deletes
- * nothing and returns `ambiguous` with the number of matches: the record was liked more than once,
+ * nothing and throws {@link AmbiguousMatchError}: the record was liked more than once,
  * and the SDK does not choose which like to remove. See {@link UndoResult}.
  *
  * The target is not read, so it does not have to exist any more. The scan is a snapshot: it cannot
@@ -86,11 +86,13 @@ export const like = createAction(likeAction);
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; only that account's repository is scanned.
  * @param input - The record to unlike. See {@link RecordTargetInput}.
- * @returns `deleted`, `not-found` or `ambiguous` with `matchCount`. See {@link UndoResult}.
+ * @returns `deleted` or `not-found`. See {@link UndoResult}.
  * @throws {@link TypeError} If `input` has an unknown field or a `targetUri` that is not a full
  * record URI. Nothing was changed.
  * @throws {@link Error} If the client is not authenticated, or the likes cannot be read in full (a
  * failed or malformed page). A partial read is never treated as "not found". Nothing was changed.
+ * @throws {@link AmbiguousMatchError} If several records match. Nothing was deleted; `matches` lists
+ * them.
  * @throws {@link WriteRejectedError} If the PDS refused the deletion (HTTP 4xx). With `code`
  * `"InvalidSwap"` the like changed after the scan, so it was not deleted; call again to scan
  * afresh.
@@ -105,9 +107,9 @@ export const like = createAction(likeAction);
  * const result = await unlike(context, {
  *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
  * });
- * if (result.status === "ambiguous") {
- *   // Liked more than once, so nothing was deleted: remove the extra likes yourself.
- * }
+ * console.log(result.status); // "deleted" or "not-found"
+ * // Liked more than once: throws AmbiguousMatchError, nothing is deleted. Its `matches` lists
+ * // the likes; remove the extra ones yourself, then call again.
  * ```
  */
 export const unlike = undoAction(likeAction);
@@ -124,7 +126,7 @@ export const unlike = undoAction(likeAction);
  * new TID chosen by the SDK, and `createdAt` defaults to the time of the call.
  *
  * Nothing is deduplicated: calling this again for the same record creates a second repost, and a
- * later {@link unrepost} then does nothing until the duplicate is removed (see {@link UndoResult}).
+ * later {@link unrepost} then throws {@link AmbiguousMatchError} until the duplicate is removed.
  *
  * `via` is optional: the URI of the record through which the target was encountered, typically
  * another repost. The SDK reads it the same way. See {@link ActionOptions}.
@@ -177,7 +179,7 @@ export const repost = createAction(repostAction);
  * them by the URI of the record they repost, whatever CID they pin, so a repost of an earlier
  * version of an edited target is found too. With no match it returns `not-found`. With exactly one
  * it deletes that record, only if it still has the CID the scan saw, and returns `deleted`. With
- * several it deletes nothing and returns `ambiguous` with the number of matches: the record was
+ * several it deletes nothing and throws {@link AmbiguousMatchError}: the record was
  * reposted more than once, and the SDK does not choose which repost to remove. See
  * {@link UndoResult}.
  *
@@ -190,11 +192,13 @@ export const repost = createAction(repostAction);
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; only that account's repository is scanned.
  * @param input - The record to unrepost. See {@link RecordTargetInput}.
- * @returns `deleted`, `not-found` or `ambiguous` with `matchCount`. See {@link UndoResult}.
+ * @returns `deleted` or `not-found`. See {@link UndoResult}.
  * @throws {@link TypeError} If `input` has an unknown field or a `targetUri` that is not a full
  * record URI. Nothing was changed.
  * @throws {@link Error} If the client is not authenticated, or the reposts cannot be read in full (a
  * failed or malformed page). A partial read is never treated as "not found". Nothing was changed.
+ * @throws {@link AmbiguousMatchError} If several records match. Nothing was deleted; `matches` lists
+ * them.
  * @throws {@link WriteRejectedError} If the PDS refused the deletion (HTTP 4xx). With `code`
  * `"InvalidSwap"` the repost changed after the scan, so it was not deleted; call again to scan
  * afresh.
@@ -209,9 +213,9 @@ export const repost = createAction(repostAction);
  * const result = await unrepost(context, {
  *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
  * });
- * if (result.status === "ambiguous") {
- *   // Reposted more than once, so nothing was deleted: remove the extra reposts yourself.
- * }
+ * console.log(result.status); // "deleted" or "not-found"
+ * // Reposted more than once: throws AmbiguousMatchError, nothing is deleted. Its `matches` lists
+ * // the reposts; remove the extra ones yourself, then call again.
  * ```
  */
 export const unrepost = undoAction(repostAction);

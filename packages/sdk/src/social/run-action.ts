@@ -11,6 +11,7 @@ import { compact } from "../internal/input.js";
 import { resolveRecordRef } from "../internal/resolve-record-ref.js";
 import { submitDelete, submitWrites } from "../internal/submit-writes.js";
 import type { ActionOptions, SocialAction, UndoFunction } from "./action.js";
+import { AmbiguousMatchError } from "./ambiguous-match-error.js";
 import { listCollection } from "./list-collection.js";
 
 /**
@@ -57,11 +58,11 @@ export function createAction<TCreate extends TUndo & ActionOptions, TUndo extend
  *   (see `listCollection`). It does not read the target, so a target that was edited or deleted
  *   does not prevent the removal. No indexer is consulted.
  * - Deletes only when exactly one record matches, and then only if that record still has the CID
- *   the scan saw (see `submitDelete`). With several matches it deletes nothing.
+ *   the scan saw (see `submitDelete`). With several matches it deletes nothing and throws `AmbiguousMatchError`.
  * - The scan is a snapshot; it cannot stop another writer creating a matching record.
  *
  * The function throws TypeError for invalid input, Error when the collection cannot be read in
- * full, and what `submitDelete` throws.
+ * full, AmbiguousMatchError when several records match, and what `submitDelete` throws.
  */
 export function undoAction<TCreate extends TUndo & ActionOptions, TUndo extends object>(
   action: SocialAction<TCreate, TUndo>,
@@ -72,7 +73,13 @@ export function undoAction<TCreate extends TUndo & ActionOptions, TUndo extends 
     const matches = records.filter(({ value }) => action.isSubject(value.subject, parsed));
     const [match, ...others] = matches;
     if (match === undefined) return { status: "not-found" };
-    if (others.length > 0) return { status: "ambiguous", matchCount: matches.length };
+    if (others.length > 0) {
+      throw new AmbiguousMatchError(
+        action.names.undo,
+        action.schema.$type,
+        matches.map(({ ref }) => ref),
+      );
+    }
     await submitDelete(context, build.did, match.ref, build.operation);
     return { status: "deleted" };
   };

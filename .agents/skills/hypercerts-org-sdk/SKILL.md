@@ -51,7 +51,7 @@ Make a new context when the signed-in account changes. Records are always writte
 | `@hypercerts-org/sdk/tag`      | `createVocabularyTag`, `createWorkScopeTag`, `RecordAlreadyExistsError`, the same `Write*` errors, input/result types                                                                                  |
 | `@hypercerts-org/sdk/feature`  | `createFeature`, `RecordAlreadyExistsError`, the same `Write*` errors, `FeatureInput`, `CreateFeatureResult`, `LeafletDocument`                                                                        |
 | `@hypercerts-org/sdk/organization` | `createOrganization`, `OrganizationAlreadyExistsError`, `RecordAlreadyExistsError`, the same `Write*` errors, `OrganizationInput`, `CreateOrganizationInput`, `CreateOrganizationResult`, `LeafletDocument` |
-| `@hypercerts-org/sdk/social`   | `followAccount`, `followEntity`, `like`, `repost`, `unfollowAccount`, `unfollowEntity`, `unlike`, `unrepost`, the `Write*` errors, `UndoResult` and input types                                          |
+| `@hypercerts-org/sdk/social`   | `followAccount`, `followEntity`, `like`, `repost`, `unfollowAccount`, `unfollowEntity`, `unlike`, `unrepost`, the `Write*` errors, `AmbiguousMatchError`, `UndoResult` and input types                                          |
 | `@hypercerts-org/sdk/blob`     | `uploadBlob`                                                                                                                                                                                           |
 | `@hypercerts-org/sdk/collection` | `createCollection`, `createActivityInCollection`, `RecordAlreadyExistsError`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types                                                         |
 
@@ -77,7 +77,7 @@ Things to know before opening a reference:
 - `createProfile` needs an OAuth scope with both `create` and `update` on `app.certified.actor.profile`. With only `create` it fails with `WriteRejectedError` (403).
 - `location: { uri }` inside a location is a link to external data; a whole location given as `{ uri }` in `createActivity` reuses an existing record.
 - `createOrganization` takes the name, avatar, banner and website in `profileIfMissing`, not in `organization`, and an existing location as `{ uri }`, never a bare string.
-- Social functions take the **target** of the action: `{ targetDid }` for an account, `{ targetUri }` (a full record URI) for a record. Undo functions return `UndoResult` (`deleted`, `not-found` or `ambiguous`), not `void`.
+- Social functions take the **target** of the action: `{ targetDid }` for an account, `{ targetUri }` (a full record URI) for a record. Undo functions return `UndoResult` (`deleted` or `not-found`), not `void`, and throw `AmbiguousMatchError` (with `matches`) when several records match.
 
 ## 5. Images and files
 

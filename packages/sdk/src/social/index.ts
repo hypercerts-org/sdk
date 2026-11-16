@@ -2,6 +2,7 @@
 //
 // Covers the social graph and feed records: follows and entity follows (`app.certified.graph.*`)
 // and likes and reposts (`app.certified.feed.*`), with the operations that undo them.
+
 export type { StrongRef } from "../internal/resolve-record-ref.js";
 export {
   WriteError,
@@ -17,5 +18,6 @@ export type {
   UndoResult,
   UnfollowAccountInput,
 } from "./action.js";
+export { AmbiguousMatchError } from "./ambiguous-match-error.js";
 export { like, repost, unlike, unrepost } from "./feed.js";
 export { followAccount, followEntity, unfollowAccount, unfollowEntity } from "./graph.js";

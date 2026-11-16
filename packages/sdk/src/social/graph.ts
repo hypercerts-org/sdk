@@ -46,8 +46,7 @@ const followEntityAction: SocialAction<RecordActionInput, RecordTargetInput> = {
  * SDK, and `createdAt` defaults to the time of the call.
  *
  * Nothing is deduplicated: calling this again for an account that is already followed creates a
- * second follow record, and a later {@link unfollowAccount} then does nothing until the duplicate is
- * removed (see {@link UndoResult}).
+ * second follow record, and a later {@link unfollowAccount} then throws {@link AmbiguousMatchError} until the duplicate is removed.
  *
  * `via` is optional: the URI of a record through which the account was found (a starter pack, for
  * example). The SDK reads it to pin its current version. See {@link ActionOptions}.
@@ -107,7 +106,7 @@ export const followAccount = createAction(followAccountAction);
  * The SDK lists the account's own follow records (all pages, from its own PDS; no indexer), and
  * matches them by the DID they follow. With no match it returns `not-found`. With exactly one it
  * deletes that record, only if it still has the CID the scan saw, and returns `deleted`. With
- * several it deletes nothing and returns `ambiguous` with the number of matches: the account
+ * several it deletes nothing and throws {@link AmbiguousMatchError}: the account
  * followed the same DID more than once, and the SDK does not choose which record to remove. See
  * {@link UndoResult}.
  *
@@ -120,12 +119,14 @@ export const followAccount = createAction(followAccountAction);
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; only that account's repository is scanned.
  * @param input - The account to stop following. See {@link UnfollowAccountInput}.
- * @returns `deleted`, `not-found` or `ambiguous` with `matchCount`. See {@link UndoResult}.
+ * @returns `deleted` or `not-found`. See {@link UndoResult}.
  * @throws {@link TypeError} If `input` has an unknown field or a `targetDid` that is not a DID.
  * Nothing was changed.
  * @throws {@link Error} If the client is not authenticated, or the follow records cannot be read in
  * full (a failed or malformed page). A partial read is never treated as "not found". Nothing was
  * changed.
+ * @throws {@link AmbiguousMatchError} If several records match. Nothing was deleted; `matches` lists
+ * them.
  * @throws {@link WriteRejectedError} If the PDS refused the deletion (HTTP 4xx). With `code`
  * `"InvalidSwap"` the record changed after the scan, so it was not deleted; call again to scan
  * afresh.
@@ -138,10 +139,9 @@ export const followAccount = createAction(followAccountAction);
  *
  * // `context` comes from createSDKContext.
  * const result = await unfollowAccount(context, { targetDid: "did:plc:abc123" });
- * if (result.status === "ambiguous") {
- *   // Followed more than once, so nothing was deleted: remove the extra follow records yourself.
- *   console.log(`${result.matchCount} follow records for this account`);
- * }
+ * console.log(result.status); // "deleted" or "not-found"
+ * // Followed more than once: throws AmbiguousMatchError, nothing is deleted. Its `matches` lists
+ * // the follow records; remove the extra ones yourself, then call again.
  * ```
  */
 export const unfollowAccount = undoAction(followAccountAction);
@@ -159,8 +159,8 @@ export const unfollowAccount = undoAction(followAccountAction);
  * call.
  *
  * Nothing is deduplicated: calling this again for the same record creates a second follow, and a
- * later {@link unfollowEntity} then does nothing until the duplicate is removed (see
- * {@link UndoResult}).
+ * later {@link unfollowEntity} then throws {@link AmbiguousMatchError} until the duplicate is
+ * removed.
  *
  * `via` is optional: the URI of a record through which the target was found. The SDK reads it to
  * pin its current version. See {@link ActionOptions}.
@@ -209,7 +209,7 @@ export const followEntity = createAction(followEntityAction);
  * The SDK lists the account's own entity follows (all pages, from its own PDS; no indexer), and
  * matches them by the record URI they follow. With no match it returns `not-found`. With exactly one
  * it deletes that record, only if it still has the CID the scan saw, and returns `deleted`. With
- * several it deletes nothing and returns `ambiguous` with the number of matches: the record was
+ * several it deletes nothing and throws {@link AmbiguousMatchError}: the record was
  * followed more than once, and the SDK does not choose which follow to remove. See
  * {@link UndoResult}.
  *
@@ -222,12 +222,14 @@ export const followEntity = createAction(followEntityAction);
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; only that account's repository is scanned.
  * @param input - The record to stop following. See {@link RecordTargetInput}.
- * @returns `deleted`, `not-found` or `ambiguous` with `matchCount`. See {@link UndoResult}.
+ * @returns `deleted` or `not-found`. See {@link UndoResult}.
  * @throws {@link TypeError} If `input` has an unknown field or a `targetUri` that is not a full
  * record URI. Nothing was changed.
  * @throws {@link Error} If the client is not authenticated, or the entity follows cannot be read in
  * full (a failed or malformed page). A partial read is never treated as "not found". Nothing was
  * changed.
+ * @throws {@link AmbiguousMatchError} If several records match. Nothing was deleted; `matches` lists
+ * them.
  * @throws {@link WriteRejectedError} If the PDS refused the deletion (HTTP 4xx). With `code`
  * `"InvalidSwap"` the record changed after the scan, so it was not deleted; call again to scan
  * afresh.
@@ -242,7 +244,7 @@ export const followEntity = createAction(followEntityAction);
  * const result = await unfollowEntity(context, {
  *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
  * });
- * console.log(result.status); // "deleted", "not-found" or "ambiguous"
+ * console.log(result.status); // "deleted" or "not-found"
  * ```
  */
 export const unfollowEntity = undoAction(followEntityAction);

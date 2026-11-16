@@ -3,6 +3,7 @@ import { fakeCollection, type StoredEntry } from "../test-utils/fake-collection.
 import { CID, DID, json } from "../test-utils/fake-pds.js";
 import { methods } from "../test-utils/fake-repo.js";
 import {
+  AmbiguousMatchError,
   unfollowAccount,
   unfollowEntity,
   unlike,
@@ -98,14 +99,21 @@ describe.each(actions)("$name", ({ collection, undo, record, mine, others }) => 
     expect(methods(requests)).toEqual(["com.atproto.repo.listRecords"]);
   });
 
-  it("returns ambiguous with the count, and deletes nothing, when several records match", async () => {
+  it("throws AmbiguousMatchError listing every match, and deletes nothing, when several records match", async () => {
     const { context, deletes } = fakeCollection({
       entries: {
         [collection]: [entry("3aaaaaaaaaaaa", mine), entry("3bbbbbbbbbbbb", mine)],
       },
     });
 
-    await expect(undo(context)).resolves.toEqual({ status: "ambiguous", matchCount: 2 });
+    const error = await undo(context).catch((e) => e);
+
+    expect(error).toBeInstanceOf(AmbiguousMatchError);
+    expect(error.matches.map(({ uri }: { uri: string }) => uri)).toEqual([
+      `at://${DID}/${collection}/3aaaaaaaaaaaa`,
+      `at://${DID}/${collection}/3bbbbbbbbbbbb`,
+    ]);
+    expect(error.message).toContain("2");
 
     expect(deletes).toEqual([]);
   });
@@ -173,7 +181,7 @@ describe("scanning the records", () => {
     expect(deletes.map(({ rkey }) => rkey)).toEqual(["3eeeeeeeeeeee"]);
   });
 
-  it("counts matches over all pages", async () => {
+  it("counts matches over all pages, so matches on different pages are ambiguous", async () => {
     const { context, deletes } = fakeCollection({
       pageSize: 2,
       entries: {
@@ -187,7 +195,10 @@ describe("scanning the records", () => {
       },
     });
 
-    await expect(unlikeTarget(context)).resolves.toEqual({ status: "ambiguous", matchCount: 3 });
+    const error = await unlikeTarget(context).catch((e) => e);
+
+    expect(error).toBeInstanceOf(AmbiguousMatchError);
+    expect(error.matches).toHaveLength(3);
 
     expect(deletes).toEqual([]);
   });

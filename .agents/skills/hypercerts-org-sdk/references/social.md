@@ -53,20 +53,23 @@ Each create call writes a new record under a new TID. Calling `like` twice for t
 
 ## Undo and `UndoResult`
 
-Undo functions return `UndoResult`, not `void`:
+Undo functions return `UndoResult` (`deleted` or `not-found`), not `void`. Several matching records throw `AmbiguousMatchError`:
 
 ```ts
-import { unlike } from "@hypercerts-org/sdk/social";
+import { AmbiguousMatchError, unlike } from "@hypercerts-org/sdk/social";
 
-const result = await unlike(context, { targetUri: activity });
-switch (result.status) {
-  case "deleted": // exactly one matching like existed and is gone
-    break;
-  case "not-found": // no matching like; nothing was deleted
-    break;
-  case "ambiguous": // result.matchCount likes match; NOTHING was deleted
-    // The account liked it more than once. Delete the extras yourself (com.atproto.repo.deleteRecord), then call again.
-    break;
+try {
+  const result = await unlike(context, { targetUri: activity });
+  switch (result.status) {
+    case "deleted": // exactly one matching like existed and is gone
+      break;
+    case "not-found": // no matching like; nothing was deleted
+      break;
+  }
+} catch (error) {
+  if (!(error instanceof AmbiguousMatchError)) throw error;
+  // The account liked it more than once; NOTHING was deleted. error.matches lists every like
+  // ({ uri, cid }). Delete the extras yourself (com.atproto.repo.deleteRecord), then call again.
 }
 ```
 

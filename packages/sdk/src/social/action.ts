@@ -25,19 +25,15 @@ export interface ActionOptions {
  * - `deleted`: the account's repository held exactly one matching record, and it was deleted.
  * - `not-found`: no matching record was found; nothing was deleted. This does not say whether the
  *   action never existed or was removed earlier.
- * - `ambiguous`: `matchCount` matching records were found (always more than one, because the
- *   account created the same action repeatedly); nothing was deleted. The SDK cannot tell which
- *   one is meant, and deleting all of them would be a decision for the caller. Delete the extra
- *   records yourself (for example with `com.atproto.repo.deleteRecord`) and call again.
+ *
+ * Several matching records (the account created the same action repeatedly) are not a result: the
+ * undo function throws {@link AmbiguousMatchError} and deletes nothing.
  *
  * The outcome reflects the records the scan saw. A matching record created by another writer after
  * the scan is not seen, so `deleted` does not promise that no matching record remains, and
  * `not-found` does not promise that none exists a moment later.
  */
-export type UndoResult =
-  | { status: "deleted" }
-  | { status: "not-found" }
-  | { status: "ambiguous"; matchCount: number };
+export type UndoResult = { status: "deleted" } | { status: "not-found" };
 
 /** The input of {@link followAccount}. */
 export interface FollowAccountInput extends ActionOptions {

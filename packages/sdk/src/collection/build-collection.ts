@@ -18,7 +18,6 @@ import {
   type LeafletDocument,
 } from "../feature/build-feature.js";
 import { type BuildContext, parseInput } from "../internal/build-context.js";
-import { longDescription } from "../internal/long-description.js";
 import {
   compact,
   optionalMedia,
@@ -26,6 +25,7 @@ import {
   strictObject,
   weightString,
 } from "../internal/input.js";
+import { longDescription } from "../internal/long-description.js";
 import { mediaTransform } from "../internal/media.js";
 import type { PreparedRecord } from "../internal/prepare-record.js";
 import { buildRecord, recordKind } from "../internal/record-kind.js";
