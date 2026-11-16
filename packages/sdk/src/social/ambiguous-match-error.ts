@@ -1,12 +1,9 @@
 import type { NsidString } from "@atproto/lex";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 
-// How many record URIs the message names; `matches` always holds all of them.
-const MESSAGE_URI_LIMIT = 5;
-
 /**
- * Thrown by {@link unfollowAccount}, {@link unfollowEntity}, {@link unlike} and {@link unrepost}
- * when the account has more than one record for the target. Nothing was deleted.
+ * Thrown by `unfollowAccount`, `unfollowEntity`, `unlike` and `unrepost` when the account has more
+ * than one record for the target. Nothing was deleted.
  *
  * @remarks
  * The account did the same thing more than once (it liked a record twice, for example). The SDK
@@ -37,10 +34,8 @@ export class AmbiguousMatchError extends Error {
   readonly matches: readonly StrongRef[];
 
   constructor(operation: string, collection: NsidString, matches: readonly StrongRef[]) {
-    const shown = matches.slice(0, MESSAGE_URI_LIMIT).map(({ uri }) => uri);
-    const more = matches.length > shown.length ? `, and ${matches.length - shown.length} more` : "";
     super(
-      `${operation}: the account has ${matches.length} ${collection} records for this target (${shown.join(", ")}${more}), so none was deleted: the SDK cannot tell which one is meant. Delete the extra records yourself (for example with com.atproto.repo.deleteRecord; error.matches lists them all), then call ${operation} again if one should go too.`,
+      `${operation}: the account has ${matches.length} ${collection} records for this target, so none was deleted because the SDK cannot tell which one is meant. Delete the extra records yourself (error.matches lists them), then call again.`,
     );
     this.matches = matches;
   }

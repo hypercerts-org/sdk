@@ -58,7 +58,8 @@ export function createAction<TCreate extends TUndo & ActionOptions, TUndo extend
  *   (see `listCollection`). It does not read the target, so a target that was edited or deleted
  *   does not prevent the removal. No indexer is consulted.
  * - Deletes only when exactly one record matches, and then only if that record still has the CID
- *   the scan saw (see `submitDelete`). With several matches it deletes nothing and throws `AmbiguousMatchError`.
+ *   the scan saw (see `submitDelete`). With several matches it deletes nothing and throws
+ *   `AmbiguousMatchError`.
  * - The scan is a snapshot; it cannot stop another writer creating a matching record.
  *
  * The function throws TypeError for invalid input, Error when the collection cannot be read in

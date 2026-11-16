@@ -27,7 +27,7 @@ export interface ActionOptions {
  *   action never existed or was removed earlier.
  *
  * Several matching records (the account created the same action repeatedly) are not a result: the
- * undo function throws {@link AmbiguousMatchError} and deletes nothing.
+ * undo function throws `AmbiguousMatchError` and deletes nothing.
  *
  * The outcome reflects the records the scan saw. A matching record created by another writer after
  * the scan is not seen, so `deleted` does not promise that no matching record remains, and

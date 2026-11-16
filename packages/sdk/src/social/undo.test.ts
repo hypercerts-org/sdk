@@ -59,7 +59,7 @@ const actions = [
   },
 ];
 
-describe.each(actions)("$name", ({ collection, undo, record, mine, others }) => {
+describe.each(actions)("$name", ({ name, collection, undo, record, mine, others }) => {
   const entry = (rkey: string, subject: string): StoredEntry => ({
     rkey,
     cid: CID,
@@ -106,14 +106,15 @@ describe.each(actions)("$name", ({ collection, undo, record, mine, others }) => 
       },
     });
 
-    const error = await undo(context).catch((e) => e);
-
-    expect(error).toBeInstanceOf(AmbiguousMatchError);
-    expect(error.matches.map(({ uri }: { uri: string }) => uri)).toEqual([
-      `at://${DID}/${collection}/3aaaaaaaaaaaa`,
-      `at://${DID}/${collection}/3bbbbbbbbbbbb`,
-    ]);
-    expect(error.message).toContain("2");
+    const rejection = expect(undo(context)).rejects;
+    await rejection.toBeInstanceOf(AmbiguousMatchError);
+    await rejection.toMatchObject({
+      message: expect.stringContaining(`${name}: the account has 2 ${collection} records`),
+      matches: [
+        { uri: `at://${DID}/${collection}/3aaaaaaaaaaaa`, cid: CID },
+        { uri: `at://${DID}/${collection}/3bbbbbbbbbbbb`, cid: CID },
+      ],
+    });
 
     expect(deletes).toEqual([]);
   });
@@ -195,10 +196,13 @@ describe("scanning the records", () => {
       },
     });
 
-    const error = await unlikeTarget(context).catch((e) => e);
-
-    expect(error).toBeInstanceOf(AmbiguousMatchError);
-    expect(error.matches).toHaveLength(3);
+    const rejection = expect(unlikeTarget(context)).rejects;
+    await rejection.toBeInstanceOf(AmbiguousMatchError);
+    await rejection.toMatchObject({
+      matches: ["3aaaaaaaaaaaa", "3cccccccccccc", "3eeeeeeeeeeee"].map((rkey) => ({
+        uri: `at://${DID}/${collection}/${rkey}`,
+      })),
+    });
 
     expect(deletes).toEqual([]);
   });

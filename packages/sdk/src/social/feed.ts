@@ -20,8 +20,8 @@ const repostAction = recordRefAction({ create: "repost", undo: "unrepost" }, rep
  * read, nothing is written. The target is never modified or created. The record key is a new TID
  * chosen by the SDK, and `createdAt` defaults to the time of the call.
  *
- * Nothing is deduplicated: calling this again for the same record creates a second like, and a later
- * {@link unlike} then throws {@link AmbiguousMatchError} until the duplicate is removed.
+ * Nothing is deduplicated: calling this again for the same record creates a second like, and a
+ * later {@link unlike} then throws {@link AmbiguousMatchError} until the duplicate is removed.
  *
  * `via` is optional: the URI of the record through which the target was encountered, typically a
  * repost. The SDK reads it the same way. See {@link ActionOptions}.
@@ -72,10 +72,10 @@ export const like = createAction(likeAction);
  * @remarks
  * The SDK lists the account's own likes (all pages, from its own PDS; no indexer) and matches them
  * by the URI of the record they like, whatever CID they pin, so a like of an earlier version of an
- * edited target is found too. With no match it returns `not-found`. With exactly one it deletes that
- * record, only if it still has the CID the scan saw, and returns `deleted`. With several it deletes
- * nothing and throws {@link AmbiguousMatchError}: the record was liked more than once,
- * and the SDK does not choose which like to remove. See {@link UndoResult}.
+ * edited target is found too. With no match it returns `not-found`. With exactly one it deletes
+ * that record, only if it still has the CID the scan saw, and returns `deleted`. With several it
+ * deletes nothing and throws {@link AmbiguousMatchError}: the record was liked more than once, and
+ * the SDK does not choose which like to remove. See {@link UndoResult}.
  *
  * The target is not read, so it does not have to exist any more. The scan is a snapshot: it cannot
  * stop another writer creating a like of the same record while it runs or after it, so `deleted`
@@ -101,15 +101,19 @@ export const like = createAction(likeAction);
  *
  * @example
  * ```ts
- * import { unlike } from "@hypercerts-org/sdk/social";
+ * import { AmbiguousMatchError, unlike } from "@hypercerts-org/sdk/social";
  *
  * // `context` comes from createSDKContext.
- * const result = await unlike(context, {
- *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
- * });
- * console.log(result.status); // "deleted" or "not-found"
- * // Liked more than once: throws AmbiguousMatchError, nothing is deleted. Its `matches` lists
- * // the likes; remove the extra ones yourself, then call again.
+ * try {
+ *   const result = await unlike(context, {
+ *     targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+ *   });
+ *   console.log(result.status); // "deleted" or "not-found"
+ * } catch (error) {
+ *   // Several records match: nothing was deleted. `error.matches` lists them; remove
+ *   // the extra ones yourself, then call again.
+ *   if (!(error instanceof AmbiguousMatchError)) throw error;
+ * }
  * ```
  */
 export const unlike = undoAction(likeAction);
@@ -179,9 +183,8 @@ export const repost = createAction(repostAction);
  * them by the URI of the record they repost, whatever CID they pin, so a repost of an earlier
  * version of an edited target is found too. With no match it returns `not-found`. With exactly one
  * it deletes that record, only if it still has the CID the scan saw, and returns `deleted`. With
- * several it deletes nothing and throws {@link AmbiguousMatchError}: the record was
- * reposted more than once, and the SDK does not choose which repost to remove. See
- * {@link UndoResult}.
+ * several it deletes nothing and throws {@link AmbiguousMatchError}: the record was reposted more
+ * than once, and the SDK does not choose which repost to remove. See {@link UndoResult}.
  *
  * The target is not read, so it does not have to exist any more. The scan is a snapshot: it cannot
  * stop another writer creating a repost of the same record while it runs or after it, so `deleted`
@@ -207,15 +210,19 @@ export const repost = createAction(repostAction);
  *
  * @example
  * ```ts
- * import { unrepost } from "@hypercerts-org/sdk/social";
+ * import { AmbiguousMatchError, unrepost } from "@hypercerts-org/sdk/social";
  *
  * // `context` comes from createSDKContext.
- * const result = await unrepost(context, {
- *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
- * });
- * console.log(result.status); // "deleted" or "not-found"
- * // Reposted more than once: throws AmbiguousMatchError, nothing is deleted. Its `matches` lists
- * // the reposts; remove the extra ones yourself, then call again.
+ * try {
+ *   const result = await unrepost(context, {
+ *     targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+ *   });
+ *   console.log(result.status); // "deleted" or "not-found"
+ * } catch (error) {
+ *   // Several records match: nothing was deleted. `error.matches` lists them; remove
+ *   // the extra ones yourself, then call again.
+ *   if (!(error instanceof AmbiguousMatchError)) throw error;
+ * }
  * ```
  */
 export const unrepost = undoAction(repostAction);
