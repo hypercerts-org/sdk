@@ -50,6 +50,12 @@ TSDoc comments on exported symbols are the SDK's API reference. They ship in the
 - Live objects such as the `Client` are not data; check them with a small duck-typed guard, not a schema.
 - Do not add Zod or another validation library.
 
+## References
+
+The SDK reads a referenced record only when the record it writes must store that record's CID (a strong reference); it pins the CID it read, and a target that cannot be read stops the write. Plain DIDs and URIs are stored as given and never looked up, because ATProto lets them dangle; the SDK does not check that the account or record exists.
+
+New operations follow this rule. In the TSDoc and the domain's reference file, say which kind each reference field is (strong reference, read and pinned, or plain DID or URI, stored as given), so a caller knows what the SDK checks and what it leaves to them.
+
 ## Consumer skill
 
 `.agents/skills/hypercerts-org-sdk/` teaches coding agents in consumers' repositories to use the SDK. It follows the [Agent Skills spec](https://agentskills.io/specification): agents load all of `SKILL.md` when the skill activates and read files in `references/` only when a task needs them.

@@ -2,7 +2,7 @@ import type { CidString, DidString, NsidString, TypedLexMap } from "@atproto/lex
 import type { SDKContext } from "../context.js";
 import { describeError } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
-import type { StrongRef } from "./resolve-record-ref.js";
+import { parseRecordUri, type StrongRef } from "./resolve-record-ref.js";
 
 /**
  * Base class of the errors thrown when the single request that writes records did not succeed.
@@ -12,7 +12,9 @@ import type { StrongRef } from "./resolve-record-ref.js";
 export abstract class WriteError extends Error {
   /**
    * The URI and CID of every record the failed request tried to write, in request order: the new
-   * records first, then any record it updated (with the CID the update would give it).
+   * records first, then any record it updated (with the CID the update would give it). For a delete,
+   * the record with the CID it was guarded with; a delete without a CID guard lists nothing, because
+   * a reference needs a CID.
    */
   readonly attempted: readonly StrongRef[];
 
@@ -91,7 +93,10 @@ export class RecordAlreadyExistsError extends WriteRejectedError {
  * No usable answer came back (network failure, timeout, a server error or an unreadable response),
  * so it is not known whether the PDS applied the writes. `attempted` lists the URI and CID of every
  * record that may now exist or have changed; check them (for example with
- * `com.atproto.repo.getRecord`) before deciding what to do.
+ * `com.atproto.repo.getRecord`) before deciding what to do. The one exception is an undo function
+ * (`unlike`, `unrepost`, `unfollowAccount`, `unfollowEntity`) called without `cid`: its
+ * `attempted` is empty, because a reference needs a CID, and the message names the record's URI.
+ * Calling an undo function again is safe.
  *
  * The SDK does not retry. Retrying with new record keys would duplicate every record if the first
  * attempt had succeeded. The exception is a record whose key is fixed or decided by its data and
@@ -309,6 +314,83 @@ function alreadyExists(
     rejected.attempted,
     { status: rejected.status, code: rejected.code },
     { cause: rejected.cause },
+  );
+}
+
+/** The record `submitDelete` removes, and the version it must still have, if the caller knows it. */
+export interface DeleteTarget {
+  /** The record's URI, `at://<did>/<collection>/<rkey>`. */
+  readonly uri: string;
+  /** Delete only if the record still has this CID. Absent: delete whatever version it has. */
+  readonly cid?: CidString | undefined;
+}
+
+/**
+ * Deletes one record from `did`'s repo with `com.atproto.repo.deleteRecord`, with
+ * `swapRecord: target.cid` when the caller gave the CID.
+ *
+ * Internal. Boundaries:
+ * - Never retries. With a CID it never deletes a record that has another version: the PDS refuses
+ *   and nothing is deleted. Without one the delete is unconditional.
+ * - Classifies a failure as the other write functions do: definite only when the PDS answered with
+ *   an HTTP 4xx other than 408 (and then nothing was deleted), outcome-unknown otherwise.
+ * - Has no reported result to compare: `deleteRecord` answers with a commit, not with references.
+ *   The reference PDS (`@atproto/pds`) treats a record that is already missing as nothing to do and
+ *   answers success whatever `swapRecord` says, so that answer is indistinguishable from this call
+ *   having deleted it, and calling again after any outcome is safe.
+ * - `attempted` of the errors is `[{ uri, cid }]` with a CID, and empty without one: a reference to
+ *   a record needs a CID, and none is known.
+ *
+ * Throws WriteRejectedError (with `code` `InvalidSwap` when the record no longer has `target.cid`,
+ * so it was not deleted) or WriteOutcomeUnknownError. Throws TypeError when `target.uri` is not a
+ * record URI.
+ */
+export async function submitDelete(
+  context: SDKContext,
+  did: DidString,
+  target: DeleteTarget,
+  operation: string,
+): Promise<void> {
+  const { atUri, collection, rkey } = parseRecordUri(target.uri, operation);
+  try {
+    await context.client.deleteRecord(collection, rkey, {
+      repo: did,
+      ...(target.cid === undefined ? {} : { swapRecord: target.cid }),
+    });
+  } catch (error) {
+    throw classifyDeleteFailure(operation, error, atUri, target.cid);
+  }
+}
+
+function classifyDeleteFailure(
+  operation: string,
+  error: unknown,
+  uri: StrongRef["uri"],
+  cid: CidString | undefined,
+) {
+  const status = property(error, "status");
+  const reason = describeError(error);
+  const attempted = cid === undefined ? [] : [{ uri, cid }];
+  // As in `classifyFailure`: definite only for an HTTP 4xx other than 408.
+  const rejected = typeof status === "number" && status >= 400 && status < 500 && status !== 408;
+  if (!rejected) {
+    return new WriteOutcomeUnknownError(
+      `${operation}: no usable answer from the PDS (${reason}), so it is not known whether ${uri} was deleted. ` +
+        `The SDK does not retry, but calling ${operation} again is safe: deleting a record that is already gone succeeds. To check first, use com.atproto.repo.getRecord.`,
+      attempted,
+      { cause: error },
+    );
+  }
+  const code = property(error, "error");
+  const message =
+    code === "InvalidSwap" && cid !== undefined
+      ? `${operation}: ${uri} no longer has the version (CID ${cid}) that was given, so the PDS refused to delete it (HTTP ${status}: ${reason}). It was not deleted: something changed or replaced it in between. The SDK neither retries nor deletes without that check. Read the record for its current CID, or call ${operation} without \`cid\` to delete it whatever its version.`
+      : `${operation}: the PDS rejected the request (HTTP ${status}: ${reason}), so ${uri} was not deleted. Fix the cause (for example the session's permissions or a rate limit) and call again.`;
+  return new WriteRejectedError(
+    message,
+    attempted,
+    { status, code: typeof code === "string" ? code : undefined },
+    { cause: error },
   );
 }
 

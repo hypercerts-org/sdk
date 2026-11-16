@@ -6,17 +6,17 @@ import {
   prepareActivity,
 } from "../activity/build-activity.js";
 import type { SDKContext } from "../context.js";
-import { type BuildContext, createBuildContext, parseInput } from "../internal/build-context.js";
+import {
+  type BuildContext,
+  createBuildContext,
+  parseInput,
+  parseOwnRecordUri,
+} from "../internal/build-context.js";
 import { describeError } from "../internal/describe.js";
 import { compact, strictObject, weightString } from "../internal/input.js";
 import { type PreparedRecord, prepareUpdate } from "../internal/prepare-record.js";
 import { readRepoHead } from "../internal/read-repo-head.js";
-import {
-  parseRecordUri,
-  readRecord,
-  type StoredRecord,
-  type StrongRef,
-} from "../internal/resolve-record-ref.js";
+import { readRecord, type StoredRecord, type StrongRef } from "../internal/resolve-record-ref.js";
 import { submitWrites } from "../internal/submit-writes.js";
 
 const OPERATION = "createActivityInCollection";
@@ -215,18 +215,12 @@ export async function createActivityInCollection(
 
 // Checked before any request: the URI must name a Collection in the signed-in account's repo.
 function parseCollectionUri(build: BuildContext, uri: string): RecordKeyString {
-  const { did, collection: type, rkey } = parseRecordUri(uri, OPERATION);
-  if (type !== collection.main.$type) {
-    throw new TypeError(
+  return parseOwnRecordUri(build, uri, collection.main.$type, {
+    collection: (type) =>
       `${OPERATION}: collectionUri points at a record of type ${type}, but it must be of type ${collection.main.$type}: ${uri}. Expected at://<did>/${collection.main.$type}/<rkey>.`,
-    );
-  }
-  if (did !== build.did) {
-    throw new TypeError(
+    repository: (did) =>
       `${OPERATION}: collectionUri is in the repository of ${did}, but the client is signed in as ${build.did} and this operation changes only the signed-in account's own Collections: ${uri}.`,
-    );
-  }
-  return rkey;
+  }).rkey;
 }
 
 type Item = NonNullable<collection.Main["items"]>[number];
