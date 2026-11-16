@@ -11,6 +11,10 @@ import {
   type TypedBlobRef,
 } from "@atproto/lex";
 import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
+import * as like from "@hypercerts-org/lexicon/app/certified/feed/like";
+import * as repost from "@hypercerts-org/lexicon/app/certified/feed/repost";
+import * as entityFollow from "@hypercerts-org/lexicon/app/certified/graph/entityFollow";
+import * as follow from "@hypercerts-org/lexicon/app/certified/graph/follow";
 import * as location from "@hypercerts-org/lexicon/app/certified/location";
 import * as activity from "@hypercerts-org/lexicon/org/hypercerts/claim/activity";
 import * as contribution from "@hypercerts-org/lexicon/org/hypercerts/claim/contribution";
@@ -55,6 +59,26 @@ export async function expectStored(reader: Client, ref: Ref): Promise<LexMap> {
   return body.value;
 }
 
+/**
+ * Checks that the PDS holds no record at `uri`. A record that is gone is not an error for a delete,
+ * but reading it is: `getRecord` answers `RecordNotFound`.
+ */
+export async function expectMissing(reader: Client, uri: string): Promise<void> {
+  const { did, collection, rkey } = parseRecordUri(uri);
+  await expect(reader.getRecord(collection, rkey, { repo: did })).rejects.toMatchObject({
+    error: "RecordNotFound",
+  });
+}
+
+/**
+ * Deletes the record at `uri` from the client's repo, for a test to clean up after itself. Succeeds
+ * when the record is already gone.
+ */
+export async function deleteStored(client: Client, uri: string): Promise<void> {
+  const { did, collection, rkey } = parseRecordUri(uri);
+  await client.deleteRecord(collection, rkey, { repo: did });
+}
+
 /** Every strong reference inside a record value, at any depth. */
 export function strongRefsIn(value: unknown): Ref[] {
   if (Array.isArray(value)) return value.flatMap(strongRefsIn);
@@ -87,6 +111,10 @@ export const collections = {
   workScopeTag: workScopeTag.main.$type,
   feature: feature.main.$type,
   collection: collection.main.$type,
+  follow: follow.main.$type,
+  entityFollow: entityFollow.main.$type,
+  like: like.main.$type,
+  repost: repost.main.$type,
 } as const;
 
 /** The number of records of `collection` in the client's repo. */

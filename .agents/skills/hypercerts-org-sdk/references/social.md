@@ -34,6 +34,13 @@ console.log(liked.uri); // at://<your did>/app.certified.feed.like/<tid>
 
 A like is social feedback only. It is not an evaluation, an acknowledgement or proof of endorsement; do not present it as one.
 
+## What the SDK reads and what it does not
+
+The SDK reads a record only to pin its CID in a strong reference. Each target field is one of two kinds:
+
+- **Strong reference** (URI and CID): the `targetUri` of `like` and `repost`, and `via`. The SDK reads the record and stores the CID it read. A record it cannot read stops the call, and nothing is written.
+- **Plain DID or URI**: the `targetDid` of `followAccount` and the `targetUri` of `followEntity`. The SDK stores it as given and never looks it up, because ATProto lets these dangle. A follow of an account or record that does not exist, or of a mistyped DID or URI, is written. Check the value yourself if that matters.
+
 ## Options
 
 Create functions also take `createdAt` (ISO 8601, default: now) and `via`:
@@ -87,8 +94,8 @@ await unfollowAccount(context, { followUri: "did:plc:abc123" }); // TypeError: n
 
 | Field       | Used by                             | Type                              | Notes                                                                             |
 | ----------- | ----------------------------------- | --------------------------------- | --------------------------------------------------------------------------------- |
-| `targetDid` | `followAccount`                     | `DidString` (from `@atproto/lex`) | Required. A DID, not a handle.                                                    |
-| `targetUri` | `followEntity`, `like`, `repost`    | `string`                          | Required. Full record URI with a DID authority.                                   |
+| `targetDid` | `followAccount`                     | `DidString` (from `@atproto/lex`) | Required. A DID, not a handle. Stored as given, not looked up.                    |
+| `targetUri` | `followEntity`, `like`, `repost`    | `string`                          | Required. Full record URI with a DID authority. See above for what is read.       |
 | `createdAt` | create functions                    | `string`                          | Optional. ISO 8601 date-time. Default: time of the call.                          |
 | `via`       | create functions                    | `string`                          | Optional. Record URI, read and pinned by the SDK. Any Lexicon.                    |
 | `followUri` | `unfollowAccount`, `unfollowEntity` | `string`                          | Required. URI of your own follow (or entity follow) record.                       |

@@ -187,6 +187,7 @@ try {
 - A vocabulary tag's key is `<category>.<key>` exactly as you pass it. A dot in either part throws a `TypeError`; the SDK does not normalise the parts.
 - A work-scope tag URI is not a vocabulary tag URI: each field accepts one collection, and a `{ uri }` of another throws a `TypeError`.
 - One write holds at most 200 records on the reference PDS. A larger call throws a `TypeError` before anything is written; the SDK does not split it. Create some records first and pass their URIs.
+- The SDK reads a record you reference only to pin its CID in a strong reference (`{ uri }` inputs, the target of `like` and `repost`, `via`); a record it cannot read stops the call. A plain DID or URI (`followAccount`'s `targetDid`, `followEntity`'s `targetUri`) is stored as given and never looked up, so a mistyped one is stored too. Check it yourself if that matters.
 - Do not call operations a subpath does not export, even if a TSDoc example mentions them.
 
 ## Verify

@@ -41,14 +41,14 @@ pnpm test:e2e
 | `SDK_E2E_PDS_URL`                         | Origin of the PDS, for example `https://pds1.atmosbox.test`.                                |
 | `SDK_E2E_PLC_URL`                         | Origin of the sandbox's PLC directory, for example `https://plc.atmosbox.test`.             |
 | `SDK_E2E_USER1`, `SDK_E2E_USER1_PASSWORD` | Handle and password of the account that creates records.                                    |
-| `SDK_E2E_USER2`, `SDK_E2E_USER2_PASSWORD` | Handle and password of a second account, whose records the first account's Activity reuses. |
+| `SDK_E2E_USER2`, `SDK_E2E_USER2_PASSWORD` | Handle and password of a second account, whose records the first account's tests use.       |
 | `NODE_EXTRA_CA_CERTS` (set by the script) | The sandbox's root certificate (`state/ca/root.crt`). Node trusts it for this process only. |
 
 `pnpm test` never runs these tests.
 
 ## Things to know
 
-- The tests leave their records and blobs in the two accounts. Each test counts records only around its own call, so earlier runs do not matter. Destroy the sandbox (`deno task sandbox destroy --accept-destructive`) to start clean.
+- Most tests leave their records and blobs in the two accounts (the social tests delete theirs). Each test counts records only around its own call, so earlier runs do not matter. Destroy the sandbox (`deno task sandbox destroy --accept-destructive`) to start clean.
 - An account has one profile, so the `createProfile` tests delete the first account's profile (the `self` record) before each test.
 - A vocabulary tag's key is chosen by the caller and cannot be reused, so the tag tests give every tag a key that is different on every run.
 - To reuse another account's record, the SDK finds that account's PDS in the `plc.directory` DID document, and it cannot be pointed at another directory. The sandbox's accounts exist only in its own PLC directory, so `e2e/plc.ts` redirects requests for `https://plc.directory` to `SDK_E2E_PLC_URL` while those tests run.

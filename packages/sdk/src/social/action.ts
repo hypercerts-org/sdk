@@ -21,7 +21,8 @@ export interface ActionOptions {
 export interface FollowAccountInput extends ActionOptions {
   /**
    * The account to follow, as a DID (`did:plc:...` or `did:web:...`). A handle, a record URI or an
-   * object is rejected.
+   * object is rejected. Stored as given and never looked up: the SDK does not check that the
+   * account exists.
    */
   targetDid: DidString;
 }
@@ -32,6 +33,10 @@ export interface RecordActionInput extends ActionOptions {
    * The record the action is about, as a full record URI: `at://<did>/<collection>/<rkey>`, with a
    * DID (not a handle) as the authority. A bare DID or a URI without a collection and record key is
    * rejected; to follow an account, use {@link followAccount}. The record may be of any Lexicon.
+   *
+   * {@link followEntity} stores the URI as given and does not read the record, so a record that
+   * does not exist is followed all the same. {@link like} and {@link repost} store the record's
+   * CID, so they read it and pin the version they find; a record that cannot be read stops them.
    */
   targetUri: string;
 }

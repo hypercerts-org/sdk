@@ -38,9 +38,10 @@ const followEntityAction: SocialAction<RecordActionInput, UnfollowEntityInput> =
  * account's repo.
  *
  * @remarks
- * `targetDid` is the account being followed. Nothing about it is looked up: the SDK does not check
- * that the account exists or has a Certified profile. The record key is a new TID chosen by the
- * SDK, and `createdAt` defaults to the time of the call.
+ * `targetDid` is the account being followed, a plain DID stored as given. It is never looked up:
+ * ATProto lets a DID dangle, so the SDK does not check that the account exists or has a Certified
+ * profile. The record key is a new TID chosen by the SDK, and `createdAt` defaults to the time of
+ * the call.
  *
  * Nothing is deduplicated: calling this again for an account that is already followed creates a
  * second follow record. {@link unfollowAccount} deletes only the record whose URI it is given, so
@@ -158,11 +159,12 @@ export const unfollowAccount = undoAction(followAccountAction);
  *
  * @remarks
  * The follow stores the target's URI as a `app.certified.defs#recordSubject` and no CID, so it
- * keeps pointing at the record through later updates. The target is not read: the SDK does not
- * check that it exists, so a follow of a record that is missing, private or of an unknown Lexicon
- * is created all the same. (A like or a repost differs: see {@link like}, which pins the version it
- * read.) The record key is a new TID chosen by the SDK, and `createdAt` defaults to the time of the
- * call.
+ * keeps pointing at the record through later updates. With no CID to pin, the target is a plain URI
+ * stored as given and never read: ATProto lets a URI dangle, so the SDK does not check that the
+ * record exists, and a follow of a record that is missing, private or of an unknown Lexicon is
+ * created all the same. (A like or a repost differs: see {@link like}, which stores a CID and so
+ * pins the version it read.) The record key is a new TID chosen by the SDK, and `createdAt`
+ * defaults to the time of the call.
  *
  * Nothing is deduplicated: calling this again for the same record creates a second follow.
  * {@link unfollowEntity} deletes only the record whose URI it is given, so each duplicate has to be
