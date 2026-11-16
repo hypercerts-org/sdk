@@ -13,10 +13,11 @@ export type {
   ActionOptions,
   FollowAccountInput,
   RecordActionInput,
-  RecordTargetInput,
-  UndoResult,
+  UndoOptions,
   UnfollowAccountInput,
+  UnfollowEntityInput,
+  UnlikeInput,
+  UnrepostInput,
 } from "./action.js";
-export { AmbiguousMatchError } from "./ambiguous-match-error.js";
 export { like, repost, unlike, unrepost } from "./feed.js";
 export { followAccount, followEntity, unfollowAccount, unfollowEntity } from "./graph.js";

@@ -4,15 +4,14 @@ import {
   type BuildContext,
   createBuildContext,
   parseInput,
+  parseOwnRecordUri,
   prepareChecked,
 } from "../internal/build-context.js";
 import type { StandaloneCreator } from "../internal/create-record.js";
 import { compact } from "../internal/input.js";
 import { resolveRecordRef } from "../internal/resolve-record-ref.js";
 import { submitDelete, submitWrites } from "../internal/submit-writes.js";
-import type { ActionOptions, SocialAction, UndoFunction } from "./action.js";
-import { AmbiguousMatchError } from "./ambiguous-match-error.js";
-import { listCollection } from "./list-collection.js";
+import type { ActionOptions, SocialAction, UndoFunction, UndoOptions } from "./action.js";
 
 /**
  * The function that creates one social record (a follow, an entity follow, a like or a repost) in
@@ -28,7 +27,7 @@ import { listCollection } from "./list-collection.js";
  *
  * The function throws TypeError for invalid input, and what the reads and `submitWrites` throw.
  */
-export function createAction<TCreate extends TUndo & ActionOptions, TUndo extends object>(
+export function createAction<TCreate extends ActionOptions, TUndo extends UndoOptions>(
   action: SocialAction<TCreate, TUndo>,
 ): StandaloneCreator<TCreate> {
   return async (context, input) => {
@@ -50,40 +49,40 @@ export function createAction<TCreate extends TUndo & ActionOptions, TUndo extend
 }
 
 /**
- * The function that removes the one social record in the client's repo that is for the input's
- * target.
+ * The function that deletes the one social record whose URI the input gives, from the client's repo.
  *
  * Internal. Boundaries:
- * - Looks only at the action's collection in the client's own repository, and reads all of it
- *   (see `listCollection`). It does not read the target, so a target that was edited or deleted
- *   does not prevent the removal. No indexer is consulted.
- * - Deletes only when exactly one record matches, and then only if that record still has the CID
- *   the scan saw (see `submitDelete`). With several matches it deletes nothing and throws
- *   `AmbiguousMatchError`.
- * - The scan is a snapshot; it cannot stop another writer creating a matching record.
+ * - Deletes exactly that record, with one `submitDelete` request, and looks at nothing else: no scan
+ *   of the collection, no read of the record or of what it points at, no indexer. Another record
+ *   for the same target, for example a duplicate like, is not touched.
+ * - Refuses, before anything is sent, a URI that is not in the action's collection or not in the
+ *   signed-in account's repository, so a wrong URI (the target's, for example) cannot delete
+ *   anything. The PDS would refuse another account's record anyway; this says why.
+ * - With `cid` the delete is guarded by it (see `submitDelete`); without it, it is not.
  *
- * The function throws TypeError for invalid input, Error when the collection cannot be read in
- * full, AmbiguousMatchError when several records match, and what `submitDelete` throws.
+ * The function throws TypeError for invalid input, Error when the client is not authenticated, and
+ * what `submitDelete` throws.
  */
-export function undoAction<TCreate extends TUndo & ActionOptions, TUndo extends object>(
+export function undoAction<TCreate extends ActionOptions, TUndo extends UndoOptions>(
   action: SocialAction<TCreate, TUndo>,
 ): UndoFunction<TUndo> {
   return async (context, input) => {
-    const { build, parsed } = start(context, action.names.undo, action.targetInput, input);
-    const records = await listCollection(context, build.did, action.schema.$type, build.operation);
-    const matches = records.filter(({ value }) => action.isSubject(value.subject, parsed));
-    const [match, ...others] = matches;
-    if (match === undefined) return { status: "not-found" };
-    if (others.length > 0) {
-      throw new AmbiguousMatchError(
-        action.names.undo,
-        action.schema.$type,
-        matches.map(({ ref }) => ref),
-      );
-    }
-    await submitDelete(context, build.did, match.ref, build.operation);
-    return { status: "deleted" };
+    const { build, parsed } = start(context, action.names.undo, action.undoInput, input);
+    const uri = action.undoUri(parsed);
+    assertOwnRecord(build, uri, action.schema.$type);
+    await submitDelete(context, build.did, { uri, cid: parsed.cid }, build.operation);
   };
+}
+
+// The input's URI must name a record the SDK may delete here: of this action's collection, in the
+// signed-in account's repository.
+function assertOwnRecord(build: BuildContext, uri: string, collection: string) {
+  parseOwnRecordUri(build, uri, collection, {
+    collection: (actual) =>
+      `${build.operation}: ${uri} is a ${actual} record, not a ${collection} record. Pass the URI of the ${collection} record the account created (for example the \`uri\` its create function returned), not the URI of its target. Nothing was sent.`,
+    repository: (did) =>
+      `${build.operation}: ${uri} is in the repository of ${did}, not of the signed-in account (${build.did}). Only the account's own records can be deleted. Nothing was sent.`,
+  });
 }
 
 // Checks that the client is signed in, then the input, before anything is sent.

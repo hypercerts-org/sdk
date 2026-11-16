@@ -1,10 +1,24 @@
 import * as likeRecord from "@hypercerts-org/lexicon/app/certified/feed/like";
 import * as repostRecord from "@hypercerts-org/lexicon/app/certified/feed/repost";
-import { recordRefAction } from "./action.js";
+import {
+  likeUndoInput,
+  recordRefAction,
+  repostUndoInput,
+  type UnlikeInput,
+  type UnrepostInput,
+} from "./action.js";
 import { createAction, undoAction } from "./run-action.js";
 
-const likeAction = recordRefAction({ create: "like", undo: "unlike" }, likeRecord.main);
-const repostAction = recordRefAction({ create: "repost", undo: "unrepost" }, repostRecord.main);
+const likeAction = recordRefAction<UnlikeInput>(
+  { create: "like", undo: "unlike" },
+  likeRecord.main,
+  { undoInput: likeUndoInput, undoUri: ({ likeUri }) => likeUri },
+);
+const repostAction = recordRefAction<UnrepostInput>(
+  { create: "repost", undo: "unrepost" },
+  repostRecord.main,
+  { undoInput: repostUndoInput, undoUri: ({ repostUri }) => repostUri },
+);
 
 /**
  * Likes a record: creates an `app.certified.feed.like` record in the authenticated account's repo.
@@ -20,8 +34,9 @@ const repostAction = recordRefAction({ create: "repost", undo: "unrepost" }, rep
  * read, nothing is written. The target is never modified or created. The record key is a new TID
  * chosen by the SDK, and `createdAt` defaults to the time of the call.
  *
- * Nothing is deduplicated: calling this again for the same record creates a second like, and a
- * later {@link unlike} then throws {@link AmbiguousMatchError} until the duplicate is removed.
+ * Nothing is deduplicated: calling this again for the same record creates a second like.
+ * {@link unlike} deletes only the record whose URI it is given, so each duplicate has to be undone
+ * with its own URI.
  *
  * `via` is optional: the URI of the record through which the target was encountered, typically a
  * repost. The SDK reads it the same way. See {@link ActionOptions}.
@@ -66,54 +81,61 @@ const repostAction = recordRefAction({ create: "repost", undo: "unrepost" }, rep
 export const like = createAction(likeAction);
 
 /**
- * Removes a like: deletes the authenticated account's one `app.certified.feed.like` record for
- * `targetUri`.
+ * Removes a like: deletes the `app.certified.feed.like` record at `likeUri` from the
+ * authenticated account's repo.
  *
  * @remarks
- * The SDK lists the account's own likes (all pages, from its own PDS; no indexer) and matches them
- * by the URI of the record they like, whatever CID they pin, so a like of an earlier version of an
- * edited target is found too. With no match it returns `not-found`. With exactly one it deletes
- * that record, only if it still has the CID the scan saw, and returns `deleted`. With several it
- * deletes nothing and throws {@link AmbiguousMatchError}: the record was liked more than once, and
- * the SDK does not choose which like to remove. See {@link UndoResult}.
+ * Deletes exactly the record whose URI you give. The SDK does not scan the repository, ask an
+ * indexer or read the liked record, so it does not look for other likes of the same record: after
+ * a duplicate (see {@link like}), the other like stays until you delete it with its own URI. The
+ * liked record does not have to exist any more.
  *
- * The target is not read, so it does not have to exist any more. The scan is a snapshot: it cannot
- * stop another writer creating a like of the same record while it runs or after it, so `deleted`
- * does not promise that no like of `targetUri` remains.
+ * Where the URI comes from: the `uri` that {@link like} returned (keep it), or the Hypercerts
+ * API, for example `app.certified.feed.getActorReactions`, which returns the like's `uri` and
+ * `cid`. It is the URI of the like record, not the URI of the record that was liked.
+ *
+ * The PDS treats deleting a record that does not exist as nothing to do and answers success, so a
+ * stale URI is harmless and the call is safe to repeat. The call does not say whether it removed
+ * anything.
+ *
+ * `cid` is optional. With it, the PDS deletes the like only if it still has that CID; without it,
+ * the like is deleted whatever its version.
  *
  * The session needs permission to delete `app.certified.feed.like` records.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
- * authenticated; only that account's repository is scanned.
- * @param input - The record to unlike. See {@link RecordTargetInput}.
- * @returns `deleted` or `not-found`. See {@link UndoResult}.
- * @throws {@link TypeError} If `input` has an unknown field or a `targetUri` that is not a full
- * record URI. Nothing was changed.
- * @throws {@link Error} If the client is not authenticated, or the likes cannot be read in full (a
- * failed or malformed page). A partial read is never treated as "not found". Nothing was changed.
- * @throws {@link AmbiguousMatchError} If several records match. Nothing was deleted; `matches` lists
- * them.
+ * authenticated; only that account's own records can be deleted.
+ * @param input - The like record's URI and an optional `cid`. See {@link UnlikeInput}.
+ * @returns Nothing. It resolves when the PDS confirmed the deletion or that the record is absent.
+ * @throws {@link TypeError} If `input` has an unknown field, a `likeUri` that is not a full record
+ * URI, one whose collection is not `app.certified.feed.like` or that is in another account's
+ * repository, or a `cid` that is not a CID string. Nothing was sent.
+ * @throws {@link Error} If the client is not authenticated. Nothing was sent.
  * @throws {@link WriteRejectedError} If the PDS refused the deletion (HTTP 4xx). With `code`
- * `"InvalidSwap"` the like changed after the scan, so it was not deleted; call again to scan
- * afresh.
+ * `"InvalidSwap"` the like no longer has the given `cid`, so it was not deleted.
  * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
- * is safe: it either deletes the like or returns `not-found`.
+ * is safe.
  *
  * @example
  * ```ts
- * import { AmbiguousMatchError, unlike } from "@hypercerts-org/sdk/social";
+ * import { like, unlike } from "@hypercerts-org/sdk/social";
  *
  * // `context` comes from createSDKContext.
- * try {
- *   const result = await unlike(context, {
- *     targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
- *   });
- *   console.log(result.status); // "deleted" or "not-found"
- * } catch (error) {
- *   // Several records match: nothing was deleted. `error.matches` lists them; remove
- *   // the extra ones yourself, then call again.
- *   if (!(error instanceof AmbiguousMatchError)) throw error;
- * }
+ * const liked = await like(context, {
+ *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+ * });
+ * // Keep `liked.uri` (and `liked.cid`) to undo it later.
+ * await unlike(context, { likeUri: liked.uri, cid: liked.cid });
+ * ```
+ *
+ * @example The like's URI, not the URI of the liked record
+ * ```ts
+ * import { unlike } from "@hypercerts-org/sdk/social";
+ *
+ * // TypeError: this is the activity, not an app.certified.feed.like record.
+ * await unlike(context, {
+ *   likeUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+ * });
  * ```
  */
 export const unlike = undoAction(likeAction);
@@ -129,8 +151,9 @@ export const unlike = undoAction(likeAction);
  * cannot be read, nothing is written. The target is never modified or created. The record key is a
  * new TID chosen by the SDK, and `createdAt` defaults to the time of the call.
  *
- * Nothing is deduplicated: calling this again for the same record creates a second repost, and a
- * later {@link unrepost} then throws {@link AmbiguousMatchError} until the duplicate is removed.
+ * Nothing is deduplicated: calling this again for the same record creates a second repost.
+ * {@link unrepost} deletes only the record whose URI it is given, so each duplicate has to be undone
+ * with its own URI.
  *
  * `via` is optional: the URI of the record through which the target was encountered, typically
  * another repost. The SDK reads it the same way. See {@link ActionOptions}.
@@ -175,54 +198,61 @@ export const unlike = undoAction(likeAction);
 export const repost = createAction(repostAction);
 
 /**
- * Removes a repost: deletes the authenticated account's one `app.certified.feed.repost` record for
- * `targetUri`.
+ * Removes a repost: deletes the `app.certified.feed.repost` record at `repostUri` from the
+ * authenticated account's repo.
  *
  * @remarks
- * The SDK lists the account's own reposts (all pages, from its own PDS; no indexer) and matches
- * them by the URI of the record they repost, whatever CID they pin, so a repost of an earlier
- * version of an edited target is found too. With no match it returns `not-found`. With exactly one
- * it deletes that record, only if it still has the CID the scan saw, and returns `deleted`. With
- * several it deletes nothing and throws {@link AmbiguousMatchError}: the record was reposted more
- * than once, and the SDK does not choose which repost to remove. See {@link UndoResult}.
+ * Deletes exactly the record whose URI you give. The SDK does not scan the repository, ask an
+ * indexer or read the reposted record, so it does not look for other reposts of the same record:
+ * after a duplicate (see {@link repost}), the other repost stays until you delete it with its own
+ * URI. The reposted record does not have to exist any more.
  *
- * The target is not read, so it does not have to exist any more. The scan is a snapshot: it cannot
- * stop another writer creating a repost of the same record while it runs or after it, so `deleted`
- * does not promise that no repost of `targetUri` remains.
+ * Where the URI comes from: the `uri` that {@link repost} returned (keep it), or the Hypercerts
+ * API, for example `app.certified.feed.getActorReactions`, which returns the repost's `uri` and
+ * `cid`. It is the URI of the repost record, not the URI of the record that was reposted.
+ *
+ * The PDS treats deleting a record that does not exist as nothing to do and answers success, so a
+ * stale URI is harmless and the call is safe to repeat. The call does not say whether it removed
+ * anything.
+ *
+ * `cid` is optional. With it, the PDS deletes the repost only if it still has that CID; without it,
+ * the repost is deleted whatever its version.
  *
  * The session needs permission to delete `app.certified.feed.repost` records.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
- * authenticated; only that account's repository is scanned.
- * @param input - The record to unrepost. See {@link RecordTargetInput}.
- * @returns `deleted` or `not-found`. See {@link UndoResult}.
- * @throws {@link TypeError} If `input` has an unknown field or a `targetUri` that is not a full
- * record URI. Nothing was changed.
- * @throws {@link Error} If the client is not authenticated, or the reposts cannot be read in full (a
- * failed or malformed page). A partial read is never treated as "not found". Nothing was changed.
- * @throws {@link AmbiguousMatchError} If several records match. Nothing was deleted; `matches` lists
- * them.
+ * authenticated; only that account's own records can be deleted.
+ * @param input - The repost record's URI and an optional `cid`. See {@link UnrepostInput}.
+ * @returns Nothing. It resolves when the PDS confirmed the deletion or that the record is absent.
+ * @throws {@link TypeError} If `input` has an unknown field, a `repostUri` that is not a full record
+ * URI, one whose collection is not `app.certified.feed.repost` or that is in another account's
+ * repository, or a `cid` that is not a CID string. Nothing was sent.
+ * @throws {@link Error} If the client is not authenticated. Nothing was sent.
  * @throws {@link WriteRejectedError} If the PDS refused the deletion (HTTP 4xx). With `code`
- * `"InvalidSwap"` the repost changed after the scan, so it was not deleted; call again to scan
- * afresh.
+ * `"InvalidSwap"` the repost no longer has the given `cid`, so it was not deleted.
  * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
- * is safe: it either deletes the repost or returns `not-found`.
+ * is safe.
  *
  * @example
  * ```ts
- * import { AmbiguousMatchError, unrepost } from "@hypercerts-org/sdk/social";
+ * import { repost, unrepost } from "@hypercerts-org/sdk/social";
  *
  * // `context` comes from createSDKContext.
- * try {
- *   const result = await unrepost(context, {
- *     targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
- *   });
- *   console.log(result.status); // "deleted" or "not-found"
- * } catch (error) {
- *   // Several records match: nothing was deleted. `error.matches` lists them; remove
- *   // the extra ones yourself, then call again.
- *   if (!(error instanceof AmbiguousMatchError)) throw error;
- * }
+ * const reposted = await repost(context, {
+ *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+ * });
+ * // Keep `reposted.uri` (and `reposted.cid`) to undo it later.
+ * await unrepost(context, { repostUri: reposted.uri, cid: reposted.cid });
+ * ```
+ *
+ * @example The repost's URI, not the URI of the reposted record
+ * ```ts
+ * import { unrepost } from "@hypercerts-org/sdk/social";
+ *
+ * // TypeError: this is the activity, not an app.certified.feed.repost record.
+ * await unrepost(context, {
+ *   repostUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+ * });
  * ```
  */
 export const unrepost = undoAction(repostAction);

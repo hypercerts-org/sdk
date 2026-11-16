@@ -3,37 +3,34 @@ import * as defs from "@hypercerts-org/lexicon/app/certified/defs";
 import * as entityFollow from "@hypercerts-org/lexicon/app/certified/graph/entityFollow";
 import * as follow from "@hypercerts-org/lexicon/app/certified/graph/follow";
 import {
-  accountTarget,
+  accountCreateInput,
   type FollowAccountInput,
+  followUndoInput,
   type RecordActionInput,
-  type RecordTargetInput,
-  recordTarget,
+  recordCreateInput,
   type SocialAction,
   type UnfollowAccountInput,
-  uriOf,
+  type UnfollowEntityInput,
 } from "./action.js";
 import { createAction, undoAction } from "./run-action.js";
 
 const followAccountAction: SocialAction<FollowAccountInput, UnfollowAccountInput> = {
   names: { create: "followAccount", undo: "unfollowAccount" },
   schema: follow.main,
-  ...accountTarget,
+  createInput: accountCreateInput,
   subject: (_context, { targetDid }) => targetDid,
-  isSubject: (stored, { targetDid }) => stored === targetDid,
+  undoInput: followUndoInput,
+  undoUri: ({ followUri }) => followUri,
 };
 
-const followEntityAction: SocialAction<RecordActionInput, RecordTargetInput> = {
+const followEntityAction: SocialAction<RecordActionInput, UnfollowEntityInput> = {
   names: { create: "followEntity", undo: "unfollowEntity" },
   schema: entityFollow.main,
-  ...recordTarget,
+  createInput: recordCreateInput,
   // The URI only: no CID, so the follow keeps pointing at the record when it is updated.
   subject: (_context, { targetUri }) => defs.recordSubject.build({ uri: asAtUriString(targetUri) }),
-  isSubject: (stored, { targetUri }) =>
-    typeof stored === "object" &&
-    stored !== null &&
-    "$type" in stored &&
-    stored.$type === defs.recordSubject.$type &&
-    uriOf(stored) === targetUri,
+  undoInput: followUndoInput,
+  undoUri: ({ followUri }) => followUri,
 };
 
 /**
@@ -46,8 +43,8 @@ const followEntityAction: SocialAction<RecordActionInput, RecordTargetInput> = {
  * SDK, and `createdAt` defaults to the time of the call.
  *
  * Nothing is deduplicated: calling this again for an account that is already followed creates a
- * second follow record, and a later {@link unfollowAccount} then throws {@link AmbiguousMatchError}
- * until the duplicate is removed.
+ * second follow record. {@link unfollowAccount} deletes only the record whose URI it is given, so
+ * each duplicate has to be undone with its own URI.
  *
  * `via` is optional: the URI of a record through which the account was found (a starter pack, for
  * example). The SDK reads it to pin its current version. See {@link ActionOptions}.
@@ -100,52 +97,57 @@ const followEntityAction: SocialAction<RecordActionInput, RecordTargetInput> = {
 export const followAccount = createAction(followAccountAction);
 
 /**
- * Stops following an account: deletes the authenticated account's one
- * `app.certified.graph.follow` record for `targetDid`.
+ * Stops following an account: deletes the `app.certified.graph.follow` record at `followUri` from
+ * the authenticated account's repo.
  *
  * @remarks
- * The SDK lists the account's own follow records (all pages, from its own PDS; no indexer), and
- * matches them by the DID they follow. With no match it returns `not-found`. With exactly one it
- * deletes that record, only if it still has the CID the scan saw, and returns `deleted`. With
- * several it deletes nothing and throws {@link AmbiguousMatchError}: the account followed the same
- * DID more than once, and the SDK does not choose which record to remove. See {@link UndoResult}.
+ * Deletes exactly the record whose URI you give. The SDK does not scan the repository, ask an
+ * indexer or read the followed account, so it does not look for other follow records of the same
+ * account: after a duplicate follow (see {@link followAccount}), the other record stays until you
+ * delete it with its own URI.
  *
- * The scan is a snapshot. It cannot stop another writer creating a follow of the same account while
- * it runs or after it, so a result of `deleted` does not promise that no follow of `targetDid`
- * remains. The account being followed does not have to exist any more.
+ * Where the URI comes from: the `uri` that {@link followAccount} returned (keep it), or the
+ * Hypercerts API, for example `app.certified.graph.getFollow`, which returns the follow record's
+ * `uri` and `cid`. It is the URI of the follow record, not the DID of the followed account.
+ *
+ * The PDS treats deleting a record that does not exist as nothing to do and answers success, so a
+ * stale URI is harmless and the call is safe to repeat. The call does not say whether it removed
+ * anything.
+ *
+ * `cid` is optional. With it, the PDS deletes the record only if it still has that CID; without
+ * it, the record is deleted whatever its version.
  *
  * The session needs permission to delete `app.certified.graph.follow` records.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
- * authenticated; only that account's repository is scanned.
- * @param input - The account to stop following. See {@link UnfollowAccountInput}.
- * @returns `deleted` or `not-found`. See {@link UndoResult}.
- * @throws {@link TypeError} If `input` has an unknown field or a `targetDid` that is not a DID.
- * Nothing was changed.
- * @throws {@link Error} If the client is not authenticated, or the follow records cannot be read in
- * full (a failed or malformed page). A partial read is never treated as "not found". Nothing was
- * changed.
- * @throws {@link AmbiguousMatchError} If several records match. Nothing was deleted; `matches` lists
- * them.
+ * authenticated; only that account's own records can be deleted.
+ * @param input - The follow record's URI and an optional `cid`. See {@link UnfollowAccountInput}.
+ * @returns Nothing. It resolves when the PDS confirmed the deletion or that the record is absent.
+ * @throws {@link TypeError} If `input` has an unknown field, a `followUri` that is not a full record
+ * URI, one whose collection is not `app.certified.graph.follow` or that is in another account's
+ * repository, or a `cid` that is not a CID string. Nothing was sent.
+ * @throws {@link Error} If the client is not authenticated. Nothing was sent.
  * @throws {@link WriteRejectedError} If the PDS refused the deletion (HTTP 4xx). With `code`
- * `"InvalidSwap"` the record changed after the scan, so it was not deleted; call again to scan
- * afresh.
+ * `"InvalidSwap"` the record no longer has the given `cid`, so it was not deleted.
  * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
- * is safe: it either deletes the record or returns `not-found`.
+ * is safe.
  *
  * @example
  * ```ts
- * import { AmbiguousMatchError, unfollowAccount } from "@hypercerts-org/sdk/social";
+ * import { followAccount, unfollowAccount } from "@hypercerts-org/sdk/social";
  *
  * // `context` comes from createSDKContext.
- * try {
- *   const result = await unfollowAccount(context, { targetDid: "did:plc:abc123" });
- *   console.log(result.status); // "deleted" or "not-found"
- * } catch (error) {
- *   // Several records match: nothing was deleted. `error.matches` lists them; remove
- *   // the extra ones yourself, then call again.
- *   if (!(error instanceof AmbiguousMatchError)) throw error;
- * }
+ * const follow = await followAccount(context, { targetDid: "did:plc:abc123" });
+ * // Keep `follow.uri` (and `follow.cid`) to undo it later.
+ * await unfollowAccount(context, { followUri: follow.uri, cid: follow.cid });
+ * ```
+ *
+ * @example The follow record's URI, not the followed account
+ * ```ts
+ * import { unfollowAccount } from "@hypercerts-org/sdk/social";
+ *
+ * // TypeError: `followUri` is the URI of the follow record, not the DID of the followed account.
+ * await unfollowAccount(context, { followUri: "did:plc:abc123" });
  * ```
  */
 export const unfollowAccount = undoAction(followAccountAction);
@@ -162,9 +164,9 @@ export const unfollowAccount = undoAction(followAccountAction);
  * read.) The record key is a new TID chosen by the SDK, and `createdAt` defaults to the time of the
  * call.
  *
- * Nothing is deduplicated: calling this again for the same record creates a second follow, and a
- * later {@link unfollowEntity} then throws {@link AmbiguousMatchError} until the duplicate is
- * removed.
+ * Nothing is deduplicated: calling this again for the same record creates a second follow.
+ * {@link unfollowEntity} deletes only the record whose URI it is given, so each duplicate has to be
+ * undone with its own URI.
  *
  * `via` is optional: the URI of a record through which the target was found. The SDK reads it to
  * pin its current version. See {@link ActionOptions}.
@@ -206,48 +208,62 @@ export const unfollowAccount = undoAction(followAccountAction);
 export const followEntity = createAction(followEntityAction);
 
 /**
- * Stops following a record: deletes the authenticated account's one
- * `app.certified.graph.entityFollow` record for `targetUri`.
+ * Stops following a record: deletes the `app.certified.graph.entityFollow` record at `followUri`
+ * from the authenticated account's repo.
  *
  * @remarks
- * The SDK lists the account's own entity follows (all pages, from its own PDS; no indexer), and
- * matches them by the record URI they follow. With no match it returns `not-found`. With exactly
- * one it deletes that record, only if it still has the CID the scan saw, and returns `deleted`.
- * With several it deletes nothing and throws {@link AmbiguousMatchError}: the record was followed
- * more than once, and the SDK does not choose which follow to remove. See {@link UndoResult}.
+ * Deletes exactly the record whose URI you give. The SDK does not scan the repository, ask an
+ * indexer or read the followed record, so it does not look for other follow records of the same
+ * target: after a duplicate follow (see {@link followEntity}), the other record stays until you
+ * delete it with its own URI. The followed record does not have to exist any more.
  *
- * The target is not read, so it does not have to exist any more. The scan is a snapshot: it cannot
- * stop another writer creating a follow of the same record while it runs or after it, so `deleted`
- * does not promise that no follow of `targetUri` remains.
+ * Where the URI comes from: the `uri` that {@link followEntity} returned (keep it), or the
+ * Hypercerts API, for example `app.certified.graph.getEntityFollow`, which returns the follow
+ * record's `uri` and `cid`. It is the URI of the follow record, not the URI of the record that is
+ * followed.
+ *
+ * The PDS treats deleting a record that does not exist as nothing to do and answers success, so a
+ * stale URI is harmless and the call is safe to repeat. The call does not say whether it removed
+ * anything.
+ *
+ * `cid` is optional. With it, the PDS deletes the record only if it still has that CID; without
+ * it, the record is deleted whatever its version.
  *
  * The session needs permission to delete `app.certified.graph.entityFollow` records.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
- * authenticated; only that account's repository is scanned.
- * @param input - The record to stop following. See {@link RecordTargetInput}.
- * @returns `deleted` or `not-found`. See {@link UndoResult}.
- * @throws {@link TypeError} If `input` has an unknown field or a `targetUri` that is not a full
- * record URI. Nothing was changed.
- * @throws {@link Error} If the client is not authenticated, or the entity follows cannot be read in
- * full (a failed or malformed page). A partial read is never treated as "not found". Nothing was
- * changed.
- * @throws {@link AmbiguousMatchError} If several records match. Nothing was deleted; `matches` lists
- * them.
+ * authenticated; only that account's own records can be deleted.
+ * @param input - The follow record's URI and an optional `cid`. See {@link UnfollowEntityInput}.
+ * @returns Nothing. It resolves when the PDS confirmed the deletion or that the record is absent.
+ * @throws {@link TypeError} If `input` has an unknown field, a `followUri` that is not a full record
+ * URI, one whose collection is not `app.certified.graph.entityFollow` or that is in another
+ * account's repository, or a `cid` that is not a CID string. Nothing was sent.
+ * @throws {@link Error} If the client is not authenticated. Nothing was sent.
  * @throws {@link WriteRejectedError} If the PDS refused the deletion (HTTP 4xx). With `code`
- * `"InvalidSwap"` the record changed after the scan, so it was not deleted; call again to scan
- * afresh.
+ * `"InvalidSwap"` the record no longer has the given `cid`, so it was not deleted.
  * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
- * is safe: it either deletes the record or returns `not-found`.
+ * is safe.
  *
  * @example
  * ```ts
- * import { unfollowEntity } from "@hypercerts-org/sdk/social";
+ * import { followEntity, unfollowEntity } from "@hypercerts-org/sdk/social";
  *
  * // `context` comes from createSDKContext.
- * const result = await unfollowEntity(context, {
+ * const follow = await followEntity(context, {
  *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
  * });
- * console.log(result.status); // "deleted" or "not-found"
+ * // Keep `follow.uri` (and `follow.cid`) to undo it later.
+ * await unfollowEntity(context, { followUri: follow.uri, cid: follow.cid });
+ * ```
+ *
+ * @example The follow record's URI, not the followed record's
+ * ```ts
+ * import { unfollowEntity } from "@hypercerts-org/sdk/social";
+ *
+ * // TypeError: this is the followed activity, not an app.certified.graph.entityFollow record.
+ * await unfollowEntity(context, {
+ *   followUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+ * });
  * ```
  */
 export const unfollowEntity = undoAction(followEntityAction);

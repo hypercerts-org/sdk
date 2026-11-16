@@ -51,7 +51,7 @@ Make a new context when the signed-in account changes. Records are always writte
 | `@hypercerts-org/sdk/tag`      | `createVocabularyTag`, `createWorkScopeTag`, `RecordAlreadyExistsError`, the same `Write*` errors, input/result types                                                                                  |
 | `@hypercerts-org/sdk/feature`  | `createFeature`, `RecordAlreadyExistsError`, the same `Write*` errors, `FeatureInput`, `CreateFeatureResult`, `LeafletDocument`                                                                        |
 | `@hypercerts-org/sdk/organization` | `createOrganization`, `OrganizationAlreadyExistsError`, `RecordAlreadyExistsError`, the same `Write*` errors, `OrganizationInput`, `CreateOrganizationInput`, `CreateOrganizationResult`, `LeafletDocument` |
-| `@hypercerts-org/sdk/social`   | `followAccount`, `followEntity`, `like`, `repost`, `unfollowAccount`, `unfollowEntity`, `unlike`, `unrepost`, the `Write*` errors, `AmbiguousMatchError`, `UndoResult` and input types                                          |
+| `@hypercerts-org/sdk/social`   | `followAccount`, `followEntity`, `like`, `repost`, `unfollowAccount`, `unfollowEntity`, `unlike`, `unrepost`, the `Write*` errors and input types                                                                                                                        |
 | `@hypercerts-org/sdk/blob`     | `uploadBlob`                                                                                                                                                                                           |
 | `@hypercerts-org/sdk/collection` | `createCollection`, `createActivityInCollection`, `RecordAlreadyExistsError`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types                                                         |
 
@@ -77,7 +77,7 @@ Things to know before opening a reference:
 - `createProfile` needs an OAuth scope with both `create` and `update` on `app.certified.actor.profile`. With only `create` it fails with `WriteRejectedError` (403).
 - `location: { uri }` inside a location is a link to external data; a whole location given as `{ uri }` in `createActivity` reuses an existing record.
 - `createOrganization` takes the name, avatar, banner and website in `profileIfMissing`, not in `organization`, and an existing location as `{ uri }`, never a bare string.
-- Social functions take the **target** of the action: `{ targetDid }` for an account, `{ targetUri }` (a full record URI) for a record. Undo functions return `UndoResult` (`deleted` or `not-found`), not `void`, and throw `AmbiguousMatchError` (with `matches`) when several records match.
+- Social create functions take the **target**: `{ targetDid }` for an account, `{ targetUri }` (a full record URI) for a record. Undo functions (`unlike`, `unrepost`, `unfollowAccount`, `unfollowEntity`) take the **URI of your own like, repost or follow record** (`likeUri`, `repostUri`, `followUri`), not the target's, and return `void`. Keep the `uri` the create function returned.
 
 ## 5. Images and files
 
@@ -110,15 +110,15 @@ Uploads happen before the write and are not rolled back, so a call that throws c
 
 Order of work: validate input → read `{ uri }` records → upload blobs → validate against lexicons → one write. The SDK never retries.
 
-The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor`, `/location`, `/tag`, `/feature`, `/collection`, `/organization` and `/social` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order: for `createActivity` the Activity is last; for `createActivityInCollection` the Collection is last and the Activity is just before it; for `createCollection` the Collection is last, after the records it points at; for `createOrganization` the organization is last. `instanceof WriteError` catches all three.
+The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor`, `/location`, `/tag`, `/feature`, `/collection`, `/organization` and `/social` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order (an undo function called without `cid` has an empty `attempted`; its message names the URI): for `createActivity` the Activity is last; for `createActivityInCollection` the Collection is last and the Activity is just before it; for `createCollection` the Collection is last, after the records it points at; for `createOrganization` the organization is last. `instanceof WriteError` catches all three.
 
 | Error                      | Meaning                                                                                        | What to do                                    |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | `TypeError`                | Bad input. The message names the field (e.g. `contributors[1].weight`). Nothing written.       | Fix the input.                                |
 | `Error`                    | Not authenticated, a `{ uri }` record could not be read, or an upload failed. Nothing written. | Fix auth or the URI, then retry.              |
-| `WriteRejectedError`       | PDS answered 4xx. Nothing created or changed. `status`, `code`.                                | Safe to fix and retry. `InvalidSwap`: see [Concurrent changes](#concurrent-changes-invalidswap); undo functions also return it when the record changed after it was read, and calling again is safe. |
+| `WriteRejectedError`       | PDS answered 4xx. Nothing created or changed. `status`, `code`.                                | Safe to fix and retry. `InvalidSwap`: see [Concurrent changes](#concurrent-changes-invalidswap); undo functions throw it with `InvalidSwap` when you passed a `cid` the record no longer has; it was not deleted. |
 | `RecordAlreadyExistsError` | A key you chose is taken (a `WriteRejectedError`). `uri` names the record. Nothing written.    | Use it as `{ uri }`, or choose another key.   |
-| `WriteOutcomeUnknownError` | Network error, timeout or 5xx. The records may exist. `attempted` lists every URI.             | Check before retrying.                        |
+| `WriteOutcomeUnknownError` | Network error, timeout or 5xx. The records may exist. `attempted` lists every URI (empty for an undo without `cid`; the message names the URI). | Check before retrying. Undo functions: calling again is safe. |
 | `WriteResultMismatchError` | Created, but the PDS reported other URIs/CIDs (`reported` vs `attempted`).                     | Do not retry. Log it and inspect the records. |
 
 ```ts

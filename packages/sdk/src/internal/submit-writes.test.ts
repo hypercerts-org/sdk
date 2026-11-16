@@ -217,4 +217,41 @@ describe("submitDelete", () => {
     expect(error.attempted).toEqual([ref]);
     expect(error.message).toContain(`whether ${ref.uri} was deleted`);
   });
+
+  it("explains an InvalidSwap by the CID it was given, and says how to delete without it", async () => {
+    const { context } = fakeRepo({
+      deleteRecord: () => json(400, { error: "InvalidSwap", message: "Record CID did not match" }),
+    });
+
+    const error = await submitDelete(context, DID, ref, "op").catch((e) => e);
+
+    expect(error).toBeInstanceOf(WriteRejectedError);
+    expect(error).toMatchObject({ status: 400, code: "InvalidSwap", attempted: [ref] });
+    expect(error.message).toContain(`no longer has the version (CID ${ref.cid})`);
+    expect(error.message).toContain("without `cid`");
+  });
+
+  it("lists nothing as attempted, and words a rejection and an unknown outcome without a CID", async () => {
+    const rejected = fakeRepo({
+      deleteRecord: () => json(403, { error: "Forbidden", message: "no delete permission" }),
+    });
+    const unknown = fakeRepo({
+      deleteRecord: () => json(500, { error: "InternalServerError", message: "boom" }),
+    });
+
+    const rejection = await submitDelete(rejected.context, DID, { uri: ref.uri }, "op").catch(
+      (e) => e,
+    );
+    const outcome = await submitDelete(unknown.context, DID, { uri: ref.uri }, "op").catch(
+      (e) => e,
+    );
+
+    expect(rejection).toBeInstanceOf(WriteRejectedError);
+    expect(rejection.attempted).toEqual([]);
+    expect(rejection.message).toContain(`${ref.uri} was not deleted`);
+    expect(outcome).toBeInstanceOf(WriteOutcomeUnknownError);
+    expect(outcome.attempted).toEqual([]);
+    expect(outcome.message).toContain(`whether ${ref.uri} was deleted`);
+    expect(outcome.message).toContain("calling op again is safe");
+  });
 });
