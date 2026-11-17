@@ -32,7 +32,7 @@ import { createAttachment } from "@hypercerts-org/sdk/context";
 
 const attachment = await createAttachment(context, {
   title: "Field survey, June 2026",
-  contentType: "evidence", // update | report | audit | evidence | testimonial | methodology, others allowed
+  contentType: "evidence", // update | comment | report | audit | evidence | testimonial | methodology, others allowed
   subjects: [{ uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" }],
   content: [reportFile, "https://example.org/survey/2026-06"], // uploaded, stored as a URL
   tags: [

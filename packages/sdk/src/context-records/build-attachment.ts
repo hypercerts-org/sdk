@@ -30,8 +30,8 @@ export interface AttachmentInput {
    */
   subjects?: readonly ExistingRecord[] | undefined;
   /**
-   * The kind of attachment, for example `update`, `report`, `audit`, `evidence`, `testimonial` or
-   * `methodology`. Other values are accepted. At most 64 characters.
+   * The kind of attachment, for example `update`, `comment`, `report`, `audit`, `evidence`,
+   * `testimonial` or `methodology`. Other values are accepted. At most 64 characters.
    */
   contentType?: string | undefined;
   /**
