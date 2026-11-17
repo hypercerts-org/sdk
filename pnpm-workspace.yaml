@@ -6,5 +6,5 @@ allowBuilds:
 # Wait 4 days before installing a newly published version.
 minimumReleaseAge: 5760
 minimumReleaseAgeExclude:
-  - "@hypercerts-org/lexicon@2.0.1"
-  - "@hypercerts-org/lexicon@2.1.0"
+  # Our own package: no need to wait for new releases to mature.
+  - "@hypercerts-org/lexicon"
