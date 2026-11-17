@@ -1,7 +1,7 @@
 import { l } from "@atproto/lex";
 import * as strongRef from "@hypercerts-org/lexicon/com/atproto/repo/strongRef";
 import * as activity from "@hypercerts-org/lexicon/org/hypercerts/claim/activity";
-import * as defs from "@hypercerts-org/lexicon/org/hypercerts/defs";
+import type * as defs from "@hypercerts-org/lexicon/org/hypercerts/defs";
 import * as cel from "@hypercerts-org/lexicon/org/hypercerts/workscope/cel";
 import type { SDKContext } from "../context.js";
 import {
@@ -12,6 +12,12 @@ import {
 } from "../internal/build-context.js";
 import { describeValue } from "../internal/describe.js";
 import { blobOrUrl, compact, dateRange, strictObject, weightString } from "../internal/input.js";
+import {
+  type LeafletDocument,
+  longDescription,
+  longDescriptionValue,
+  planLongDescription,
+} from "../internal/long-description.js";
 import { mediaValue } from "../internal/media.js";
 import type { PreparedRecord } from "../internal/prepare-record.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
@@ -100,8 +106,17 @@ export interface ActivityInput {
   title: string;
   /** A summary for previews, at most 300 characters. */
   shortDescription: string;
-  /** A long description as plain text or Markdown. */
-  description?: string | undefined;
+  /**
+   * Rich-text annotations (mentions, links, hashtags) of `shortDescription`, as
+   * `app.bsky.richtext.facet` objects. Passed to the record as given; the lexicon validates them.
+   */
+  shortDescriptionFacets?: activity.Main["shortDescriptionFacets"];
+  /**
+   * A long description: plain text or Markdown, a {@link LeafletDocument}, or `{ uri }` of an
+   * existing record of any type, stored as a reference to it. A string and a document are stored
+   * inline, as they are (a document needs its `$type`). The SDK never creates a document record.
+   */
+  description?: string | LeafletDocument | ExistingRecord | undefined;
   /** Languages of the text fields as BCP-47 tags (up to three), for example `["en"]`. */
   langs?: readonly string[] | undefined;
   /**
@@ -174,12 +189,23 @@ const celWorkScope = strictObject({
   createdAt: l.optional(l.string()),
 });
 
+/**
+ * The schemas of the text fields of an Activity's input.
+ *
+ * Internal. A Project's default Activity copies these fields from the Project (see `createProject`),
+ * and reads them with the same schemas, so the copy is read the way an Activity's own input is.
+ */
+export const activityTextFields = {
+  title: l.string(),
+  shortDescription: l.string(),
+  shortDescriptionFacets: l.optional(l.array(l.unknown())),
+  description: l.optional(longDescription),
+  langs: l.optional(l.array(l.string())),
+};
+
 const activityInput = l.refine(
   strictObject({
-    title: l.string(),
-    shortDescription: l.string(),
-    description: l.optional(l.string()),
-    langs: l.optional(l.array(l.string())),
+    ...activityTextFields,
     image: l.optional(blobOrUrl),
     workScope: l.optional(l.unknown()),
     startDate: l.optional(l.string()),
@@ -209,6 +235,8 @@ type WorkScopePlan =
     };
 
 interface ActivityPlan {
+  /** The existing record of a `{ uri }` description. */
+  description: Slot | undefined;
   workScope: WorkScopePlan | undefined;
   rights: Slot | undefined;
   locations: Slot[];
@@ -219,6 +247,7 @@ interface ActivityPlan {
 // prefixes the field names in messages when the Activity is nested in a larger input.
 function planActivity(build: BuildContext, input: l.InferOutput<typeof activityInput>, at: string) {
   return {
+    description: planLongDescription(build, `${at}description`, input.description),
     workScope: planWorkScope(build, input.workScope, at),
     rights:
       input.rights === undefined
@@ -272,6 +301,7 @@ function planWorkScope(build: BuildContext, value: unknown, at: string): WorkSco
 // value is stored in the Activity and is no record, so it is left out.
 function supportingSlots(plan: ActivityPlan): Slot[] {
   return [
+    ...(plan.description ? [plan.description] : []),
     ...(plan.workScope?.kind === "cel" ? plan.workScope.usedTags : []),
     ...(plan.rights ? [plan.rights] : []),
     ...plan.locations,
@@ -286,6 +316,10 @@ function supportingSlots(plan: ActivityPlan): Slot[] {
  * contributor-information, contribution and work-scope tag records it needs, in one atomic write.
  *
  * @remarks
+ * Prefer {@link createProject} to publish work. An Activity on its own may not show up or work in
+ * other apps in the ecosystem; apps expect a Project (a Collection of type `project` that holds its
+ * Activities). Use `createActivity` when you need the Activity by itself.
+ *
  * Each supporting field takes one of:
  * - a new record's fields, to create it;
  * - `{ uri }` of an existing record of the right type, reused as it is;
@@ -300,7 +334,11 @@ function supportingSlots(plan: ActivityPlan): Slot[] {
  * Everything is created in one write: all the records exist afterwards, or none do. One write holds
  * at most 200 records, the Activity included. `createdAt` defaults to the time of the call.
  *
- * Not supported: `signatures`, `shortDescriptionFacets` and a non-string `description`.
+ * `description` is a string, a Leaflet document (with `$type: "pub.leaflet.pages.linearDocument"`),
+ * or `{ uri }` of an existing record of any type, stored as a strong reference to it (read once for
+ * its CID, never rewritten). `shortDescriptionFacets` is passed to the record as given.
+ *
+ * Not supported: the lexicon's `signatures`.
  *
  * Files (`Blob` or `File` values) are uploaded: the Activity's `image`, a new rights record's
  * `attachment`, a new contributor's `image` and a new location's `{ blob }`. Blobs are uploaded
@@ -535,10 +573,13 @@ function activityRecord(
   return compact({
     title: input.title,
     shortDescription: input.shortDescription,
+    shortDescriptionFacets: input.shortDescriptionFacets as
+      | ActivityInput["shortDescriptionFacets"]
+      | undefined,
     description:
       input.description === undefined
         ? undefined
-        : defs.descriptionString.build({ value: input.description }),
+        : longDescriptionValue(input.description, plan.description, refOf),
     langs: input.langs as l.LanguageString[] | undefined,
     image,
     workScope: plan.workScope && workScopeValue(plan.workScope, refOf),

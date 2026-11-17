@@ -103,8 +103,21 @@ export function assertFileAllowed(
 
 type PlaceholderBlobRef = { $type: "blob"; ref: Cid; mimeType: string; size: number };
 
-// The check runs the lexicon's own blob schema on the wrapper object for this kind.
-function assertWithinLimits(build: BuildContext, field: string, file: Blob, kind: BlobKind): void {
+/**
+ * Checks a file against the limits of a blob `kind` (see `BlobKind`) before it is uploaded, as
+ * `mediaValue` does.
+ *
+ * Internal. For a caller that must report a file the field cannot hold, under the name the caller
+ * used, before the file is uploaded for another field.
+ *
+ * Throws TypeError, naming `field`, for a file the lexicon does not allow.
+ */
+export function assertWithinLimits(
+  build: BuildContext,
+  field: string,
+  file: Blob,
+  kind: BlobKind,
+): void {
   const { schema, property, label } = WRAPPERS[kind];
   assertFileAllowed(build, field, file, `stored as a ${label}`, (ref) =>
     schema.safeValidate({ [property]: ref }),

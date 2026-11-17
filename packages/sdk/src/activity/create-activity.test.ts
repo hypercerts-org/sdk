@@ -6,6 +6,7 @@ import { fakeRepo, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
 import {
   type ActivityInput,
   createActivity,
+  type LeafletDocument,
   WriteOutcomeUnknownError,
   WriteRejectedError,
   WriteResultMismatchError,
@@ -18,6 +19,7 @@ const CONTRIBUTOR_INFORMATION = "org.hypercerts.claim.contributorInformation";
 const CONTRIBUTION = "org.hypercerts.claim.contribution";
 const WORKSCOPE_TAG = "org.hypercerts.workscope.tag";
 const CEL = "org.hypercerts.workscope.cel";
+const LEAFLET = "pub.leaflet.pages.linearDocument";
 
 const png = () => new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
 const uriOf = (collection: string) => `at://${DID}/${collection}/3k2a4b5c6d7e8`;
@@ -427,6 +429,73 @@ describe("createActivity", () => {
     );
 
     expect(requests).toEqual([]);
+  });
+});
+
+describe("createActivity description and facets", () => {
+  const document: LeafletDocument = { $type: LEAFLET, blocks: [] };
+  const documentUri = uriOf("pub.leaflet.document");
+
+  it.each<[string, ActivityInput["description"], object, number]>([
+    [
+      "a string inline",
+      "## Goals\nRestore crane habitat.",
+      { $type: "org.hypercerts.defs#descriptionString", value: "## Goals\nRestore crane habitat." },
+      0,
+    ],
+    ["a Leaflet document inline, as it is", document, document, 0],
+    [
+      "{ uri } of a record of any type as a typed strong reference, read once",
+      { uri: documentUri },
+      { $type: "com.atproto.repo.strongRef", uri: documentUri, cid: CID },
+      1,
+    ],
+  ])("stores a description given as %s", async (_, description, stored, reads) => {
+    const { context, requests, creates } = fakeRepo({ existing: { [documentUri]: CID } });
+
+    await createActivity(context, { ...base, description });
+
+    expect(writeOf(creates[0] ?? [], ACTIVITY).value.description).toEqual(stored);
+    expect(methods(requests).filter((method) => method.endsWith("getRecord"))).toHaveLength(reads);
+  });
+
+  it("passes shortDescriptionFacets to the record as given", async () => {
+    const { context, creates } = fakeRepo();
+    const shortDescriptionFacets = [
+      {
+        index: { byteStart: 0, byteEnd: 8 },
+        features: [
+          { $type: "app.bsky.richtext.facet#link", uri: "https://example.org/trees" } as const,
+        ],
+      },
+    ];
+
+    await createActivity(context, { ...base, shortDescriptionFacets });
+
+    expect(writeOf(creates[0] ?? [], ACTIVITY).value.shortDescriptionFacets).toEqual(
+      shortDescriptionFacets,
+    );
+  });
+
+  it.each<[string, Record<string, unknown>, RegExp]>([
+    [
+      "a description that is none of text, a Leaflet document or { uri }",
+      { ...base, description: { blocks: [] } },
+      /invalid input: must be a string, \{ uri \} of an existing record, or a Leaflet document.* at \$\.description/,
+    ],
+    [
+      "a description URI of a handle",
+      { ...base, description: { uri: `at://alice.example.com/${LOCATION}/3k2a4b5c6d7e8` } },
+      /description must use a DID as the authority/,
+    ],
+  ])("sends nothing for %s", async (_, input, message) => {
+    const { context, requests } = fakeRepo();
+
+    await expect(createActivity(context, input as unknown as ActivityInput)).rejects.toThrow(
+      message,
+    );
+
+    expect(requests).toHaveLength(0);
   });
 });
 

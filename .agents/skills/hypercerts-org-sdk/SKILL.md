@@ -12,6 +12,8 @@ The SDK turns plain input objects into validated `org.hypercerts.*` / `app.certi
 
 The TSDoc on each export is the full reference. Read it in `node_modules/@hypercerts-org/sdk/dist/**/*.d.ts` before guessing a field. Each domain has its own reference file with examples and field tables (see [Domains](#4-domains)).
 
+> To publish work, create a project with `createProject`. An Activity on its own may not show up or work in other apps in the ecosystem; apps expect a project (a collection with type `project` that holds its activities). That is why `createProject` exists.
+
 ## 1. Install
 
 ```sh
@@ -67,6 +69,7 @@ export const context = createSDKContext({
 | `@hypercerts-org/sdk/context`  | `createAttachment`, `createMeasurement`, `createEvaluation`, `createAcknowledgement`, `RecordAlreadyExistsError`, the same `Write*` errors, input/result types |
 | `@hypercerts-org/sdk/blob`     | `uploadBlob`                                                                                                                                                                                           |
 | `@hypercerts-org/sdk/collection` | `createCollection`, `createActivityInCollection`, `RecordAlreadyExistsError`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types                                                         |
+| `@hypercerts-org/sdk/project`  | `createProject`, `RecordAlreadyExistsError`, the same `Write*` errors, `ProjectInput`, `ProjectActivityInput`, `CreateProjectResult`, `ProjectActivityResult`                                           |
 
 The root entry does not re-export operations. `import { createActivity } from "@hypercerts-org/sdk"` fails.
 
@@ -82,6 +85,7 @@ Operations are grouped by domain, each under its own subpath. Read the domain's 
 | Tag (`org.hypercerts.vocab.tag`, `org.hypercerts.workscope.tag`) | `@hypercerts-org/sdk/tag` | [references/tag.md](references/tag.md) |
 | Feature (`org.hypercerts.entity.feature`, with its tags and locations) | `@hypercerts-org/sdk/feature` | [references/feature.md](references/feature.md) |
 | Collection (create a Collection with items; add a new Activity to an existing Collection) | `@hypercerts-org/sdk/collection` | [references/collection.md](references/collection.md) |
+| Project (a Collection of type `project` with its Activities, or one default Activity). Use it to publish work: an Activity on its own may not show up or work in other apps | `@hypercerts-org/sdk/project` | [references/project.md](references/project.md) |
 | Organization (`app.certified.actor.organization`, with its profile and locations) | `@hypercerts-org/sdk/organization` | [references/organization.md](references/organization.md) |
 | Social (follow accounts and records, like, repost, and undo them) | `@hypercerts-org/sdk/social` | [references/social.md](references/social.md) |
 | Badge (`app.certified.badge.*`: definitions, awards to an account or record, responses) | `@hypercerts-org/sdk/badge` | [references/badge.md](references/badge.md) |
@@ -127,7 +131,7 @@ Uploads happen before the write and are not rolled back, so a call that throws c
 
 Order of work: validate input → read `{ uri }` records → upload blobs → validate against lexicons → one write. The SDK never retries.
 
-The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor`, `/badge`, `/location`, `/tag`, `/feature`, `/collection`, `/context`, `/organization` and `/social` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order (an undo function called without `cid` has an empty `attempted`; its message names the URI): for `createActivity` the Activity is last; for `createActivityInCollection` the Collection is last and the Activity is just before it; for `createCollection` the Collection is last, after the records it points at; for `awardBadge` the award is last, after a new definition; for `createOrganization` the organization is last. `instanceof WriteError` catches all three.
+The three write errors are exported from `@hypercerts-org/sdk/activity`, `@hypercerts-org/sdk/actor`, `@hypercerts-org/sdk/badge`, `@hypercerts-org/sdk/location`, `@hypercerts-org/sdk/tag`, `@hypercerts-org/sdk/feature`, `@hypercerts-org/sdk/collection`, `@hypercerts-org/sdk/context`, `@hypercerts-org/sdk/organization`, `@hypercerts-org/sdk/project` and `@hypercerts-org/sdk/social` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order (an undo function called without `cid` has an empty `attempted`; its message names the URI): for `createActivity` the Activity is last; for `createActivityInCollection` the Collection is last and the Activity is just before it; for `createCollection` the Collection is last, after the records it points at; for `createProject` the Project is last, after its Activities and their records; for `awardBadge` the award is last, after a new definition; for `createOrganization` the organization is last. `instanceof WriteError` catches all three.
 
 | Error                      | Meaning                                                                                        | What to do                                    |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
@@ -200,8 +204,9 @@ try {
 - `createSDKContext({ client: session })` or passing an `@atproto/api` `Agent` throws. Wrap it: `new Client(session)`.
 - `didResolver: oauthClient` throws. Pass `oauthClient.identityResolver`.
 - Passing an `uploadBlob` result as `image` throws. Pass the `Blob`/`File`.
-- Retrying blindly after `WriteOutcomeUnknownError` duplicates every record under new keys. The exception is a call whose records all have a fixed key and are only created if absent: `createProfile` and `createVocabularyTag`. `createOrganization` is also safe to repeat: the organization exists at most once, so a second call creates it or throws `OrganizationAlreadyExistsError`. Undo functions are safe to repeat too. `createFeature`, `createCollection`, `createWorkScopeTag`, `createBadgeDefinition`, `awardBadge`, `respondToBadgeAward`, `followAccount`, `followEntity`, `like` and `repost` are not safe to repeat.
+- Retrying blindly after `WriteOutcomeUnknownError` duplicates every record under new keys. The exception is a call whose records all have a fixed key and are only created if absent: `createProfile` and `createVocabularyTag`. `createOrganization` is also safe to repeat: the organization exists at most once, so a second call creates it or throws `OrganizationAlreadyExistsError`. Undo functions are safe to repeat too. `createFeature`, `createCollection`, `createProject`, `createWorkScopeTag`, `createBadgeDefinition`, `awardBadge`, `respondToBadgeAward`, `followAccount`, `followEntity`, `like` and `repost` are not safe to repeat.
 - An item of `createCollection` is `{ activity }`, `{ feature }`, `{ collection }` or `{ uri }`, never a bare Activity input; `{ uri }` must be an Activity, Feature or Collection.
+- An entry of `createProject`'s `activities` is `{ activity }` or `{ uri }` (an Activity), never a bare Activity input, and a Project takes no `type` or `items`. Without `activities` it creates one default Activity, which needs a `shortDescription` and copies the Project's `title`, `shortDescription`, `shortDescriptionFacets`, `description`, `langs` and `banner` (as `image`) but not its `location`, `tags`, `avatar` or `createdAt`; see [references/project.md](references/project.md#the-default-activity).
 - A vocabulary tag's key is `<category>.<key>` exactly as you pass it. A dot in either part throws a `TypeError`; the SDK does not normalise the parts.
 - A work-scope tag URI is not a vocabulary tag URI: each field accepts one collection, and a `{ uri }` of another throws a `TypeError`.
 - One write holds at most 200 records on the reference PDS. A larger call throws a `TypeError` before anything is written; the SDK does not split it. Create some records first and pass their URIs.
@@ -210,7 +215,6 @@ try {
 
 ## Verify
 
-1. Imports come only from `@hypercerts-org/sdk`, `.../activity`, `.../actor`, `.../badge`, `.../collection`, `.../feature`, `.../location`, `.../organization`, `.../social`, `.../tag` or `.../blob`.
-1. Imports come only from `@hypercerts-org/sdk`, `.../activity`, `.../actor`, `.../badge`, `.../collection`, `.../context`, `.../feature`, `.../location`, `.../organization`, `.../social`, `.../tag` or `.../blob`.
+1. Imports come only from `@hypercerts-org/sdk`, `@hypercerts-org/sdk/activity`, `@hypercerts-org/sdk/actor`, `@hypercerts-org/sdk/badge`, `@hypercerts-org/sdk/collection`, `@hypercerts-org/sdk/context`, `@hypercerts-org/sdk/feature`, `@hypercerts-org/sdk/location`, `@hypercerts-org/sdk/organization`, `@hypercerts-org/sdk/project`, `@hypercerts-org/sdk/social`, `@hypercerts-org/sdk/tag` or `@hypercerts-org/sdk/blob`. These are package subpaths, not file paths.
 2. `tsc --noEmit` passes. The input types catch wrong field names and shapes.
 3. `com.atproto.repo.getRecord` on each returned `uri` returns the record, and any references it holds match the URIs and CIDs the SDK returned.

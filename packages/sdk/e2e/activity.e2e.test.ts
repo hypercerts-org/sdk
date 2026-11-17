@@ -105,6 +105,33 @@ describe("createActivity with new records", () => {
 
 const byUri = (a: Ref, b: Ref) => a.uri.localeCompare(b.uri);
 
+describe("createActivity with a long description", () => {
+  it("stores a description given as { uri } as a strong reference with the CID that was read, and the facets as given", async () => {
+    const target = await createActivity(user.context, base());
+    const shortDescriptionFacets = [
+      {
+        index: { byteStart: 0, byteEnd: 8 },
+        features: [
+          { $type: "app.bsky.richtext.facet#link", uri: "https://example.org/trees" } as const,
+        ],
+      },
+    ];
+
+    const result = await createActivity(user.context, {
+      ...base(),
+      shortDescriptionFacets,
+      description: { uri: target.uri },
+    });
+
+    const stored = await expectStored(user.client, result);
+    expect(stored).toMatchObject({
+      shortDescriptionFacets,
+      description: { $type: "com.atproto.repo.strongRef", ...refOnly(target) },
+    });
+    await expectReferencesResolve(user.client, stored);
+  });
+});
+
 describe("createActivity with a CEL work scope", () => {
   it("stores the expression as written with new and existing work-scope tags, and every reference resolves", async () => {
     const existing = await createWorkScopeTag(user.context, {

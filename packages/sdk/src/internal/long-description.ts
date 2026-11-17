@@ -1,8 +1,16 @@
 import { l } from "@atproto/lex";
+import * as strongRef from "@hypercerts-org/lexicon/com/atproto/repo/strongRef";
 import * as defs from "@hypercerts-org/lexicon/org/hypercerts/defs";
 import * as linearDocument from "@hypercerts-org/lexicon/pub/leaflet/pages/linearDocument";
+import { type BuildContext, parseInput } from "./build-context.js";
 import type { FieldTransform, ReferenceField } from "./record-kind.js";
-import { type ExistingRecord, isExistingRecord } from "./slots.js";
+import {
+  type ExistingRecord,
+  isExistingRecord,
+  type ReferenceOf,
+  type Slot,
+  toExistingSlot,
+} from "./slots.js";
 
 /**
  * A Leaflet document (`pub.leaflet.pages.linearDocument`): rich text in blocks. Passed to the record
@@ -50,3 +58,41 @@ export const longDescriptionReference: ReferenceField = {
   when: isExistingRecord,
   typed: true,
 };
+
+/**
+ * Plans the `description` of a record that is built by hand instead of with a `recordKind`: the
+ * slot of the existing record when the value is `{ uri }`, `undefined` for a string, a Leaflet
+ * document or no value, which the record stores itself.
+ *
+ * Internal. `field` names the value in messages. Pair it with `longDescriptionValue`.
+ *
+ * Throws TypeError, naming `field`, for a value that is none of the three.
+ */
+export function planLongDescription(
+  build: BuildContext,
+  field: string,
+  value: unknown,
+): Slot | undefined {
+  if (value === undefined) return undefined;
+  const description = parseInput(build, field, longDescription, value);
+  return isExistingRecord(description) ? toExistingSlot(build, field, description) : undefined;
+}
+
+/**
+ * The value a record stores for a description planned by `planLongDescription`: `descriptionString`
+ * for a string, the strong reference (stored with its `$type`, because the lexicon field is a union
+ * that has it as a member) for `{ uri }`, and a Leaflet document as it is.
+ *
+ * Internal. `description` must have passed `longDescription`, and `existing` is the slot
+ * `planLongDescription` returned for it.
+ */
+export function longDescriptionValue(
+  description: unknown,
+  existing: Slot | undefined,
+  refOf: ReferenceOf,
+) {
+  if (existing !== undefined) return strongRef.main.build(refOf(existing));
+  return typeof description === "string"
+    ? defs.descriptionString.build({ value: description })
+    : (description as LeafletDocument);
+}

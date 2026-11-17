@@ -1,8 +1,6 @@
 import { l } from "@atproto/lex";
-import * as strongRef from "@hypercerts-org/lexicon/com/atproto/repo/strongRef";
 import * as activity from "@hypercerts-org/lexicon/org/hypercerts/claim/activity";
 import * as collection from "@hypercerts-org/lexicon/org/hypercerts/collection";
-import * as defs from "@hypercerts-org/lexicon/org/hypercerts/defs";
 import * as feature from "@hypercerts-org/lexicon/org/hypercerts/entity/feature";
 import {
   type ActivityInput,
@@ -25,14 +23,13 @@ import {
   strictObject,
   weightString,
 } from "../internal/input.js";
-import { longDescription } from "../internal/long-description.js";
+import { longDescriptionValue, planLongDescription } from "../internal/long-description.js";
 import { mediaTransform } from "../internal/media.js";
 import type { PreparedRecord } from "../internal/prepare-record.js";
 import { buildRecord, recordKind } from "../internal/record-kind.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import {
   type ExistingRecord,
-  isExistingRecord,
   type NewSlot,
   planNew,
   type ReferenceOf,
@@ -298,7 +295,7 @@ function planFields(build: BuildContext, field: string, value: unknown): Collect
   const input = parseInput(build, field, collectionKind.input, value);
   return {
     input,
-    description: planDescription(build, `${field}.description`, input.description),
+    description: planLongDescription(build, `${field}.description`, input.description),
     location:
       input.location === undefined
         ? undefined
@@ -318,7 +315,7 @@ function storedFields(
   return {
     ...input,
     ...compact({
-      description: descriptionValue(input.description, description, refOf),
+      description: longDescriptionValue(input.description, description, refOf),
       location: location && refOf(location),
       tags: tags?.map(refOf),
       items: items?.map((item) =>
@@ -326,22 +323,6 @@ function storedFields(
       ),
     }),
   };
-}
-
-// Only `{ uri }` is a record. A string and a Leaflet document are stored in the Collection itself.
-function planDescription(build: BuildContext, field: string, value: unknown): Slot | undefined {
-  if (value === undefined) return undefined;
-  const description = parseInput(build, field, longDescription, value);
-  return isExistingRecord(description) ? toExistingSlot(build, field, description) : undefined;
-}
-
-// The union of the lexicon's `description` has the strong reference as a member, so a reference is
-// stored with its `$type`.
-function descriptionValue(description: unknown, existing: Slot | undefined, refOf: ReferenceOf) {
-  if (existing !== undefined) return strongRef.main.build(refOf(existing));
-  return typeof description === "string"
-    ? defs.descriptionString.build({ value: description })
-    : description;
 }
 
 function planItem(build: BuildContext, field: string, value: unknown): PlannedItem {

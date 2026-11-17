@@ -4,6 +4,8 @@ Read [../SKILL.md](../SKILL.md) first for setup and error handling, [activity.md
 
 Two operations: `createCollection` creates a **new** Collection with its items; `createActivityInCollection` adds a new Activity to a Collection that **already exists**.
 
+For `type: "project"`, use `createProject` ([project.md](project.md)) instead: `createCollection` creates a Project with no Activity, and `createProject` guarantees it has one. To publish work, create a project with `createProject`: an Activity on its own may not show up or work in other apps in the ecosystem, and apps expect a project that holds its activities.
+
 ## createCollection
 
 `createCollection(context, input)` creates an `org.hypercerts.collection` (TID key) and every new record in it, in one `applyWrites` commit: the Collection, new Activities (with their rights, locations, contributors, ...), Features, child Collections, locations and tags. All of it exists afterwards, or none does.
