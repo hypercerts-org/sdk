@@ -211,6 +211,6 @@ try {
 ## Verify
 
 1. Imports come only from `@hypercerts-org/sdk`, `.../activity`, `.../actor`, `.../badge`, `.../collection`, `.../feature`, `.../location`, `.../organization`, `.../social`, `.../tag` or `.../blob`.
-1. Imports come only from `@hypercerts-org/sdk`, `.../activity`, `.../actor`, `.../collection`, `.../context`, `.../feature`, `.../location`, `.../organization`, `.../social`, `.../tag` or `.../blob`.
+1. Imports come only from `@hypercerts-org/sdk`, `.../activity`, `.../actor`, `.../badge`, `.../collection`, `.../context`, `.../feature`, `.../location`, `.../organization`, `.../social`, `.../tag` or `.../blob`.
 2. `tsc --noEmit` passes. The input types catch wrong field names and shapes.
 3. `com.atproto.repo.getRecord` on each returned `uri` returns the record, and any references it holds match the URIs and CIDs the SDK returned.
