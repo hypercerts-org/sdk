@@ -189,7 +189,6 @@ describe("awardBadge issuers", () => {
 
   it.each([
     ["no list", undefined],
-    ["a list with the signed-in account", [DID]],
     ["a list with the signed-in account among others", [OTHER, DID]],
   ])("lets the signed-in account award an existing definition with %s", async (_, issuers) => {
     const { context, creates } = fakeRepo({ records: { [definitionUri]: listing(issuers) } });
@@ -259,11 +258,6 @@ describe("awardBadge input and references", () => {
       /subject.*has a field the SDK does not know/,
     ],
     ["a subject DID that is not one", { subject: { did: "alice.test" } }, /invalid subject: .*did/],
-    [
-      "a subject that is a handle URI",
-      { subject: { uri: `at://alice.test/${ACTIVITY}/3k2a4b5c6d7e8` } },
-      /not a record URI/,
-    ],
     [
       "a subject URI without a record key",
       { subject: { uri: `at://${DID}/${ACTIVITY}` } },

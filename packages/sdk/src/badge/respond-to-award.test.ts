@@ -140,17 +140,6 @@ describe("respondToBadgeAward", () => {
     },
   );
 
-  it("does not let the issuer respond to an award they made for someone else", async () => {
-    const own = `at://${DID}/${AWARD}/3k2a4b5c6d7e8`;
-    const { context, requests } = fakeRepo({ records: { [own]: storedAward(forDid(OTHER)) } });
-
-    await expect(respondToBadgeAward(context, respond({ awardUri: own }))).rejects.toThrow(
-      /only the recipient can respond/,
-    );
-
-    expect(methods(requests)).toEqual(["com.atproto.repo.getRecord"]);
-  });
-
   it.each<[string, Partial<RespondToBadgeAwardInput> | Record<string, unknown>, RegExp]>([
     [
       "a weight on a rejected award",

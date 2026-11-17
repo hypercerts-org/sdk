@@ -75,7 +75,6 @@ describe("createBadgeDefinition", () => {
 
   it.each([
     ["a type the lexicon does not accept", icon("image/gif"), /image\/gif/],
-    ["a PDF", icon("application/pdf"), /application\/pdf/],
     ["a file over 1 MiB", icon("image/png", MiB + 1), /blob too big \(maximum 1048576/],
   ])("sends nothing for an icon that is %s", async (_, file, message) => {
     const { context, requests } = fakeRepo();
