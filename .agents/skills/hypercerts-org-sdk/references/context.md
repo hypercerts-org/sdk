@@ -139,7 +139,7 @@ Not supported: `signatures`, `shortDescriptionFacets`, `commentFacets`, and a no
 
 ## Failures
 
-Input errors, unresolved or wrongly typed `{ uri }` records and files the lexicon would reject fail before anything is sent. See [Handle failures](../SKILL.md#6-handle-failures) for the write errors. After `WriteOutcomeUnknownError` the primary record is last in `attempted`, and calling again would create new records under new keys: check the URIs first.
+Input errors, unresolved or wrongly typed `{ uri }` records and files the lexicon would reject fail before any record is written. Existing `{ uri }` records are read first (so a `getRecord` request can precede the error), and files are uploaded only after those reads succeed. See [Handle failures](../SKILL.md#6-handle-failures) for the write errors. After `WriteOutcomeUnknownError` the primary record is last in `attempted`, and calling again would create new records under new keys: check the URIs first.
 
 Files (`content`, a new tag's `referenceDocument`, a new location's `{ blob }`) are uploaded before the write and are not rolled back if it fails; see [Uploads are not part of the atomic write](../SKILL.md#uploads-are-not-part-of-the-atomic-write).
 
