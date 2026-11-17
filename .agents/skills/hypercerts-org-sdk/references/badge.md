@@ -21,7 +21,7 @@ const definition = await createBadgeDefinition(context, {
 ```
 
 - `allowedIssuers`: omitted means **anyone** may award the badge; `[]` means **no one** may. You do not have to be on the list to create the definition, only to award it.
-- `icon` is a `Blob`/`File`, not a URL and not an `uploadBlob` result. A type or size the lexicon refuses throws `TypeError` before anything is uploaded.
+- `icon` is a `Blob`/`File`, not a URL and not an `uploadBlob` result. A type or size the lexicon refuses throws `TypeError` before anything is uploaded. A `Blob` with an empty `type` is not checked by the SDK: `uploadBlob` refuses it, and the failure is an `Error` ("could not upload …"), not a `TypeError`. Nothing is written either way.
 - Nothing is deduplicated: two calls create two definitions.
 
 ## awardBadge
