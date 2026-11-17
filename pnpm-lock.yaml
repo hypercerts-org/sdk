@@ -210,8 +210,8 @@ importers:
         specifier: 0.4.4
         version: 0.4.4
       '@hypercerts-org/lexicon':
-        specifier: 2.0.1
-        version: 2.0.1(@atproto/lex@0.4.4)
+        specifier: 2.1.0
+        version: 2.1.0(@atproto/lex@0.4.4)
 
 packages:
 
@@ -487,8 +487,8 @@ packages:
     resolution: {integrity: sha512-dlT1m5e/0yUL0kRNcQn7yGLVThkgbB0Ga/1AmfDDC/8ik6AIiSf2QLQO2zPYvefsHP0aFgxO93cVLCCfDp7kzQ==}
     engines: {node: '>= 20.12.0'}
 
-  '@hypercerts-org/lexicon@2.0.1':
-    resolution: {integrity: sha512-o0k1eNzc3Eta4FGYN6+8xngSu82yig8sYAT3QBqRtBO4wIQPfqkAWteAZDnz9hHtowj8wG5uZ4kvGvWhnjRiVw==}
+  '@hypercerts-org/lexicon@2.1.0':
+    resolution: {integrity: sha512-FC23XtWTCbjga85QWgramyDUpC0vPwNtDvzakxBrT+RDq2YNImtuH/DbIrLgA8jLCpdh4/LM2H/76xDUzglKqg==}
     engines: {node: '>=22'}
     peerDependencies:
       '@atproto/lex': ^0.4.2
@@ -1797,7 +1797,7 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
 
-  '@hypercerts-org/lexicon@2.0.1(@atproto/lex@0.4.4)':
+  '@hypercerts-org/lexicon@2.1.0(@atproto/lex@0.4.4)':
     dependencies:
       '@atproto/lex': 0.4.4
       '@atproto/lexicon': 0.6.2

@@ -7,3 +7,4 @@ allowBuilds:
 minimumReleaseAge: 5760
 minimumReleaseAgeExclude:
   - "@hypercerts-org/lexicon@2.0.1"
+  - "@hypercerts-org/lexicon@2.1.0"
