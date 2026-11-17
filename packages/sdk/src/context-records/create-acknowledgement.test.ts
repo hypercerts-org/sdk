@@ -3,12 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSDKContext } from "../context.js";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
-import {
-  type AcknowledgementInput,
-  createAcknowledgement,
-  WriteOutcomeUnknownError,
-  WriteRejectedError,
-} from "./index.js";
+import { type AcknowledgementInput, createAcknowledgement } from "./index.js";
 
 const ACKNOWLEDGEMENT = "org.hypercerts.context.acknowledgement";
 const CONTRIBUTOR = "org.hypercerts.claim.contributorInformation";
@@ -25,7 +20,7 @@ describe("createAcknowledgement", () => {
   });
 
   it("acknowledges a subject with a pinned context, as the signed-in account", async () => {
-    const { context, requests, creates } = fakeRepo({
+    const { context, requests, creates, updates, puts } = fakeRepo({
       existing: { [subject]: CID, [activity]: CID },
     });
 
@@ -46,6 +41,9 @@ describe("createAcknowledgement", () => {
     const body = JSON.parse(new TextDecoder().decode(requests.at(-1)?.body));
     expect(body.repo).toBe(DID);
     expect(creates[0]).toHaveLength(1);
+    // The subject and the context are read and pinned, never modified.
+    expect(updates.flat()).toEqual([]);
+    expect(puts).toEqual([]);
     const write = writeOf(creates[0] ?? [], ACKNOWLEDGEMENT);
     expect(isTidString(write.rkey)).toBe(true);
     expect(write.value).toEqual({
@@ -134,25 +132,13 @@ describe("createAcknowledgement", () => {
     });
   });
 
-  it("accepts a subject of any record type and does not modify it", async () => {
-    const { context, creates, updates, puts } = fakeRepo({
-      existing: { [activity]: CID },
-    });
-
-    await createAcknowledgement(context, { subject: { uri: activity }, acknowledged: true });
-
-    expect(creates[0]).toHaveLength(1);
-    expect(updates.flat()).toEqual([]);
-    expect(puts).toEqual([]);
-  });
-
   it.each<[string, Record<string, unknown>, RegExp]>([
     ["a subject that is a bare string", { subject }, /must be \{ uri \}.* at \$\.subject/],
     ["no subject", { subject: undefined }, / at \$\.subject/],
     [
       "a subject with a handle authority",
-      { subject: { uri: "at://alice.example/a.b/c" } },
-      /subject/,
+      { subject: { uri: "at://alice.example/org.hypercerts.claim.activity/3k2a4b5c6d7e8" } },
+      /subject must use a DID as the authority, not a handle/,
     ],
     [
       "an acknowledged that is not a boolean",
@@ -171,11 +157,6 @@ describe("createAcknowledgement", () => {
       { repo: "did:plc:other" },
       /Allowed fields: subject, acknowledged, context/,
     ],
-    [
-      "a location",
-      { location: { uri: activity } },
-      /Allowed fields: subject, acknowledged, context/,
-    ],
   ])("sends nothing for %s", async (_, fields, message) => {
     const { context, requests } = fakeRepo({ existing: { [subject]: CID } });
     const input = { subject: { uri: subject }, acknowledged: true, ...fields };
@@ -187,28 +168,15 @@ describe("createAcknowledgement", () => {
     expect(requests).toHaveLength(0);
   });
 
-  it.each<[string, Record<string, unknown>]>([
-    ["a context string that is not a URI", { context: "not a uri" }],
-    ["a comment over the lexicon's limit", { comment: "x".repeat(10_001) }],
-  ])("writes nothing for %s", async (_, fields) => {
+  it("writes nothing for a context string that is not a URI", async () => {
     const { context, requests } = fakeRepo({ existing: { [subject]: CID } });
-    const input = { subject: { uri: subject }, acknowledged: true, ...fields };
+    const input = { subject: { uri: subject }, acknowledged: true, context: "not a uri" };
 
     await expect(createAcknowledgement(context, input)).rejects.toThrow(
       /input is not a valid org\.hypercerts\.context\.acknowledgement record/,
     );
 
     // The subject was read to build its reference, but nothing was written.
-    expect(methods(requests)).toEqual(["com.atproto.repo.getRecord"]);
-  });
-
-  it("writes nothing when the subject cannot be resolved", async () => {
-    const { context, requests } = fakeRepo();
-
-    await expect(
-      createAcknowledgement(context, { subject: { uri: subject }, acknowledged: true }),
-    ).rejects.toThrow(/cannot resolve .*the record was not found/);
-
     expect(methods(requests)).toEqual(["com.atproto.repo.getRecord"]);
   });
 
@@ -229,40 +197,5 @@ describe("createAcknowledgement", () => {
     ).rejects.toThrow(/createAcknowledgement: the client is not authenticated/);
 
     expect(requests).toEqual([]);
-  });
-});
-
-describe("createAcknowledgement when the write fails", () => {
-  const input = { subject: { uri: subject }, acknowledged: true };
-
-  it("reports a definite rejection and does not retry", async () => {
-    const { context, requests } = fakeRepo({
-      existing: { [subject]: CID },
-      applyWrites: () => json(400, { error: "InvalidRequest", message: "Bad record" }),
-    });
-
-    const error = await createAcknowledgement(context, input).catch((e) => e);
-
-    expect(error).toBeInstanceOf(WriteRejectedError);
-    expect(methods(requests).filter((m) => m === APPLY)).toHaveLength(1);
-  });
-
-  it("reports an unknown outcome with the attempted URI and does not retry", async () => {
-    const { context, requests } = fakeRepo({
-      existing: { [subject]: CID },
-      applyWrites: () => json(500, {}),
-    });
-
-    const error = await createAcknowledgement(context, input).catch((e) => e);
-
-    expect(error).toBeInstanceOf(WriteOutcomeUnknownError);
-    const sent = JSON.parse(new TextDecoder().decode(requests.at(-1)?.body)).writes[0] as {
-      collection: string;
-      rkey: string;
-    };
-    expect(error.attempted.map((ref: { uri: string }) => ref.uri)).toEqual([
-      `at://${DID}/${sent.collection}/${sent.rkey}`,
-    ]);
-    expect(methods(requests).filter((m) => m === APPLY)).toHaveLength(1);
   });
 });

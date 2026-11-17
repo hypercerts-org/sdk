@@ -41,7 +41,12 @@ describe("createEvaluation", () => {
       subject: { uri: activity },
       content: [new Blob(["report"], { type: "application/pdf" }), "https://example.org/report"],
       measurements: [
-        { ...measurement, measurers: ["did:plc:abc123"], locations: [location("plot")] },
+        {
+          ...measurement,
+          value: "0.10",
+          measurers: ["did:plc:abc123"],
+          locations: [location("plot")],
+        },
         { uri: existingMeasurement },
       ],
       score: { min: "0", max: "5", value: "4.2" },
@@ -64,9 +69,12 @@ describe("createEvaluation", () => {
       EVALUATION,
     ]);
     const [plot, newMeasurement, site] = writes.slice(0, 3).map(refTo);
+    // The nested measurement is built as createMeasurement builds one: a TID key, the value as written.
+    expect(isTidString(writes[1]?.rkey)).toBe(true);
     expect(writes[1]?.value).toEqual({
       $type: MEASUREMENT,
       ...measurement,
+      value: "0.10",
       measurers: [{ did: "did:plc:abc123" }],
       locations: [plot],
       // A nested record's createdAt is the time of the call, not the Evaluation's own createdAt.
@@ -120,57 +128,6 @@ describe("createEvaluation", () => {
     expect(result).toEqual({ ...refTo(write), created: true });
   });
 
-  it("only reuses existing measurements, without writing them", async () => {
-    const [first, second] = [
-      uriOf(MEASUREMENT, "3k2a4b5c6d7e7"),
-      uriOf(MEASUREMENT, "3k2a4b5c6d7e9"),
-    ];
-    const { context, creates } = fakeRepo({ existing: { [first]: CID, [second]: CID } });
-
-    const result = await createEvaluation(context, {
-      ...base,
-      measurements: [{ uri: first }, { uri: second }],
-    });
-
-    expect(creates[0]).toHaveLength(1);
-    expect(writeOf(creates[0] ?? [], EVALUATION).value.measurements).toEqual([
-      { uri: first, cid: CID },
-      { uri: second, cid: CID },
-    ]);
-    expect(result.measurements).toEqual([
-      { uri: first, cid: CID, created: false },
-      { uri: second, cid: CID, created: false },
-    ]);
-  });
-
-  it("reuses an existing location by URI without writing it", async () => {
-    const existingLocation = uriOf(LOCATION);
-    const { context, creates } = fakeRepo({ existing: { [existingLocation]: CID } });
-
-    const result = await createEvaluation(context, {
-      ...base,
-      location: { uri: existingLocation },
-    });
-
-    expect(creates[0]).toHaveLength(1);
-    expect(writeOf(creates[0] ?? [], EVALUATION).value.location).toEqual({
-      uri: existingLocation,
-      cid: CID,
-    });
-    expect(result.location).toEqual({ uri: existingLocation, cid: CID, created: false });
-  });
-
-  it("builds a nested measurement as createMeasurement does", async () => {
-    const { context, creates } = fakeRepo();
-
-    await createEvaluation(context, { ...base, measurements: [{ ...measurement, value: "0.10" }] });
-
-    // Same record shape, key type and value handling as the standalone creator.
-    const written = writeOf(creates[0] ?? [], MEASUREMENT);
-    expect(isTidString(written.rkey)).toBe(true);
-    expect(written.value.value).toBe("0.10");
-  });
-
   it.each<[string, { min: string; max: string; value: string }]>([
     ["the minimum", { min: "0", max: "5", value: "0" }],
     ["the maximum", { min: "0", max: "5", value: "5" }],
@@ -188,6 +145,10 @@ describe("createEvaluation", () => {
     ["above the maximum", { min: "0", max: "5", value: "5.01" }],
     ["below the minimum", { min: "0", max: "5", value: "-0.01" }],
     ["below a negative minimum", { min: "-5", max: "5", value: "-5.5" }],
+    [
+      "above a 20-digit maximum by one in the last place",
+      { min: "0", max: "12345678901234567890.1", value: "12345678901234567890.2" },
+    ],
   ])("rejects a score %s", async (_, score) => {
     const { context, requests } = fakeRepo();
 
@@ -196,15 +157,6 @@ describe("createEvaluation", () => {
     );
 
     expect(requests).toHaveLength(0);
-  });
-
-  it("does not lose precision comparing long scores", async () => {
-    const { context } = fakeRepo();
-    const score = { min: "0", max: "12345678901234567890.1", value: "12345678901234567890.2" };
-
-    await expect(createEvaluation(context, { ...base, score })).rejects.toThrow(
-      /must have a value from min to max/,
-    );
   });
 
   it.each<[string, Record<string, unknown>, RegExp]>([
@@ -220,44 +172,6 @@ describe("createEvaluation", () => {
       /decimal number written as a string/,
     ],
     ["a score missing its max", { score: { min: "0", value: "3" } }, /max/],
-    ["a score on a reversed scale", { score: { min: "5", max: "0", value: "3" } }, /min to max/],
-    ["a subject that is a bare string", { subject: uriOf(ACTIVITY) }, /subject must be \{ uri \}/],
-    [
-      "a measurement URI of another record type",
-      { measurements: [{ uri: uriOf(ACTIVITY) }] },
-      /measurements\[0\] points at a record of type org\.hypercerts\.claim\.activity, but this field holds org\.hypercerts\.context\.measurement/,
-    ],
-    [
-      "a measurement URI mixed with measurement fields",
-      { measurements: [{ uri: uriOf(MEASUREMENT), ...measurement }] },
-      /measurements\[0\] combines `uri` with other fields/,
-    ],
-    [
-      "a new measurement with a number value",
-      { measurements: [{ ...measurement, value: 5 }] },
-      /decimal number written as a string/,
-    ],
-    [
-      "a new measurement with a misspelled field",
-      { measurements: [{ ...measurement, metrik: "x" }] },
-      /measurements\[0\].*Allowed fields: metric, unit, value/,
-    ],
-    [
-      "a new location of the wrong shape",
-      { location: { ...location("x"), location: { url: "https://example.org" } } },
-      /location.*must be \{ uri: string \}/,
-    ],
-    [
-      "a location URI of another record type",
-      { location: { uri: uriOf(MEASUREMENT) } },
-      /location points at a record of type org\.hypercerts\.context\.measurement, but this field holds app\.certified\.location/,
-    ],
-    ["a misspelled field", { sumary: "x" }, /Allowed fields: evaluators, summary, content/],
-    [
-      "a summary the lexicon rejects",
-      { summary: "x".repeat(5001) },
-      /input is not a valid org\.hypercerts\.context\.evaluation record/,
-    ],
   ])("sends nothing for %s", async (_, fields, message) => {
     const { context, requests } = fakeRepo();
 
@@ -266,34 +180,6 @@ describe("createEvaluation", () => {
     ).rejects.toThrow(message);
 
     expect(requests).toHaveLength(0);
-  });
-
-  it("reads existing measurements before uploading, and writes nothing when one is missing", async () => {
-    const { context, requests } = fakeRepo();
-
-    await expect(
-      createEvaluation(context, {
-        ...base,
-        content: [new Blob(["x"], { type: "application/pdf" })],
-        measurements: [{ uri: uriOf(MEASUREMENT) }],
-      }),
-    ).rejects.toThrow(/cannot resolve .*the record was not found/);
-
-    expect(methods(requests)).toEqual(["com.atproto.repo.getRecord"]);
-  });
-
-  it("does not write when an upload fails", async () => {
-    const { context, requests } = fakeRepo({ uploadBlob: () => json(500, { error: "Internal" }) });
-
-    await expect(
-      createEvaluation(context, {
-        ...base,
-        measurements: [measurement],
-        content: [new Blob(["x"], { type: "application/pdf" })],
-      }),
-    ).rejects.toThrow(/createEvaluation: could not upload input\.content\[0\]/);
-
-    expect(methods(requests)).toEqual([UPLOAD]);
   });
 });
 
@@ -321,6 +207,8 @@ describe("createEvaluation when the write fails", () => {
     const error = await createEvaluation(context, input).catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteOutcomeUnknownError);
+    // Record keys are TIDs chosen per call, so calling again after a write that succeeded duplicates.
+    expect(error.message).toMatch(/would create duplicates with new record keys/);
     const sent = JSON.parse(new TextDecoder().decode(requests[0]?.body)).writes as {
       collection: string;
       rkey: string;

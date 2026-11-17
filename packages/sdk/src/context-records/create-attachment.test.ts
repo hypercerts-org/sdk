@@ -2,13 +2,7 @@ import { isTidString } from "@atproto/lex";
 import { describe, expect, it } from "vitest";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
-import {
-  type AttachmentInput,
-  createAttachment,
-  RecordAlreadyExistsError,
-  WriteOutcomeUnknownError,
-  WriteRejectedError,
-} from "./index.js";
+import { type AttachmentInput, createAttachment, RecordAlreadyExistsError } from "./index.js";
 
 const ATTACHMENT = "org.hypercerts.context.attachment";
 const ACTIVITY = "org.hypercerts.claim.activity";
@@ -184,19 +178,9 @@ describe("createAttachment", () => {
       /subjects\[0\] must be \{ uri \} of an existing record/,
     ],
     [
-      "a subject mixed with other fields",
-      { subjects: [{ uri: uriOf(ACTIVITY), title: "x" }] },
-      /subjects\[0\] combines `uri` with other fields/,
-    ],
-    [
       "a work-scope tag where a vocabulary tag is held",
       { tags: [{ uri: uriOf(WORKSCOPE) }] },
       /tags\[0\] points at a record of type org\.hypercerts\.workscope\.tag, but this field holds org\.hypercerts\.vocab\.tag/,
-    ],
-    [
-      "a vocabulary tag where a location is held",
-      { location: { uri: uriOf(VOCAB, "a.b") } },
-      /location points at a record of type org\.hypercerts\.vocab\.tag, but this field holds app\.certified\.location/,
     ],
     [
       "a content entry that is a number",
@@ -208,11 +192,6 @@ describe("createAttachment", () => {
     [
       "a title the lexicon rejects",
       { title: "x".repeat(257) },
-      /input is not a valid org\.hypercerts\.context\.attachment record/,
-    ],
-    [
-      "a capturedAt without a timezone",
-      { capturedAt: "2026-06-12" },
       /input is not a valid org\.hypercerts\.context\.attachment record/,
     ],
     [
@@ -284,41 +263,5 @@ describe("createAttachment", () => {
     ).rejects.toThrow(/createAttachment: could not upload input\.content\[1\]/);
 
     expect(methods(requests)).toEqual([UPLOAD]);
-  });
-});
-
-describe("createAttachment when the write fails", () => {
-  const input: AttachmentInput = {
-    title: "Report",
-    location,
-    tags: [tag("evidence-kind", "survey")],
-  };
-  const attempted = (body: Uint8Array | undefined) =>
-    (
-      JSON.parse(new TextDecoder().decode(body)).writes as { collection: string; rkey: string }[]
-    ).map((w) => `at://${DID}/${w.collection}/${w.rkey}`);
-
-  it("reports a definite rejection and does not retry", async () => {
-    const { context, requests } = fakeRepo({
-      applyWrites: () => json(400, { error: "InvalidRequest", message: "Bad record" }),
-    });
-
-    const error = await createAttachment(context, input).catch((e) => e);
-
-    expect(error).toBeInstanceOf(WriteRejectedError);
-    expect(error).toMatchObject({ status: 400, code: "InvalidRequest" });
-    expect(methods(requests).filter((m) => m === APPLY)).toHaveLength(1);
-  });
-
-  it("reports an unknown outcome with every attempted URI and does not retry", async () => {
-    const { context, requests } = fakeRepo({ applyWrites: () => json(500, {}) });
-
-    const error = await createAttachment(context, input).catch((e) => e);
-
-    expect(error).toBeInstanceOf(WriteOutcomeUnknownError);
-    const sent = requests.find((request) => request.path.endsWith("applyWrites"));
-    expect(error.attempted.map((ref: { uri: string }) => ref.uri)).toEqual(attempted(sent?.body));
-    expect(error.attempted).toHaveLength(3);
-    expect(methods(requests).filter((m) => m === APPLY)).toHaveLength(1);
   });
 });

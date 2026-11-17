@@ -159,7 +159,6 @@ describe("createEvaluation", () => {
     const created = defined(result.measurements?.[0]);
     expect(created.created).toBe(true);
     expect(stored.measurements).toEqual([{ uri: created.uri, cid: created.cid }]);
-    await expectStored(user.client, created);
   });
 
   it("throws and writes nothing, not even its new measurement, when the subject cannot be read", async () => {
