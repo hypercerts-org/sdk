@@ -3,7 +3,7 @@ name: hypercerts-org-sdk
 description: "Write Hypercerts and Certified records (org.hypercerts.*, app.certified.*) to a PDS from an app with @hypercerts-org/sdk: setting up the SDK context from an authenticated @atproto/lex Client, choosing the right operation and subpath, uploading blobs, and handling write errors without duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create, link or write hypercert-related records from an app. Not for changing the SDK's own source."
 metadata:
   author: hypercerts-org
-  version: "6"
+  version: "7"
 ---
 
 # @hypercerts-org/sdk
@@ -64,6 +64,7 @@ export const context = createSDKContext({
 | `@hypercerts-org/sdk/organization` | `createOrganization`, `OrganizationAlreadyExistsError`, `RecordAlreadyExistsError`, the same `Write*` errors, `OrganizationInput`, `CreateOrganizationInput`, `CreateOrganizationResult`, `LeafletDocument` |
 | `@hypercerts-org/sdk/social`   | `followAccount`, `followEntity`, `like`, `repost`, `unfollowAccount`, `unfollowEntity`, `unlike`, `unrepost`, the `Write*` errors and input types                                                                                                                        |
 | `@hypercerts-org/sdk/badge`    | `createBadgeDefinition`, `awardBadge`, `respondToBadgeAward`, the same `Write*` errors, input/result types                                                                                              |
+| `@hypercerts-org/sdk/context`  | `createAttachment`, `createMeasurement`, `createEvaluation`, `createAcknowledgement`, `RecordAlreadyExistsError`, the same `Write*` errors, input/result types |
 | `@hypercerts-org/sdk/blob`     | `uploadBlob`                                                                                                                                                                                           |
 | `@hypercerts-org/sdk/collection` | `createCollection`, `createActivityInCollection`, `RecordAlreadyExistsError`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types                                                         |
 
@@ -84,6 +85,7 @@ Operations are grouped by domain, each under its own subpath. Read the domain's 
 | Organization (`app.certified.actor.organization`, with its profile and locations) | `@hypercerts-org/sdk/organization` | [references/organization.md](references/organization.md) |
 | Social (follow accounts and records, like, repost, and undo them) | `@hypercerts-org/sdk/social` | [references/social.md](references/social.md) |
 | Badge (`app.certified.badge.*`: definitions, awards to an account or record, responses) | `@hypercerts-org/sdk/badge` | [references/badge.md](references/badge.md) |
+| Context (attachments, measurements, evaluations, acknowledgements) | `@hypercerts-org/sdk/context` | [references/context.md](references/context.md) |
 
 Things to know before opening a reference:
 
@@ -92,10 +94,11 @@ Things to know before opening a reference:
 - `createOrganization` takes the name, avatar, banner and website in `profileIfMissing`, not in `organization`, and an existing location as `{ uri }`, never a bare string.
 - Social create functions take the **target**: `{ targetDid }` for an account, `{ targetUri }` (a full record URI) for a record. Undo functions (`unlike`, `unrepost`, `unfollowAccount`, `unfollowEntity`) take the **URI of your own like, repost or follow record** (`likeUri`, `repostUri`, `followUri`), not the target's, and return `void`. Keep the `uri` the create function returned.
 - `awardBadge` takes `{ did }` or `{ uri }` as the subject and `{ uri }` or new fields as the definition; never build strong references or DID objects. `respondToBadgeAward` works only as the award's recipient.
+- `createAttachment`, `createMeasurement`, `createEvaluation` and `createAcknowledgement` take a subject as `{ uri }`, never a bare string, and a measured value or score as a decimal string, never a number.
 
 ## 5. Images and files
 
-- `create*` operations upload `Blob`/`File` values for you (`image`, `attachment`, a profile's `avatar` and `banner`, a location's `{ blob }`). Pass the file, not an upload result.
+- `create*` operations upload `Blob`/`File` values for you (`image`, a rights record's `attachment`, `content` of `createAttachment` and `createEvaluation`, a profile's `avatar` and `banner`, a location's `{ blob }`). Pass the file, not an upload result.
 - A string is stored as a URL and never fetched.
 - Use `uploadBlob` only when writing a record yourself with the client:
 
@@ -124,7 +127,7 @@ Uploads happen before the write and are not rolled back, so a call that throws c
 
 Order of work: validate input → read `{ uri }` records → upload blobs → validate against lexicons → one write. The SDK never retries.
 
-The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor`, `/badge`, `/location`, `/tag`, `/feature`, `/collection`, `/organization` and `/social` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order (an undo function called without `cid` has an empty `attempted`; its message names the URI): for `createActivity` the Activity is last; for `createActivityInCollection` the Collection is last and the Activity is just before it; for `createCollection` the Collection is last, after the records it points at; for `awardBadge` the award is last, after a new definition; for `createOrganization` the organization is last. `instanceof WriteError` catches all three.
+The three write errors are exported from `@hypercerts-org/sdk/activity`, `/actor`, `/badge`, `/location`, `/tag`, `/feature`, `/collection`, `/context`, `/organization` and `/social` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order (an undo function called without `cid` has an empty `attempted`; its message names the URI): for `createActivity` the Activity is last; for `createActivityInCollection` the Collection is last and the Activity is just before it; for `createCollection` the Collection is last, after the records it points at; for `awardBadge` the award is last, after a new definition; for `createOrganization` the organization is last. `instanceof WriteError` catches all three.
 
 | Error                      | Meaning                                                                                        | What to do                                    |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
@@ -208,5 +211,6 @@ try {
 ## Verify
 
 1. Imports come only from `@hypercerts-org/sdk`, `.../activity`, `.../actor`, `.../badge`, `.../collection`, `.../feature`, `.../location`, `.../organization`, `.../social`, `.../tag` or `.../blob`.
+1. Imports come only from `@hypercerts-org/sdk`, `.../activity`, `.../actor`, `.../badge`, `.../collection`, `.../context`, `.../feature`, `.../location`, `.../organization`, `.../social`, `.../tag` or `.../blob`.
 2. `tsc --noEmit` passes. The input types catch wrong field names and shapes.
 3. `com.atproto.repo.getRecord` on each returned `uri` returns the record, and any references it holds match the URIs and CIDs the SDK returned.
