@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { createCollection } from "../collection/index.js";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
-import { fakeRepo, methods, type ReceivedCreate, refTo, writeOf } from "../test-utils/fake-repo.js";
+import {
+  fakeRepo,
+  HEAD,
+  methods,
+  type ReceivedCreate,
+  refTo,
+  writeOf,
+} from "../test-utils/fake-repo.js";
 import {
   createProject,
   type LeafletDocument,
@@ -67,10 +74,10 @@ describe("createProject without activities", () => {
 
       const result = await createProject(context, input);
 
-      // The banner file is uploaded once for the Project's banner and once for the Activity's image,
-      // then everything is written in one request: the Project's location and tag, the one
-      // Activity, and the Project last.
-      expect(methods(requests).filter((method) => method.endsWith("uploadBlob"))).toHaveLength(2);
+      // The banner file is uploaded once, for the Project's banner and the Activity's image, then
+      // everything is written in one request: the Project's location and tag, the one Activity,
+      // and the Project last.
+      expect(methods(requests).filter((method) => method.endsWith("uploadBlob"))).toHaveLength(1);
       expect(methods(requests).at(-1)).toBe("com.atproto.repo.applyWrites");
       expect(creates).toHaveLength(1);
       const writes = creates[0] ?? [];
@@ -149,10 +156,10 @@ describe("createProject without activities", () => {
       0,
     ],
     [
-      "a file of exactly 5 MiB as the Activity's image, uploaded again for it",
+      "a file of exactly 5 MiB as the Activity's image, from the Project's one upload",
       image(SMALL_IMAGE_MAX),
       expect.objectContaining({ $type: "org.hypercerts.defs#smallImage" }),
-      2,
+      1,
     ],
     // The Project's banner holds up to 10 MiB, the Activity's image 5 MiB: the Activity goes without.
     ["a file over 5 MiB not at all", image(SMALL_IMAGE_MAX + 1), undefined, 1],
@@ -172,6 +179,35 @@ describe("createProject without activities", () => {
     expect(methods(requests).filter((method) => method.endsWith("uploadBlob"))).toHaveLength(
       uploads,
     );
+  });
+
+  it("stores the one uploaded banner as the Project's banner and the Activity's image: the same blob reference", async () => {
+    // The fake hands out another CID for every upload, so a second upload would show as a
+    // different CID in the Activity.
+    const cids = [CID, HEAD];
+    let uploads = 0;
+    const { context, creates } = fakeRepo({
+      uploadBlob: () =>
+        json(200, {
+          blob: {
+            $type: "blob",
+            ref: { $link: cids[uploads++] },
+            mimeType: "image/png",
+            size: 3,
+          },
+        }),
+    });
+
+    await createProject(context, { title: "Valley", shortDescription: "x", banner: png() });
+
+    const writes = creates[0] ?? [];
+    const banner = writeOf(writes, COLLECTION).value.banner as { image: { ref: unknown } };
+    expect(uploads).toBe(1);
+    expect(writeOf(writes, ACTIVITY).value.image).toEqual({
+      $type: "org.hypercerts.defs#smallImage",
+      image: banner.image,
+    });
+    expect(String(banner.image.ref)).toBe(CID);
   });
 
   it("asks for a shortDescription, naming the field, and sends nothing", async () => {

@@ -106,15 +106,11 @@ export interface ActivityInput {
   title: string;
   /** A summary for previews, at most 300 characters. */
   shortDescription: string;
-  /**
-   * Rich-text annotations (mentions, links, hashtags) of `shortDescription`, as
-   * `app.bsky.richtext.facet` objects. Passed to the record as given; the lexicon validates them.
-   */
+  /** Rich-text facets (`app.bsky.richtext.facet`) of `shortDescription`, passed as given. */
   shortDescriptionFacets?: activity.Main["shortDescriptionFacets"];
   /**
-   * A long description: plain text or Markdown, a {@link LeafletDocument}, or `{ uri }` of an
-   * existing record of any type, stored as a reference to it. A string and a document are stored
-   * inline, as they are (a document needs its `$type`). The SDK never creates a document record.
+   * A long description: text or Markdown, a {@link LeafletDocument} (with its `$type`), or `{ uri }`
+   * of an existing record of any type. The SDK never creates a document record.
    */
   description?: string | LeafletDocument | ExistingRecord | undefined;
   /** Languages of the text fields as BCP-47 tags (up to three), for example `["en"]`. */
@@ -190,10 +186,9 @@ const celWorkScope = strictObject({
 });
 
 /**
- * The schemas of the text fields of an Activity's input.
+ * The schemas of an Activity's text fields.
  *
- * Internal. A Project's default Activity copies these fields from the Project (see `createProject`),
- * and reads them with the same schemas, so the copy is read the way an Activity's own input is.
+ * Internal. `createProject` reads the fields its default Activity copies with these.
  */
 export const activityTextFields = {
   title: l.string(),
@@ -316,9 +311,8 @@ function supportingSlots(plan: ActivityPlan): Slot[] {
  * contributor-information, contribution and work-scope tag records it needs, in one atomic write.
  *
  * @remarks
- * Prefer {@link createProject} to publish work. An Activity on its own may not show up or work in
- * other apps in the ecosystem; apps expect a Project (a Collection of type `project` that holds its
- * Activities). Use `createActivity` when you need the Activity by itself.
+ * Prefer {@link createProject} to publish work: an Activity on its own may not show up in other
+ * apps. Use `createActivity` when you need the Activity by itself.
  *
  * Each supporting field takes one of:
  * - a new record's fields, to create it;
@@ -334,9 +328,8 @@ function supportingSlots(plan: ActivityPlan): Slot[] {
  * Everything is created in one write: all the records exist afterwards, or none do. One write holds
  * at most 200 records, the Activity included. `createdAt` defaults to the time of the call.
  *
- * `description` is a string, a Leaflet document (with `$type: "pub.leaflet.pages.linearDocument"`),
- * or `{ uri }` of an existing record of any type, stored as a strong reference to it (read once for
- * its CID, never rewritten). `shortDescriptionFacets` is passed to the record as given.
+ * `description` is a string, a Leaflet document or `{ uri }` of an existing record of any type,
+ * stored as a strong reference (read once for its CID, never rewritten).
  *
  * Not supported: the lexicon's `signatures`.
  *

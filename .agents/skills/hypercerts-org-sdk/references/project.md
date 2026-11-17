@@ -41,8 +41,8 @@ project.activities[1]; // { uri, cid, created: false }
 ```
 
 - An entry is **exactly one** of `{ activity }` (the data of a new Activity, the same input as `createActivity`) or `{ uri }`, plus an optional `weight`. The SDK never guesses from the fields: a bare Activity (`{ title, shortDescription }`) is a `TypeError`, and so is `{ feature }`.
-- `type` and `items` are not accepted (`TypeError`). A Project is always `type: "project"`, and its items are its `activities`.
-- `{ uri }` must be an **Activity** with a DID (`at://<did>/org.hypercerts.claim.activity/<rkey>`). A Feature or a Collection URI is a `TypeError` naming the entry, unlike in `createCollection`. It is read for its CID (a strong reference) and reused unchanged; it may belong to another account if public. Another account's PDS is found with the context's `didResolver` ([SKILL.md](../SKILL.md#2-create-the-context-once)).
+- `type`, `items` and any unknown field are not accepted (`TypeError`). A Project is always `type: "project"`, and its items are its `activities`.
+- `{ uri }` must be an **Activity** with a DID (`at://<did>/org.hypercerts.claim.activity/<rkey>`); a handle is a `TypeError`. A Feature or a Collection URI is a `TypeError` naming the entry, unlike in `createCollection`. It is read for its CID (a strong reference) and reused unchanged; it may belong to another account if public. Another account's PDS is found with the context's `didResolver` ([SKILL.md](../SKILL.md#2-create-the-context-once)).
 - `weight` is a positive decimal string (`"2"`, `"0.50"`), stored exactly as you pass it, at most 100 characters. Weights need not add up to anything.
 - Order is kept. Nothing is deduplicated or searched for: the same `{ uri }` twice gives two items, the same data twice gives two records.
 - `location`, `tags`, `description`, `avatar`, `banner`, `langs`, `shortDescriptionFacets` and `createdAt` work as in `createCollection` ([collection.md](collection.md)). A new tag's key is `<category>.<key>`: a taken key throws `RecordAlreadyExistsError` before anything is uploaded or written.
@@ -57,7 +57,7 @@ When `activities` is omitted or empty, the Activity copies these fields of the P
 - `title`, `shortDescription` and `shortDescriptionFacets`, as they are.
 - `description`, as it is: text, a Leaflet document, or `{ uri }` (the record is read once, and the Project and the Activity store the same strong reference).
 - `langs`, as they are.
-- `banner`, as the Activity's `image`: a URL is stored as a URL. A file is uploaded again for the Activity (once for each record) if it is at most 5 MB. A larger banner is left out of the Activity, with no error: the Project's banner holds up to 10 MB, the Activity's image 5 MB, and the Project keeps its banner.
+- `banner`, as the Activity's `image`: a URL is stored as a URL. A file of at most 5 MB is uploaded once and stored as both the Project's banner and the Activity's image, as the same blob. A larger banner is left out of the Activity, with no error: the Project's banner holds up to 10 MB, the Activity's image 5 MB, and the Project keeps its banner (uploaded once).
 
 It does not copy `location`, `tags`, `avatar` or `createdAt` (the Activity's `createdAt` is the time of the call), and it sets no rights, contributors or dates.
 
@@ -70,7 +70,7 @@ An Activity allows less than a Project, and the SDK never shortens a value to fi
 
 ### Order of work and failures
 
-Validate all input and count the records, read every `{ uri }` and every new tag's key, upload files, build the records, one write. A bad entry, a wrong record type, a value the default Activity cannot hold, too many records or an unreadable `{ uri }` fails (`TypeError` or `Error`) before any upload. A file the image limits reject, or a record the lexicon rejects, is only found when that record is built, so files of other records may already be uploaded. Uploads are not rolled back if the write fails; see [Uploads are not part of the atomic write](../SKILL.md#uploads-are-not-part-of-the-atomic-write). Messages name the field as you passed it, for example `input.activities[1].activity.title`.
+Validate all input and count the records, read every `{ uri }` and every new tag's key, upload files, build the records, one write. A bad entry, a wrong record type, a value the default Activity cannot hold, too many records or an unreadable `{ uri }` fails (`TypeError` or `Error`) before any upload, as does a new tag's key that cannot be checked (`Error`). A file the image limits reject, or a record the lexicon rejects, is only found when that record is built, so files of other records may already be uploaded. Uploads are not rolled back if the write fails; see [Uploads are not part of the atomic write](../SKILL.md#uploads-are-not-part-of-the-atomic-write). Messages name the field as you passed it, for example `input.activities[1].activity.title`.
 
 Errors are as in [Handle failures](../SKILL.md#6-handle-failures). After `WriteOutcomeUnknownError`, `attempted` lists every new record, children before the records that point at them, the Project **last**. The write is all-or-nothing, so check the Project with `getRecord`; if it exists, everything does. **Do not retry blindly**: it would create every record, the default Activity included, again under new keys.
 

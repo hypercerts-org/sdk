@@ -88,7 +88,11 @@ describe("createProject without activities", () => {
       image: { $type: "org.hypercerts.defs#smallImage", image: expect.anything() },
       createdAt: expect.any(String),
     });
-    await expectBlobServed(user.client, user.did, blobIn(activity.image, "image"), PNG);
+    // The one uploaded banner is both the Project's banner and the Activity's image.
+    const bannerBlob = blobIn(stored.banner, "image");
+    const imageBlob = blobIn(activity.image, "image");
+    expect(imageBlob.ref.toString()).toBe(bannerBlob.ref.toString());
+    await expectBlobServed(user.client, user.did, imageBlob, PNG);
     // One Project, one Activity, the Project's location and tag; nothing else.
     expect(await snapshotCounts(user.client)).toEqual({
       ...before,

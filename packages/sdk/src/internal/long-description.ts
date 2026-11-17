@@ -60,13 +60,11 @@ export const longDescriptionReference: ReferenceField = {
 };
 
 /**
- * Plans the `description` of a record that is built by hand instead of with a `recordKind`: the
- * slot of the existing record when the value is `{ uri }`, `undefined` for a string, a Leaflet
- * document or no value, which the record stores itself.
+ * Plans the `description` of a record built by hand: the slot of the existing record for `{ uri }`,
+ * `undefined` for a string, a Leaflet document or no value.
  *
- * Internal. `field` names the value in messages. Pair it with `longDescriptionValue`.
- *
- * Throws TypeError, naming `field`, for a value that is none of the three.
+ * Internal. Pair it with `longDescriptionValue`. Throws TypeError, naming `field`, for any other
+ * value.
  */
 export function planLongDescription(
   build: BuildContext,
@@ -80,11 +78,9 @@ export function planLongDescription(
 
 /**
  * The value a record stores for a description planned by `planLongDescription`: `descriptionString`
- * for a string, the strong reference (stored with its `$type`, because the lexicon field is a union
- * that has it as a member) for `{ uri }`, and a Leaflet document as it is.
+ * for a string, the strong reference (with its `$type`) for `{ uri }`, a Leaflet document as it is.
  *
- * Internal. `description` must have passed `longDescription`, and `existing` is the slot
- * `planLongDescription` returned for it.
+ * Internal. `existing` is the slot `planLongDescription` returned.
  */
 export function longDescriptionValue(
   description: unknown,
