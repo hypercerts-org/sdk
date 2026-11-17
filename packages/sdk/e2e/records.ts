@@ -11,6 +11,9 @@ import {
   type TypedBlobRef,
 } from "@atproto/lex";
 import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
+import * as badgeAward from "@hypercerts-org/lexicon/app/certified/badge/award";
+import * as badgeDefinition from "@hypercerts-org/lexicon/app/certified/badge/definition";
+import * as badgeResponse from "@hypercerts-org/lexicon/app/certified/badge/response";
 import * as like from "@hypercerts-org/lexicon/app/certified/feed/like";
 import * as repost from "@hypercerts-org/lexicon/app/certified/feed/repost";
 import * as entityFollow from "@hypercerts-org/lexicon/app/certified/graph/entityFollow";
@@ -115,6 +118,9 @@ export const collections = {
   entityFollow: entityFollow.main.$type,
   like: like.main.$type,
   repost: repost.main.$type,
+  badgeDefinition: badgeDefinition.main.$type,
+  badgeAward: badgeAward.main.$type,
+  badgeResponse: badgeResponse.main.$type,
 } as const;
 
 /** The number of records of `collection` in the client's repo. */
@@ -145,7 +151,7 @@ export async function snapshotCounts(client: Client) {
 }
 
 /** The blob reference a stored record holds in `value[field]`, for example `smallBlob.blob`. */
-export function blobIn(value: unknown, field: "blob" | "image"): TypedBlobRef {
+export function blobIn(value: unknown, field: "blob" | "image" | "icon"): TypedBlobRef {
   const blob = isPlainObject(value) ? value[field] : undefined;
   if (!isTypedBlobRef(blob)) throw new Error(`Expected a blob reference in \`${field}\`.`);
   return blob;
