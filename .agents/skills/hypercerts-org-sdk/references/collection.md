@@ -4,7 +4,7 @@ Read [../SKILL.md](../SKILL.md) first for setup and error handling, [activity.md
 
 Two operations: `createCollection` creates a **new** Collection with its items; `createActivityInCollection` adds a new Activity to a Collection that **already exists**.
 
-For `type: "project"`, use `createProject` ([project.md](project.md)) instead: `createCollection` creates a Project with no Activity, and `createProject` guarantees it has one. To publish work, create a project with `createProject`: an Activity on its own may not show up or work in other apps in the ecosystem, and apps expect a project that holds its activities.
+For `type: "project"`, prefer `createProject` ([project.md](project.md)): `createCollection` can create a Project with Activities (and Features or child Collections) but also one with no Activity at all, while `createProject` guarantees it has at least one Activity. Use `createCollection` when a Project needs Features or child Collections. To publish work, create a project with `createProject`: an Activity on its own may not show up or work in other apps in the ecosystem, and apps expect a project that holds its activities.
 
 ## createCollection
 
