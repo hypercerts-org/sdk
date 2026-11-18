@@ -110,7 +110,7 @@ await addActivityToCollection(context, {
 
 The write is conditional on the account not having changed since the Collection was read, so a concurrent change to its `items` cannot be overwritten with a stale list. When it did change you get `WriteRejectedError` with `code === "InvalidSwap"`: see [Concurrent changes](../SKILL.md#concurrent-changes-invalidswap) for the rule and the retry example.
 
-Any other `WriteRejectedError` (4xx) is not fixed by calling again. After `WriteOutcomeUnknownError`, `attempted` lists the new records and, last, the Collection (only the Collection for a `{ uri }`): check the Activity and whether the Collection lists it before retrying, or you add a second item.
+Any other `WriteRejectedError` (4xx) is not fixed by calling again. After `WriteOutcomeUnknownError`, `attempted` lists the new records and, last, the Collection (only the Collection for a `{ uri }`): read the Collection and check whether its CID changed since you read it before retrying, or you add a second item. An existing Activity may already be listed, so its presence proves nothing; if later writes make the CID check impossible, reconcile `items` by hand.
 
 ### Uploads are outside the commit
 
