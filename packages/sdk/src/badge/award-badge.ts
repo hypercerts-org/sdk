@@ -64,9 +64,8 @@ export interface AwardBadgeInput {
 }
 
 /** The result of {@link awardBadge}. */
-export interface AwardBadgeResult {
-  /** The new award's URI and CID. */
-  award: StrongRef;
+export interface AwardBadgeResult extends StrongRef {
+  // `uri` and `cid` are the new award's.
   /**
    * The badge definition the award references, with the CID of the version that was checked.
    * `created` is `true` when this call created it, `false` when it reused an existing one.
@@ -146,7 +145,7 @@ function assertValidityRange(build: BuildContext, input: l.InferOutput<typeof aw
  * authenticated; the award, and a new definition, are created in that account's repo.
  * @param input - The badge, the subject and the optional note, link and validity. See
  * {@link AwardBadgeInput}.
- * @returns The award's URI and CID, and the definition's, with whether this call created it. See
+ * @returns The award's URI and CID at the top, and the definition's beside them, with whether this call created it. See
  * {@link AwardBadgeResult}.
  * @throws {@link TypeError} If `input` has an unknown field; `subject` is neither `{ did }` nor
  * `{ uri }` of a record; `definition` mixes `{ uri }` with other fields, points at another type of
@@ -168,24 +167,24 @@ function assertValidityRange(build: BuildContext, input: l.InferOutput<typeof aw
  * import { awardBadge } from "@hypercerts-org/sdk/badge";
  *
  * // `context` comes from createSDKContext.
- * const { award, definition } = await awardBadge(context, {
+ * const { uri, definition } = await awardBadge(context, {
  *   definition: { uri: "at://did:plc:abc123/app.certified.badge.definition/3k2a4b5c6d7e8" },
  *   subject: { did: "did:plc:xyz789" },
  *   note: "Completed the stewardship course.",
  *   validUntil: "2027-06-01T00:00:00.000Z",
  * });
- * console.log(award.uri, definition.created); // definition.created is false
+ * console.log(uri, definition.created); // uri is the award's; definition.created is false
  * ```
  *
  * @example Defining a new badge and awarding it to a record in one commit
  * ```ts
  * import { awardBadge } from "@hypercerts-org/sdk/badge";
  *
- * const { award, definition } = await awardBadge(context, {
+ * const { uri, definition } = await awardBadge(context, {
  *   definition: { title: "Field verified", badgeType: "verification" }, // created too
  *   subject: { uri: "at://did:plc:xyz789/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
- * console.log(definition.created, award.uri); // true
+ * console.log(definition.created, uri); // true
  * ```
  */
 export async function awardBadge(
@@ -219,7 +218,7 @@ export async function awardBadge(
   const writes = badge.created === undefined ? [record] : [badge.created, record];
   await submitWrites(build, writes);
   return {
-    award: record.ref,
+    ...record.ref,
     definition: { ...badge.ref, created: badge.created !== undefined },
   };
 }

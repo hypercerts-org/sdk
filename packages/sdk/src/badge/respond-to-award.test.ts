@@ -57,7 +57,7 @@ function stubIssuerPds(records: Record<string, LexMap>) {
 }
 
 const respond = (input: Partial<RespondToBadgeAwardInput> = {}): RespondToBadgeAwardInput => ({
-  awardUri,
+  award: { uri: awardUri },
   response: "accepted",
   ...input,
 });
@@ -157,12 +157,12 @@ describe("respondToBadgeAward", () => {
     ["an unknown field", { note: "hi" }, /has a field the SDK does not know/],
     [
       "an award URI of another type of record",
-      { awardUri: ownRecordUri },
+      { award: { uri: ownRecordUri } },
       /must be of type app.certified.badge.award/,
     ],
     [
       "an award URI with a handle",
-      { awardUri: `at://alice.test/${AWARD}/3k2a4b5c6d7e8` },
+      { award: { uri: `at://alice.test/${AWARD}/3k2a4b5c6d7e8` } },
       /not a record URI/,
     ],
   ])("sends nothing for %s", async (_, bad, message) => {

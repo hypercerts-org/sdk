@@ -26,7 +26,7 @@ const definition = await createBadgeDefinition(context, {
 
 ## awardBadge
 
-`awardBadge(context, { definition, subject, note?, url?, validFrom?, validUntil?, createdAt? })` creates an award in your repo and returns `{ award, definition }`.
+`awardBadge(context, { definition, subject, note?, url?, validFrom?, validUntil?, createdAt? })` creates an award in your repo and returns `{ uri, cid, definition }`: `uri` and `cid` are the award's, `definition` is the definition record with `created`.
 
 `definition` is either the fields of a **new** definition (created in the same commit) or `{ uri }` of an **existing** one (read, never rewritten):
 
@@ -34,7 +34,7 @@ const definition = await createBadgeDefinition(context, {
 import { awardBadge } from "@hypercerts-org/sdk/badge";
 
 // An existing badge, awarded to an account.
-const { award, definition } = await awardBadge(context, {
+const { uri, definition } = await awardBadge(context, {
   definition: { uri: "at://did:plc:abc123/app.certified.badge.definition/3k2a4b5c6d7e8" },
   subject: { did: "did:plc:xyz789" },
   note: "Completed the stewardship course.",
@@ -59,7 +59,7 @@ await awardBadge(context, {
 
 ## respondToBadgeAward
 
-`respondToBadgeAward(context, { awardUri, response, weight?, createdAt? })` creates a response in **your** repo and returns `{ uri, cid }`. You must be the award's recipient.
+`respondToBadgeAward(context, { award: { uri }, response, weight?, createdAt? })` creates a response in **your** repo and returns `{ uri, cid }`. You must be the award's recipient.
 
 ```ts
 import { respondToBadgeAward } from "@hypercerts-org/sdk/badge";
@@ -67,9 +67,9 @@ import { respondToBadgeAward } from "@hypercerts-org/sdk/badge";
 // The URI of the award, from the issuer or your app.
 const awardUri = "at://did:plc:issuer/app.certified.badge.award/3k2a4b5c6d7e8";
 
-await respondToBadgeAward(context, { awardUri, response: "accepted", weight: "2" });
+await respondToBadgeAward(context, { award: { uri: awardUri }, response: "accepted", weight: "2" });
 // Or reject it (no weight here):
-await respondToBadgeAward(context, { awardUri, response: "rejected" });
+await respondToBadgeAward(context, { award: { uri: awardUri }, response: "rejected" });
 ```
 
 - The recipient of an award to an account is that account. For an award to a record it is the account whose repository holds the record (the SDK's rule; the lexicon does not say). Any other signed-in account, the issuer included, gets an `Error` and nothing is written.
@@ -95,7 +95,7 @@ A new definition's `icon` is the only file uploaded, before the write, and is no
 
 `AwardBadgeInput`: `definition` (`BadgeDefinitionInput` or `{ uri }`), `subject` (`{ did }` or `{ uri }`), `note` (at most 500 characters), `url`, `validFrom`, `validUntil`, `createdAt`.
 
-`RespondToBadgeAwardInput`: `awardUri`, `response` (`"accepted"` or `"rejected"`), `weight` (accepted only, at most 50 characters), `createdAt`.
+`RespondToBadgeAwardInput`: `award` (`{ uri }`), `response` (`"accepted"` or `"rejected"`), `weight` (accepted only, at most 50 characters), `createdAt`.
 
 ## Pitfalls
 
