@@ -42,8 +42,8 @@ import {
 } from "../internal/slots.js";
 import { type LocationInput, locationKind } from "../location/build-location.js";
 import {
+  type CreateVocabularyTagResult,
   type VocabularyTagInput,
-  type VocabularyTagResult,
   vocabularyTagKind,
 } from "../tag/build-tag.js";
 
@@ -174,7 +174,7 @@ export interface CreateCollectionResult {
   /** The location, when the input had `location`. */
   location?: SupportingRecordRef;
   /** The vocabulary tags, in input order. */
-  tags: readonly VocabularyTagResult[];
+  tags: readonly CreateVocabularyTagResult[];
   /** The items, in input order. */
   items: readonly CreateCollectionItemResult[];
 }
@@ -274,7 +274,9 @@ export function planCollection(
     result: (created, refOf) => ({
       ...refOf(slot),
       ...compact({ location: plan.location && recordRef(plan.location, created, refOf) }),
-      tags: (plan.tags ?? []).map((tag) => resultOf<VocabularyTagResult>(tag, created, refOf)),
+      tags: (plan.tags ?? []).map((tag) =>
+        resultOf<CreateVocabularyTagResult>(tag, created, refOf),
+      ),
       items: (plan.items ?? []).map((item) => item.result(created, refOf)),
     }),
   };

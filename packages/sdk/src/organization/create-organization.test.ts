@@ -113,7 +113,7 @@ describe("createOrganization", () => {
     });
     // The result carries the exact URIs and CIDs the PDS computed for what it received.
     expect(result).toEqual({
-      organization: refTo(organization as never),
+      ...refTo(organization as never),
       profile: { ...refTo(profile as never), created: true },
       location: { ...refTo(office as never), created: true },
       additionalLocations: [
@@ -139,7 +139,7 @@ describe("createOrganization", () => {
       expect(methods(requests)).toEqual([HEAD_METHOD, READ, READ, WRITE]);
       expect((creates[0] ?? []).map((write) => write.collection)).toEqual([ORGANIZATION]);
       expect(result).toEqual({
-        organization: refTo(writeOf(creates[0] ?? [], ORGANIZATION)),
+        ...refTo(writeOf(creates[0] ?? [], ORGANIZATION)),
         profile: { uri: PROFILE_URI, cid: CID, created: false },
       });
     },

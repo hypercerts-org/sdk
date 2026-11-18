@@ -8,17 +8,18 @@ import {
   longDescriptionTransform,
 } from "../internal/long-description.js";
 import { type RecordKind, recordKind, references } from "../internal/record-kind.js";
+import type { StrongRef } from "../internal/resolve-record-ref.js";
 import type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 import type { LocationInput } from "../location/build-location.js";
 import {
+  type CreateVocabularyTagResult,
   type VocabularyTagInput,
-  type VocabularyTagResult,
   vocabularyTagKind,
 } from "../tag/build-tag.js";
 import {
   contentInput,
   contentTransform,
-  creatorOf,
+  creatorWithoutCreatedOf,
   existingRecordsReference,
   locationReference,
 } from "./shared.js";
@@ -74,7 +75,7 @@ export interface AttachmentInput {
 }
 
 /**
- * The result of {@link createAttachment}: the new Attachment's URI and CID with `created: true`,
+ * The result of {@link createAttachment}: the new Attachment's URI and CID,
  * and the results for the records it points at.
  *
  * @remarks
@@ -83,7 +84,7 @@ export interface AttachmentInput {
  * a new tag nested in a new tag (`broader`) is reported under it. Filter on `created` for only the
  * records this call wrote.
  */
-export interface CreateAttachmentResult extends SupportingRecordRef {
+export interface CreateAttachmentResult extends StrongRef {
   /** The subjects with the CIDs they were pinned at. `created` is `false` for each. */
   subjects?: readonly SupportingRecordRef[];
   /** The location. */
@@ -91,7 +92,7 @@ export interface CreateAttachmentResult extends SupportingRecordRef {
   /** The record a `{ uri }` description points at, with the CID it was pinned at. */
   description?: SupportingRecordRef;
   /** The vocabulary tags, in input order. */
-  tags?: readonly VocabularyTagResult[];
+  tags?: readonly CreateVocabularyTagResult[];
 }
 
 const attachmentKind: RecordKind<AttachmentInput> = recordKind(
@@ -160,7 +161,7 @@ const attachmentKind: RecordKind<AttachmentInput> = recordKind(
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the records are created in that account's repo.
  * @param input - The attachment and the records it needs. See {@link AttachmentInput}.
- * @returns The new Attachment's URI and CID with `created: true`, and the references of its
+ * @returns The new Attachment's URI and CID, and the references of its
  * location and tags. See {@link CreateAttachmentResult}.
  * @throws {@link TypeError} If `input` has an unknown field, a `content` entry that is neither a
  * `Blob` nor a string, a file the lexicon does not allow (over 10 MB), a mixed or wrongly typed
@@ -221,7 +222,7 @@ const attachmentKind: RecordKind<AttachmentInput> = recordKind(
  * });
  * ```
  */
-export const createAttachment = creatorOf<AttachmentInput, CreateAttachmentResult>(
+export const createAttachment = creatorWithoutCreatedOf<AttachmentInput, CreateAttachmentResult>(
   "createAttachment",
   attachmentKind,
 );

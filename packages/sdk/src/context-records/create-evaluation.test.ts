@@ -24,7 +24,7 @@ const location = (name: string) => ({
   location: { string: "27.47,90.17" },
   name,
 });
-const base = { evaluators: ["did:plc:abc123"], summary: "Meets its targets." };
+const base = { evaluators: [{ did: "did:plc:abc123" }], summary: "Meets its targets." };
 const measurement = { metric: "Forest area restored", unit: "hectares", value: "1234.56" };
 
 describe("createEvaluation", () => {
@@ -36,7 +36,7 @@ describe("createEvaluation", () => {
     });
 
     const result = await createEvaluation(context, {
-      evaluators: ["did:plc:abc123", "did:plc:def456"],
+      evaluators: [{ did: "did:plc:abc123" }, { did: "did:plc:def456" }],
       summary: "Meets its targets.",
       subject: { uri: activity },
       content: [new Blob(["report"], { type: "application/pdf" }), "https://example.org/report"],
@@ -101,7 +101,6 @@ describe("createEvaluation", () => {
     });
     expect(result).toEqual({
       ...refTo(evaluation),
-      created: true,
       subject: { uri: activity, cid: CID, created: false },
       measurements: [
         { ...newMeasurement, created: true, locations: [{ ...plot, created: true }] },
@@ -125,7 +124,7 @@ describe("createEvaluation", () => {
       summary: "Meets its targets.",
       createdAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/),
     });
-    expect(result).toEqual({ ...refTo(write), created: true });
+    expect(result).toEqual(refTo(write));
   });
 
   it.each<[string, { min: string; max: string; value: string }]>([
@@ -163,7 +162,7 @@ describe("createEvaluation", () => {
     ["no evaluators", { evaluators: undefined }, / at \$\.evaluators/],
     [
       "an evaluator that is not a DID",
-      { evaluators: ["alice.example"] },
+      { evaluators: [{ did: "alice.example" }] },
       /Invalid DID.*evaluators\[0\]/,
     ],
     [

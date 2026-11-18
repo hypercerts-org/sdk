@@ -71,7 +71,7 @@ export interface MeasurementInput {
  * whether it was created or reused. The measurement {@link createMeasurement} returns is always
  * new (`created: true`).
  */
-export interface MeasurementResult extends SupportingRecordRef {
+export interface CreateMeasurementResult extends SupportingRecordRef {
   /** The subjects with the CIDs they were pinned at. `created` is `false` for each. */
   subjects?: readonly SupportingRecordRef[];
   /** The locations, in input order. */
@@ -138,7 +138,7 @@ export const measurementKind: RecordKind<MeasurementInput> = recordKind(
  * authenticated; the records are created in that account's repo.
  * @param input - The measurement and the locations it needs. See {@link MeasurementInput}.
  * @returns The new Measurement's URI and CID with `created: true`, and the references of its
- * locations in input order. See {@link MeasurementResult}.
+ * locations in input order. See {@link CreateMeasurementResult}.
  * @throws {@link TypeError} If `input` has an unknown field, a `value` that is not a decimal
  * string (a number, `"1,234"`, `"1e3"`), an `endDate` before its `startDate`, a `measurers` entry
  * that is not a DID, a mixed or wrongly typed entry (a `locations` URI that points at another
@@ -189,7 +189,7 @@ export const measurementKind: RecordKind<MeasurementInput> = recordKind(
  * });
  * ```
  */
-export const createMeasurement = creatorOf<MeasurementInput, MeasurementResult>(
+export const createMeasurement = creatorOf<MeasurementInput, CreateMeasurementResult>(
   "createMeasurement",
   measurementKind,
 );

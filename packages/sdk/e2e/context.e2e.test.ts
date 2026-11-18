@@ -163,7 +163,7 @@ describe("createEvaluation", () => {
     const bytes = new TextEncoder().encode(unique("report"));
 
     const result = await createEvaluation(user.context, {
-      evaluators: [user.did],
+      evaluators: [{ did: user.did }],
       summary: unique("Meets its targets"),
       subject: { uri: target.uri },
       content: [new File([bytes], "report.pdf", { type: "application/pdf" })],
@@ -187,7 +187,7 @@ describe("createEvaluation", () => {
 
     await expect(
       createEvaluation(user.context, {
-        evaluators: [user.did],
+        evaluators: [{ did: user.did }],
         summary: "Meets its targets",
         subject: { uri: missingUri() },
         measurements: [{ metric: "Trees planted", unit: "trees", value: "500" }],

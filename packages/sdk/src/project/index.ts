@@ -12,7 +12,7 @@ export type { LeafletDocument } from "../internal/long-description.js";
 export type { StrongRef } from "../internal/resolve-record-ref.js";
 export type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 export type { LocationInput } from "../location/build-location.js";
-export type { VocabularyTagInput, VocabularyTagResult } from "../tag/build-tag.js";
+export type { CreateVocabularyTagResult, VocabularyTagInput } from "../tag/build-tag.js";
 export type {
   AddActivityToProjectInput,
   AddActivityToProjectResult,

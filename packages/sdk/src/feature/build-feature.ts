@@ -13,8 +13,8 @@ import { type RecordKind, recordKind, references } from "../internal/record-kind
 import type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 import { type LocationInput, locationKind } from "../location/build-location.js";
 import {
+  type CreateVocabularyTagResult,
   type VocabularyTagInput,
-  type VocabularyTagResult,
   vocabularyTagKind,
 } from "../tag/build-tag.js";
 
@@ -69,7 +69,7 @@ export interface CreateFeatureResult {
   /** The CID of the new Feature. */
   cid: SupportingRecordRef["cid"];
   /** The vocabulary tags, in input order. */
-  tags: readonly VocabularyTagResult[];
+  tags: readonly CreateVocabularyTagResult[];
   /** The locations, in input order. */
   locations: readonly SupportingRecordRef[];
 }
@@ -94,7 +94,7 @@ export const featureKind: RecordKind<FeatureInput> = recordKind(
 );
 
 export type FeatureTree = SupportingRecordRef & {
-  tags?: readonly VocabularyTagResult[];
+  tags?: readonly CreateVocabularyTagResult[];
   locations?: readonly SupportingRecordRef[];
 };
 

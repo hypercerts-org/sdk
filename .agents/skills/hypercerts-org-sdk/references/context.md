@@ -2,14 +2,14 @@
 
 Read [../SKILL.md](../SKILL.md) first for setup, blob uploads and error handling. Every example assumes `context` from `createSDKContext`.
 
-| Function                | Creates                                  | Returns (`created: true` and a field only when the input had it)  |
+| Function                | Creates                                  | Returns (a field only when the input had it)                      |
 | ----------------------- | ---------------------------------------- | ----------------------------------------------------------------- |
-| `createAttachment`      | `org.hypercerts.context.attachment`      | `{ uri, cid, created, subjects?, location?, tags? }`             |
+| `createAttachment`      | `org.hypercerts.context.attachment`      | `{ uri, cid, subjects?, location?, tags? }`                     |
 | `createMeasurement`     | `org.hypercerts.context.measurement`     | `{ uri, cid, created, subjects?, locations? }`                   |
-| `createEvaluation`      | `org.hypercerts.context.evaluation`      | `{ uri, cid, created, subject?, measurements?, location? }`      |
-| `createAcknowledgement` | `org.hypercerts.context.acknowledgement` | `{ uri, cid, created, subject, context? }`                       |
+| `createEvaluation`      | `org.hypercerts.context.evaluation`      | `{ uri, cid, subject?, measurements?, location? }`              |
+| `createAcknowledgement` | `org.hypercerts.context.acknowledgement` | `{ uri, cid, subject, context? }`                               |
 
-Each reference in the result is `{ uri, cid, created }`: `created: false` for an existing `{ uri }` record, with the CID it was pinned at.
+`createMeasurement` returns `{ uri, cid, created: true, subjects?, locations? }`: it can also appear nested in an evaluation, so its result carries `created`. The other three results have no top-level `created`, because the record is always new. Each nested reference in a result is `{ uri, cid, created }`: `created: false` for an existing `{ uri }` record, with the CID it was pinned at.
 
 All four write a TID-keyed record to the signed-in account's repo. The first three also create the new locations, tags and measurements they are given, in the **same** `applyWrites` as the record (all of it exists afterwards, or none); with nothing new to create, the call is a write of one record. For the location and tag fields see [location.md](location.md) and [tag.md](tag.md).
 
@@ -68,7 +68,7 @@ measurement.locations?.[0]; // { uri, cid, created: false }
 ```
 
 - `value` must be a decimal string: `"1234.56"`, `"-3"`, `"0.10"`. A JavaScript number, `"1,234"` and `"1e3"` throw `TypeError`. The string is stored exactly as written.
-- `measurers` (and an evaluation's `evaluators`) are DIDs stored as declared data: no proof the account took part or consents, nobody is notified.
+- `measurers` (DID strings) and an evaluation's `evaluators` (`{ did }` objects) are accounts stored as declared data: no proof the account took part or consents, nobody is notified.
 - `endDate` before `startDate` throws. `methodURI` and `evidenceURI` entries are URIs, stored and never fetched.
 
 ## createEvaluation
@@ -77,7 +77,7 @@ measurement.locations?.[0]; // { uri, cid, created: false }
 import { createEvaluation } from "@hypercerts-org/sdk/context";
 
 const evaluation = await createEvaluation(context, {
-  evaluators: ["did:plc:abc123"], // required, not defaulted to the signed-in account
+  evaluators: [{ did: "did:plc:abc123" }], // required, not defaulted to the signed-in account
   summary: "The restoration meets its stated targets.",
   subject: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
   score: { min: "0", max: "5", value: "4.2" },
@@ -126,7 +126,7 @@ await createAcknowledgement(context, {
 | `startDate`, `endDate` | measurement | ISO 8601 | `endDate` not before `startDate`. |
 | `locations` | measurement | new locations or `{ uri }`, ≤ 100 | |
 | `methodType`, `methodURI`, `evidenceURI`, `measurers`, `comment` | measurement | `string`, `string`, `string[]`, DID `string[]`, `string` | |
-| `evaluators` | evaluation | DID `string[]` | Required, ≤ 1000. |
+| `evaluators` | evaluation | `{ did }[]` | Required, ≤ 1000. |
 | `summary` | evaluation | `string` | Required, ≤ 5000. |
 | `subject` | evaluation, acknowledgement | `{ uri }` | Required for an acknowledgement. |
 | `measurements` | evaluation | new measurements or `{ uri }` | ≤ 100. |

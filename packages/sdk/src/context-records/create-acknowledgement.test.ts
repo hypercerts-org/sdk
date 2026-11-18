@@ -56,7 +56,6 @@ describe("createAcknowledgement", () => {
     });
     expect(result).toEqual({
       ...refTo(write),
-      created: true,
       subject: { uri: subject, cid: CID, created: false },
       context: { uri: activity, cid: CID, created: false },
     });
