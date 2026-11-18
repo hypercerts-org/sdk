@@ -2,7 +2,7 @@ import type { DidString, l, RecordKeyString, TypedBlobRef } from "@atproto/lex";
 import type { SDKContext } from "../context.js";
 import { describeError } from "./describe.js";
 import { type PreparedRecord, prepareRecord } from "./prepare-record.js";
-import { parseRecordUri } from "./resolve-record-ref.js";
+import { assertRecordUriOfType, parseRecordUri } from "./resolve-record-ref.js";
 
 /**
  * What every step of one creation call shares: the client's repo, the timestamp used as the
@@ -74,7 +74,7 @@ export function parseOwnRecordUri(
   },
 ) {
   const parsed = parseRecordUri(uri, build.operation);
-  if (parsed.collection !== collection) throw new TypeError(reject.collection(parsed.collection));
+  assertRecordUriOfType(build.operation, "uri", uri, [collection], reject.collection);
   if (parsed.did !== build.did) throw new TypeError(reject.repository(parsed.did));
   return parsed;
 }
