@@ -1,4 +1,5 @@
 import {
+  type AtUriString,
   Client,
   type DidString,
   isDidString,
@@ -147,14 +148,22 @@ async function clientForRepo(
   return pending;
 }
 
+/** The parts of a record URI, `at://<did>/<collection>/<rkey>`. */
+export interface ParsedRecordUri {
+  readonly atUri: AtUriString;
+  readonly did: DidString;
+  readonly collection: NsidString;
+  readonly rkey: RecordKeyString;
+}
+
 /**
- * Splits a record URI into its parts without sending any request.
- *
- * Throws TypeError, naming `operation`, unless `uri` is `at://<did>/<collection>/<rkey>`.
+ * Splits a record URI into its parts without sending any request, or returns undefined unless
+ * `uri` is `at://<did>/<collection>/<rkey>`. The one definition of a record URI; use it where an
+ * invalid URI is an answer rather than an error, and {@link parseRecordUri} where it throws.
  */
-export function parseRecordUri(uri: string, operation: string) {
+export function tryParseRecordUri(uri: string): ParsedRecordUri | undefined {
   // `at-uri` alone also accepts handle authorities and URIs without a collection or record key.
-  if (!atUri.matches(uri)) throw notARecordUri(uri, operation);
+  if (!atUri.matches(uri)) return undefined;
   const [did, collection, rkey, ...rest] = uri.slice("at://".length).split("/");
   if (
     rest.length === 0 &&
@@ -167,7 +176,18 @@ export function parseRecordUri(uri: string, operation: string) {
   ) {
     return { atUri: uri, did, collection, rkey };
   }
-  throw notARecordUri(uri, operation);
+  return undefined;
+}
+
+/**
+ * Splits a record URI into its parts without sending any request.
+ *
+ * Throws TypeError, naming `operation`, unless `uri` is `at://<did>/<collection>/<rkey>`.
+ */
+export function parseRecordUri(uri: string, operation: string): ParsedRecordUri {
+  const parsed = tryParseRecordUri(uri);
+  if (parsed === undefined) throw notARecordUri(uri, operation);
+  return parsed;
 }
 
 /** The collection segment of a record URI, or undefined when it has none. Does not validate `uri`. */

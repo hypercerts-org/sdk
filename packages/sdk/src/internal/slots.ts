@@ -9,10 +9,10 @@ import {
   assertRecordUriOfType,
   collectionOf,
   type PdsClients,
-  parseRecordUri,
   recordExists,
   resolveRecordRef,
   type StrongRef,
+  tryParseRecordUri,
 } from "./resolve-record-ref.js";
 import { assertWithinWriteLimit } from "./submit-writes.js";
 
@@ -293,8 +293,6 @@ function assertNotMixed(
 const inlineValue = l.object({ inline: l.string() });
 const existingRecord = l.object({ uri: l.string({ format: "at-uri" }) });
 
-// The collection part of a record URI, which `at-uri` alone does not require.
-
 function existing(
   build: BuildContext,
   field: string,
@@ -320,9 +318,7 @@ function existing(
     allowed,
     `this field holds ${allowed?.join(", ") ?? "a record"}`,
   );
-  try {
-    parseRecordUri(uri, build.operation);
-  } catch {
+  if (tryParseRecordUri(uri) === undefined) {
     throw new TypeError(
       `${build.operation}: ${field} is not a record URI: ${uri}. Expected at://<did>/${actual}/<rkey>.`,
     );

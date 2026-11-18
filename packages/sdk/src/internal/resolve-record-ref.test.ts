@@ -2,7 +2,7 @@ import type { AtprotoDidDocument } from "@atproto-labs/did-resolver";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSDKContext, type DidDocumentResolver } from "../context.js";
 import { CID, DID, fakePds, json } from "../test-utils/fake-pds.js";
-import { resolveRecordRef } from "./resolve-record-ref.js";
+import { resolveRecordRef, tryParseRecordUri } from "./resolve-record-ref.js";
 
 const OPERATION = "resolveRecordRef";
 const URI = `at://${DID}/org.hypercerts.claim.activity/3k2a4b5c6d7e8`;
@@ -248,5 +248,26 @@ describe("resolveRecordRef", () => {
       /Expected at:\/\/<did>/,
     );
     expect(requests).toHaveLength(0);
+  });
+});
+
+describe("tryParseRecordUri", () => {
+  it("returns the parts of a record URI", () => {
+    expect(tryParseRecordUri(URI)).toEqual({
+      atUri: URI,
+      did: DID,
+      collection: "org.hypercerts.claim.activity",
+      rkey: "3k2a4b5c6d7e8",
+    });
+  });
+
+  it.each([
+    "at://alice.example.com/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+    `at://${DID}/org.hypercerts.claim.activity`,
+    `at://${DID}`,
+    `${URI}/extra`,
+    "https://example.com/record",
+  ])("returns undefined for %s", (uri) => {
+    expect(tryParseRecordUri(uri)).toBeUndefined();
   });
 });
