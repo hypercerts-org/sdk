@@ -24,6 +24,23 @@ describe("pdsTarget", () => {
     expect(error.message).toContain("exactly one create");
   });
 
+  it("rejects a create-only plan that carries swapCommit", async () => {
+    const { context } = fakeRepo({});
+    const record = await prepareRecord(DID, rights.main, {
+      rightsName: "CC BY",
+      rightsType: "CC-BY",
+      rightsDescription: "Share with credit",
+      createdAt: "2024-01-01T00:00:00.000Z",
+    });
+
+    const error = await pdsTarget(context, DID, "op")
+      .submit({ creates: [record], updates: [], createOnly: true, swapCommit: "bafyhead" })
+      .catch((e) => e);
+
+    expect(error).toBeInstanceOf(TypeError);
+    expect(error.message).toContain("swapCommit");
+  });
+
   it("reports a missing record as undefined", async () => {
     const { context } = fakeRepo({});
     const target = pdsTarget(context, DID, "op");

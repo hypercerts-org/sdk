@@ -227,6 +227,11 @@ async function submitCreateOnly(
       `${operation}: a create-only write holds exactly one create and no updates on the PDS (it uses putRecord), but got ${plan.creates.length} creates and ${plan.updates.length} updates. This is a bug in the SDK.`,
     );
   }
+  if (plan.swapCommit !== undefined) {
+    throw new TypeError(
+      `${operation}: a create-only write cannot use swapCommit because it is sent with putRecord, which has no commit check, so the check would be silently dropped. Nothing was written. This is a bug in the SDK.`,
+    );
+  }
   try {
     await submit(
       operation,
