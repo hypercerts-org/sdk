@@ -4,6 +4,7 @@ import type { AddActivityToCollectionInput } from "../collection/add-activity-to
 import type { SDKContext } from "../context.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import type { ExistingRecord } from "../internal/slots.js";
+import type { WriteOptions } from "../write-options.js";
 
 const OPERATION = "addActivityToProject";
 
@@ -66,6 +67,7 @@ export interface AddActivityToProjectResult extends StrongRef {
 export async function addActivityToProject(
   context: SDKContext,
   input: AddActivityToProjectInput,
+  options?: WriteOptions,
 ): Promise<AddActivityToProjectResult> {
   return addActivity(
     context,
@@ -82,5 +84,6 @@ export async function addActivityToProject(
       },
     },
     input,
+    options,
   );
 }

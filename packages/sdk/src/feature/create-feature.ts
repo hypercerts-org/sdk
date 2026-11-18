@@ -17,6 +17,7 @@ import {
   type VocabularyTagInput,
   vocabularyTagKind,
 } from "../tag/build-tag.js";
+import type { WriteOptions } from "../write-options.js";
 
 /** The data of a new `org.hypercerts.entity.feature` record. */
 export interface FeatureInput {
@@ -198,8 +199,9 @@ const createFeatureTree = creatorOf<FeatureInput, FeatureTree>("createFeature", 
 export async function createFeature(
   context: SDKContext,
   input: FeatureInput,
+  options?: WriteOptions,
 ): Promise<CreateFeatureResult> {
-  return featureResult(await createFeatureTree(context, input));
+  return featureResult(await createFeatureTree(context, input, options));
 }
 
 /** The public result of a Feature, from what `creatorOf` reports for its record. */

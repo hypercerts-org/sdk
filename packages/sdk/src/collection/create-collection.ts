@@ -2,6 +2,7 @@ import type { SDKContext } from "../context.js";
 import { createBuildContext } from "../internal/build-context.js";
 import { prepareSlots } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
+import type { WriteOptions } from "../write-options.js";
 import {
   type CollectionInput,
   type CreateCollectionResult,
@@ -145,8 +146,9 @@ const OPERATION = "createCollection";
 export async function createCollection(
   context: SDKContext,
   input: CollectionInput,
+  options?: WriteOptions,
 ): Promise<CreateCollectionResult> {
-  const build = createBuildContext(context, OPERATION);
+  const build = createBuildContext(context, OPERATION, options);
   const planned = planCollection(build, "input", input);
   // Reads first, then uploads: a URI that cannot be resolved, or a taken tag key, fails before
   // anything is uploaded.

@@ -17,6 +17,7 @@ import {
   type SupportingRecordRef,
 } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
+import type { WriteOptions } from "../write-options.js";
 import { type OrganizationInput, organizationKind } from "./build-organization.js";
 
 const OPERATION = "createOrganization";
@@ -259,8 +260,9 @@ const inputSchema = strictObject({
 export async function createOrganization(
   context: SDKContext,
   input: CreateOrganizationInput,
+  options?: WriteOptions,
 ): Promise<CreateOrganizationResult> {
-  const build = createBuildContext(context, OPERATION);
+  const build = createBuildContext(context, OPERATION, options);
   const { organization: organizationSlot, fallback } = planInput(build, input);
 
   const start = await readStartingPoint(build);

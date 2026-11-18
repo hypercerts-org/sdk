@@ -19,6 +19,7 @@ import {
 } from "../internal/resolve-record-ref.js";
 import { prepareSlots } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
+import type { WriteOptions } from "../write-options.js";
 
 // The `maxLength` of the lexicon's `items`. Only used to explain a full Collection in plain words:
 // validating the updated record against the lexicon still decides what is valid.
@@ -68,8 +69,9 @@ export async function addActivity(
   operation: string,
   target: AddActivityTarget,
   input: unknown,
+  options?: WriteOptions,
 ): Promise<StrongRef & { activity: ActivityEntryResult }> {
-  const build = createBuildContext(context, operation);
+  const build = createBuildContext(context, operation, options);
   const { uri, activity: activityValue, weight } = parseAddInput(build, target.field, input);
   const rkey = parseCollectionUri(build, target, uri);
   const planned = planActivityEntry(build, "input.activity", activityValue);

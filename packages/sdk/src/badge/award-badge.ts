@@ -11,6 +11,7 @@ import { compact, endsBeforeStart, optionalText, strictObject } from "../interna
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
+import type { WriteOptions } from "../write-options.js";
 import {
   parseSubject,
   planDefinition,
@@ -189,8 +190,9 @@ function assertValidityRange(build: BuildContext, input: l.InferOutput<typeof aw
 export async function awardBadge(
   context: SDKContext,
   input: AwardBadgeInput,
+  options?: WriteOptions,
 ): Promise<AwardBadgeResult> {
-  const build = createBuildContext(context, OPERATION);
+  const build = createBuildContext(context, OPERATION, options);
   const parsed = parseInput(build, "input", awardInput, input);
   assertValidityRange(build, parsed);
   const subject = parseSubject(build, parsed.subject);

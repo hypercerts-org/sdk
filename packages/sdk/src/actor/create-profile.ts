@@ -7,6 +7,7 @@ import { optionalMedia, optionalText } from "../internal/input.js";
 import { mediaTransform } from "../internal/media.js";
 import { type RecordKind, recordKind } from "../internal/record-kind.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
+import type { WriteOptions } from "../write-options.js";
 
 /** The data of the `app.certified.actor.profile` record of an account. */
 export interface ProfileInput {
@@ -138,9 +139,13 @@ const createStandaloneProfile = standaloneCreatorOf("createProfile", profileKind
  * }
  * ```
  */
-export async function createProfile(context: SDKContext, input: ProfileInput): Promise<StrongRef> {
+export async function createProfile(
+  context: SDKContext,
+  input: ProfileInput,
+  options?: WriteOptions,
+): Promise<StrongRef> {
   try {
-    return await createStandaloneProfile(context, input);
+    return await createStandaloneProfile(context, input, options);
   } catch (error) {
     throw error instanceof RecordAlreadyExistsError ? alreadyExists(error) : error;
   }

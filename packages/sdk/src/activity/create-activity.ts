@@ -48,6 +48,7 @@ import {
   type WorkScopeTagInput,
   workScopeTagKind,
 } from "../tag/build-tag.js";
+import type { WriteOptions } from "../write-options.js";
 import { type ContributionInput, contributionKind } from "./create-contribution.js";
 import {
   type ContributorInformationInput,
@@ -450,8 +451,9 @@ function supportingSlots(plan: ActivityPlan): Slot[] {
 export async function createActivity(
   context: SDKContext,
   input: ActivityInput,
+  options?: WriteOptions,
 ): Promise<CreateActivityResult> {
-  const build = createBuildContext(context, "createActivity");
+  const build = createBuildContext(context, "createActivity", options);
   const { writes, result } = await prepareActivity(build, input);
   await submitWrites(build, writes);
   return result;

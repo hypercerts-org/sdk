@@ -15,6 +15,7 @@ import {
 } from "../internal/resolve-record-ref.js";
 import type { ExistingRecord } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
+import type { WriteOptions } from "../write-options.js";
 
 const OPERATION = "respondToBadgeAward";
 
@@ -151,8 +152,9 @@ function recipientOf({ subject }: award.Main, uri: string): DidString {
 export async function respondToBadgeAward(
   context: SDKContext,
   input: RespondToBadgeAwardInput,
+  options?: WriteOptions,
 ): Promise<StrongRef> {
-  const build = createBuildContext(context, OPERATION);
+  const build = createBuildContext(context, OPERATION, options);
   const parsed = parseInput(build, "input", inputSchema, input);
   assertAwardUri(parsed.award.uri);
 

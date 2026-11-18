@@ -2,6 +2,7 @@ import { type CidString, isCidString, isDidString, l } from "@atproto/lex";
 import type { SDKContext } from "../context.js";
 import { strictObject } from "../internal/input.js";
 import { resolveRecordRef, tryParseRecordUri } from "../internal/resolve-record-ref.js";
+import type { WriteOptions } from "../write-options.js";
 
 /** A record the action refers to, as `{ uri }`. */
 export interface RecordSubject {
@@ -99,7 +100,11 @@ export type UndoField = "follow" | "like" | "repost";
 export type UndoInput<TField extends UndoField> = { [K in TField]: UndoRecord };
 
 /** A function that deletes one of the account's own social records, as {@link unlike} does. */
-export type UndoFunction<TInput> = (context: SDKContext, input: TInput) => Promise<void>;
+export type UndoFunction<TInput> = (
+  context: SDKContext,
+  input: TInput,
+  options?: WriteOptions,
+) => Promise<void>;
 
 /** What an undo input is after validation: the same, with the `cid` known to be a CID. */
 type ValidatedUndoInput<TField extends UndoField> = {

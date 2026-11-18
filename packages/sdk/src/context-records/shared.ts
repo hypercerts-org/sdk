@@ -82,8 +82,8 @@ export function creatorWithoutCreatedOf<
   TResult extends StrongRef,
 >(operation: string, kind: RecordKind<T>): StandaloneCreator<T, TResult> {
   const create = creatorOf<T, TResult & { created: true }>(operation, kind);
-  return async (context, input) => {
-    const { created: _created, ...result } = await create(context, input);
+  return async (context, input, options) => {
+    const { created: _created, ...result } = await create(context, input, options);
     return result as unknown as TResult;
   };
 }

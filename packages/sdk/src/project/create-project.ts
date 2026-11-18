@@ -1,6 +1,7 @@
 import type { SDKContext } from "../context.js";
 import { createBuildContext } from "../internal/build-context.js";
 import { submitWrites } from "../internal/submit-writes.js";
+import type { WriteOptions } from "../write-options.js";
 import { type CreateProjectResult, type ProjectInput, prepareProject } from "./build-project.js";
 
 const OPERATION = "createProject";
@@ -65,8 +66,9 @@ const OPERATION = "createProject";
 export async function createProject(
   context: SDKContext,
   input: ProjectInput,
+  options?: WriteOptions,
 ): Promise<CreateProjectResult> {
-  const build = createBuildContext(context, OPERATION);
+  const build = createBuildContext(context, OPERATION, options);
   const { writes, result } = await prepareProject(build, input);
   await submitWrites(build, writes);
   return result;
