@@ -36,11 +36,14 @@ export interface RespondToBadgeAwardInput {
   createdAt?: string | undefined;
 }
 
+/** The `maxLength` of `weight` in the lexicon of `app.certified.badge.response`. */
+const BADGE_RESPONSE_WEIGHT_MAX_LENGTH = 50;
+
 const inputSchema = l.refine(
   strictObject({
     awardUri: l.string(),
     response: l.enum(["accepted", "rejected"]),
-    weight: l.optional(weightString),
+    weight: l.optional(weightString(BADGE_RESPONSE_WEIGHT_MAX_LENGTH)),
     createdAt: optionalText,
   }),
   {

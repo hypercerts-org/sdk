@@ -60,15 +60,29 @@ export function compact<T extends object>(value: T): Compacted<T> {
 /** A `Blob` or `File` to upload. */
 export const blob = l.custom<Blob>(isBlob, "must be a Blob or File");
 
+/** The lexicon's `maxLength` for a weight in an activity contributor, a collection item or a project/collection entry. */
+export const WEIGHT_MAX_LENGTH = 100;
+
 /**
- * A positive decimal number written as a string, for example `"2"` or `"0.5"`. The lexicons store
- * weights as strings and say only that they are positive; this is the SDK's one rule for them.
- * The string is kept as written, not normalised, and its length is left to the lexicon.
+ * A positive decimal number written as a string, for example `"2"` or `"0.5"`, of at most
+ * `maxLength` characters. The lexicons store weights as strings and say only that they are positive
+ * and how long they may be; this is the SDK's one rule for them. The string is kept as written,
+ * not normalised.
+ *
+ * Internal. Pass the `maxLength` of the lexicon field the weight is stored in, so a too-long weight
+ * is rejected before any request, with a message that names the field the caller wrote.
  */
-export const weightString = l.refine(l.string(), {
-  check: (value: string) => /^\d+(\.\d+)?$/.test(value) && Number(value) > 0,
-  message: 'must be a positive decimal number written as a string, for example "1" or "0.25"',
-});
+export const weightString = (maxLength: number) =>
+  l.refine(
+    l.refine(l.string(), {
+      check: (value: string) => /^\d+(\.\d+)?$/.test(value) && Number(value) > 0,
+      message: 'must be a positive decimal number written as a string, for example "1" or "0.25"',
+    }),
+    {
+      check: (value: string) => value.length <= maxLength,
+      message: `must be at most ${maxLength} characters`,
+    },
+  );
 
 /** An optional string. The lexicon checks its length and format. */
 export const optionalText = l.optional(l.string());

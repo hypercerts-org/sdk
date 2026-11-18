@@ -73,7 +73,7 @@ await respondToBadgeAward(context, { awardUri, response: "rejected" });
 ```
 
 - The recipient of an award to an account is that account. For an award to a record it is the account whose repository holds the record (the SDK's rule; the lexicon does not say). Any other signed-in account, the issuer included, gets an `Error` and nothing is written.
-- `weight` only goes with `"accepted"`; with `"rejected"` it throws `TypeError`. It must be a positive decimal number written as a string and is stored exactly as written (`"007.50"` stays `"007.50"`).
+- `weight` only goes with `"accepted"`; with `"rejected"` it throws `TypeError`. It must be a positive decimal number written as a string of at most 50 characters and is stored exactly as written (`"007.50"` stays `"007.50"`).
 - Nothing is deduplicated or overwritten: every call creates a response under a new key. Responding twice leaves two responses. Calling again after `WriteOutcomeUnknownError` is not safe: it would create a second response.
 
 ## Uploads are outside the commit

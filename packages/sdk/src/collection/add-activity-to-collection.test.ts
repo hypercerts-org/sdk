@@ -214,6 +214,11 @@ describe("addActivityToCollection with an existing Activity", () => {
 describe("addActivityToCollection when the input is wrong", () => {
   it.each<[string, Partial<AddActivityToCollectionInput> | object, RegExp]>([
     [
+      "a weight over 100 characters",
+      { weight: "1".repeat(101) },
+      /invalid input: must be at most 100 characters at \$\.weight/,
+    ],
+    [
       "a bare Activity as `activity`",
       { activity },
       /invalid input\.activity: .*Allowed fields: activity, uri/,
