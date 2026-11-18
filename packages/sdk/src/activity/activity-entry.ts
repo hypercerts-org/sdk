@@ -1,37 +1,18 @@
 import { l } from "@atproto/lex";
 import * as activity from "@hypercerts-org/lexicon/org/hypercerts/claim/activity";
-import { type BuildContext, parseInput } from "../internal/build-context.js";
-import { strictObject, WEIGHT_MAX_LENGTH, weightString } from "../internal/input.js";
+import type { BuildContext } from "../internal/build-context.js";
+import { WEIGHT_MAX_LENGTH, weightString } from "../internal/input.js";
 import {
+  isExistingRecord,
   type Planned,
   type Slot,
   type SupportingRecordRef,
   toExistingSlot,
 } from "../internal/slots.js";
-import {
-  type ActivityInput,
-  type CreateActivityResult,
-  planActivitySlot,
-} from "./build-activity.js";
+import { type CreateActivityResult, planActivitySlot } from "./build-activity.js";
 
 /**
- * An Activity to put in a Collection or Project: exactly one of `{ activity }` (a new Activity) or
- * `{ uri }` (an existing Activity, reused and never changed). A bare Activity is not an entry.
- */
-export type ActivityEntry =
-  | {
-      /** A new Activity and its supporting records. See {@link ActivityInput}. */
-      activity: ActivityInput;
-      uri?: never;
-    }
-  | {
-      /** An existing Activity: `at://<did>/org.hypercerts.claim.activity/<rkey>`, with a DID. */
-      uri: string;
-      activity?: never;
-    };
-
-/**
- * What a call did for one {@link ActivityEntry}: created the Activity (with its records) or reused
+ * What a call did for one Activity that may be new or existing: created the Activity (with its records) or reused
  * it. Narrow on `created`.
  */
 export type ActivityEntryResult =
@@ -46,64 +27,31 @@ export type ActivityEntryResult =
 export const entryWeight = l.optional(weightString(WEIGHT_MAX_LENGTH));
 
 /**
- * The schemas of an entry's two choices, for an input that adds more fields (a weight) around them.
- *
- * Internal.
- */
-export const activityEntryFields = {
-  activity: l.optional(l.unknown()),
-  uri: l.optional(l.string()),
-};
-
-const activityEntry = strictObject(activityEntryFields);
-
-/**
- * Checks that exactly one of `activity` and `uri` is given.
- *
- * Internal. `field` names the entry in messages. The choice is explicit and never guessed from the
- * fields, so a bare Activity (`{ title, shortDescription }`) fails on its unknown fields first.
- *
- * Throws TypeError, naming `field`, when both or neither is given.
- */
-export function chooseActivity(
-  build: BuildContext,
-  field: string,
-  entry: { activity?: unknown; uri?: string | undefined },
-): { activity: unknown } | { uri: string } {
-  const { uri } = entry;
-  if (uri !== undefined && entry.activity === undefined) return { uri };
-  if (uri === undefined && entry.activity !== undefined) return { activity: entry.activity };
-  throw new TypeError(
-    `${build.operation}: ${field} must have exactly one of activity or uri, but has ${uri === undefined ? "none" : "both"}. Use { activity } with the data of a new Activity, or { uri } of an existing one.`,
-  );
-}
-
-/**
- * The slot of an existing Activity: `uri` must name an Activity (not a Feature or a Collection) and
- * use a DID.
+ * The slot of an existing Activity: `value` is `{ uri }`, and the URI must name an Activity (not a
+ * Feature or a Collection) and use a DID.
  *
  * Internal. Throws TypeError, naming `field.uri`, for any other URI.
  */
-export const existingActivitySlot = (build: BuildContext, field: string, uri: string): Slot =>
-  toExistingSlot(build, `${field}.uri`, { uri }, [activity.main.$type]);
+export const existingActivitySlot = (build: BuildContext, field: string, value: unknown): Slot =>
+  toExistingSlot(build, `${field}.uri`, value, [activity.main.$type]);
 
 /**
- * Validates an {@link ActivityEntry} and plans its Activity, without sending any request.
+ * Validates an Activity given as the data of a new one or as `{ uri }` of an existing one, and plans
+ * it, without sending any request.
  *
- * Internal. `field` names the entry in messages, for example `input.activity`, and the data of a new
- * Activity as `input.activity.activity`. Throws TypeError, naming the field, for any problem in it.
+ * Internal. `field` names the Activity in messages, for example `input.activity`. Throws TypeError,
+ * naming the field, for any problem in it.
  */
 export function planActivityEntry(
   build: BuildContext,
   field: string,
   value: unknown,
 ): Planned<ActivityEntryResult> {
-  const choice = chooseActivity(build, field, parseInput(build, field, activityEntry, value));
-  if ("uri" in choice) {
-    const slot = existingActivitySlot(build, field, choice.uri);
+  if (isExistingRecord(value)) {
+    const slot = existingActivitySlot(build, field, value);
     return { slot, result: (_created, refOf) => ({ ...refOf(slot), created: false }) };
   }
-  const planned = planActivitySlot(build, choice.activity, `${field}.activity`);
+  const planned = planActivitySlot(build, value, field);
   return {
     slot: planned.slot,
     result: (created, refOf) => ({ ...planned.result(created, refOf), created: true }),

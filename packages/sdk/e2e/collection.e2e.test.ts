@@ -245,8 +245,8 @@ describe("addActivityToCollection", () => {
     const before = await snapshotCounts(user.client);
 
     const result = await addActivityToCollection(user.context, {
-      collectionUri: seeded.ref.uri,
-      activity: { activity: { ...base(), rights, locations: [coordinates] } },
+      collection: { uri: seeded.ref.uri },
+      activity: { ...base(), rights, locations: [coordinates] },
       weight: "2.5",
     });
 
@@ -256,9 +256,9 @@ describe("addActivityToCollection", () => {
     expect(await expectReferencesResolve(user.client, activity)).toHaveLength(2);
     // The Collection is stored at the CID the SDK reported, under the same URI, with everything
     // else as it was and the new item last.
-    expect(result.collection.uri).toBe(seeded.ref.uri);
-    expect(result.collection.cid).not.toBe(seeded.ref.cid);
-    const stored = await expectStored(user.client, result.collection);
+    expect(result.uri).toBe(seeded.ref.uri);
+    expect(result.cid).not.toBe(seeded.ref.cid);
+    const stored = await expectStored(user.client, result);
     expect(stored).toEqual({
       ...seeded.stored,
       items: [
@@ -290,8 +290,8 @@ describe("addActivityToCollection", () => {
 
     await expect(
       addActivityToCollection(interfering.context, {
-        collectionUri: seeded.ref.uri,
-        activity: { activity: { ...base(), rights, locations: [coordinates] } },
+        collection: { uri: seeded.ref.uri },
+        activity: { ...base(), rights, locations: [coordinates] },
       }),
     ).rejects.toMatchObject({ name: "WriteRejectedError", code: "InvalidSwap" });
 
@@ -318,13 +318,13 @@ describe("addActivityToCollection with another account's Activity", () => {
     const otherBefore = await snapshotCounts(other.client);
 
     const result = await addActivityToCollection(user.context, {
-      collectionUri: seeded.ref.uri,
+      collection: { uri: seeded.ref.uri },
       activity: { uri: theirs.uri },
       weight: "1",
     });
 
     expect(result.activity).toEqual({ ...refOnly(theirs), created: false });
-    const stored = await expectStored(user.client, result.collection);
+    const stored = await expectStored(user.client, result);
     await expectReferencesResolve(user.client, stored);
     expect(itemsOf(stored)).toEqual([
       ...itemsOf(seeded.stored),

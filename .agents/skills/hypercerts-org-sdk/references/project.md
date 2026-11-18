@@ -24,7 +24,7 @@ const project = await createProject(context, {
 project.activities[0]; // { uri, cid, created: true, locations: [], contributors: [] }
 ```
 
-With `activities`, you choose them, and no default Activity is created. Each entry is `{ activity }` (new) or `{ uri }` (existing), with an optional `weight`:
+With `activities`, you choose them, and no default Activity is created. Each entry is `{ activity, weight? }`, where `activity` is the data of a new Activity or `{ uri }` of an existing one:
 
 ```ts
 const project = await createProject(context, {
@@ -33,16 +33,16 @@ const project = await createProject(context, {
   tags: [{ category: "theme", key: "forest", name: "Forest", status: "accepted" }], // created
   activities: [
     { activity: { title: "Reforestation", shortDescription: "Planting 5,000 trees." }, weight: "2" }, // created
-    { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8", weight: "0.5" }, // reused
+    { activity: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" }, weight: "0.5" }, // reused
   ],
 });
 project.activities[0]; // { uri, cid, created: true, locations: [], contributors: [] }
 project.activities[1]; // { uri, cid, created: false }
 ```
 
-- An entry is **exactly one** of `{ activity }` (the data of a new Activity, the same input as `createActivity`) or `{ uri }`, plus an optional `weight`. The SDK never guesses from the fields: a bare Activity (`{ title, shortDescription }`) is a `TypeError`, and so is `{ feature }`.
+- An entry is `{ activity, weight? }`. `activity` is the data of a new Activity (the same input as `createActivity`) or `{ uri }` of an existing one; `uri` is never mixed with Activity fields. The weight sits **beside** `activity`, in the entry. A bare Activity as an entry (`{ title, shortDescription }`), a bare `{ uri }` entry and `{ feature }` are a `TypeError`.
 - `type`, `items` and any unknown field are not accepted (`TypeError`). A Project is always `type: "project"`, and its items are its `activities`.
-- `{ uri }` must be an **Activity** with a DID (`at://<did>/org.hypercerts.claim.activity/<rkey>`); a handle is a `TypeError`. A Feature or a Collection URI is a `TypeError` naming the entry, unlike in `createCollection`. It is read for its CID (a strong reference) and reused unchanged; it may belong to another account if public. Another account's PDS is found with the context's `didResolver` ([SKILL.md](../SKILL.md#2-create-the-context-once)).
+- `activity: { uri }` must be an **Activity** with a DID (`at://<did>/org.hypercerts.claim.activity/<rkey>`); a handle is a `TypeError`. A Feature or a Collection URI is a `TypeError` naming the entry, unlike in `createCollection`. It is read for its CID (a strong reference) and reused unchanged; it may belong to another account if public. Another account's PDS is found with the context's `didResolver` ([SKILL.md](../SKILL.md#2-create-the-context-once)).
 - `weight` is a positive decimal string (`"2"`, `"0.50"`), stored exactly as you pass it, at most 100 characters. Weights need not add up to anything.
 - Order is kept. Nothing is deduplicated or searched for: the same `{ uri }` twice gives two items, the same data twice gives two records.
 - `location`, `tags`, `description`, `avatar`, `banner`, `langs`, `shortDescriptionFacets` and `createdAt` work as in `createCollection` ([collection.md](collection.md)). A new tag's key is `<category>.<key>`: a taken key throws `RecordAlreadyExistsError` before anything is uploaded or written.
@@ -80,7 +80,7 @@ Errors are as in [Handle failures](../SKILL.md#6-handle-failures). After `WriteO
 | ------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `title`                  | `string`                               | Required. At most 800 bytes and 80 graphemes. Copied into the default Activity, which holds at most 256 bytes.                  |
 | `shortDescription`       | `string`                               | At most 3000 bytes and 300 graphemes. **Required** when `activities` is omitted or empty: copied into the default Activity.     |
-| `activities`             | `ProjectActivityInput[]`               | At most 1000. `{ activity \| uri, weight? }`. Omitted or empty: one default Activity. A non-empty array: no default Activity.   |
+| `activities`             | `ProjectActivityInput[]`               | At most 1000. `{ activity: ActivityInput \| { uri }, weight? }`. Omitted or empty: one default Activity. A non-empty array: no default Activity.   |
 | `description`            | `string \| LeafletDocument \| { uri }` | Inline text or document, or a strong reference to a record of any type. Copied into the default Activity as it is.              |
 | `langs`                  | `string[]`                             | Up to three BCP-47 tags. Copied into the default Activity.                                                                      |
 | `avatar`                 | `string \| Blob`                       | URL stored as is, or an image uploaded (up to 5 MB). Not copied into the default Activity.                                      |
@@ -94,36 +94,37 @@ Not supported: `type` and `items` (a Project is always `type: "project"`; its it
 
 ## addActivityToProject
 
-`addActivityToProject(context, { projectUri, activity, weight? })` appends an Activity to an **existing** Project in your repo in one `applyWrites` commit. It is [`addActivityToCollection`](collection.md#addactivitytocollection) for a Collection of type `project`, with `projectUri` in place of `collectionUri` and `project` in place of `collection` in the result.
+`addActivityToProject(context, { project: { uri }, activity, weight? })` appends an Activity to an **existing** Project in your repo in one `applyWrites` commit. It is [`addActivityToCollection`](collection.md#addactivitytocollection) for a Collection of type `project`, with `project` in place of `collection` in the input. The result has the same shape.
 
 ```ts
 import { addActivityToProject } from "@hypercerts-org/sdk/project";
 
-const projectUri = "at://did:plc:abc123/org.hypercerts.collection/3k2a4b5c6d7e8"; // placeholder: one of your own
+const project = { uri: "at://did:plc:abc123/org.hypercerts.collection/3k2a4b5c6d7e8" }; // placeholder: one of your own
 
 const added = await addActivityToProject(context, {
-  projectUri,
-  activity: { activity: { title: "Wetland survey", shortDescription: "Mapping the wetlands." } }, // created
+  project,
+  activity: { title: "Wetland survey", shortDescription: "Mapping the wetlands." }, // created
   weight: "1",
 });
 added.activity; // { uri, cid, created: true, locations: [], contributors: [] }
-added.project; // { uri, cid }: the same URI, the new version's CID
+added.uri; // the Project's URI, unchanged
+added.cid; // the CID of the Project's new version
 
 await addActivityToProject(context, {
-  projectUri,
+  project,
   activity: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" }, // reused
 });
 ```
 
-- `activity` is **exactly one** of `{ activity }` (a new Activity) or `{ uri }` (an existing Activity), never a bare Activity input; `weight` goes beside it. Validation, the item's position and weight, `signatures`, the 1000-item limit, no deduplication, `InvalidSwap` and uploads are all as in [addActivityToCollection](collection.md#addactivitytocollection).
+- `activity` is the data of a new Activity or `{ uri }` of an existing one, never both; `weight` goes beside it, not inside. Validation, the item's position and weight, `signatures`, the 1000-item limit, no deduplication, `InvalidSwap` and uploads are all as in [addActivityToCollection](collection.md#addactivitytocollection).
 - The Collection must have `type: "project"`. Any other type, or none, is a `TypeError` that names `addActivityToCollection`; the check also runs on the second read, so a Collection that stopped being a Project in between is refused. A Collection of another type: use `addActivityToCollection`.
-- `projectUri` must be your own Project, with a DID. Another account's Project is a `TypeError`.
+- `project` is `{ uri }`, never a bare string, and must be your own Project, with a DID. Another account's Project is a `TypeError`.
 - After `WriteOutcomeUnknownError`, `attempted` lists the new records and, last, the Project (only the Project for a `{ uri }`). Check before retrying, or you add a second item.
 
 ### `AddActivityToProjectInput`
 
 | Field        | Type                      | Notes                                                                                                  |
 | ------------ | ------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `projectUri` | `string`                  | Required. `at://<your did>/org.hypercerts.collection/<rkey>` of a Collection with `type: "project"`.  |
-| `activity`   | `{ activity } \| { uri }` | Required. Exactly one: a new Activity or the URI of an existing one. See [activity.md](activity.md).   |
+| `project`    | `{ uri }`                 | Required. `at://<your did>/org.hypercerts.collection/<rkey>` of a Collection with `type: "project"`.  |
+| `activity`   | `ActivityInput \| { uri }` | Required. The data of a new Activity or `{ uri }` of an existing one. See [activity.md](activity.md).   |
 | `weight`     | `string`                  | Optional. Positive decimal string, at most 100 characters.                                             |

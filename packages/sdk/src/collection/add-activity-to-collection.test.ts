@@ -32,8 +32,8 @@ const itemAt = (rkey: string) => ({
 });
 
 const call = (input: Partial<AddActivityToCollectionInput> = {}) => ({
-  collectionUri,
-  activity: { activity },
+  collection: { uri: collectionUri },
+  activity,
   ...input,
 });
 
@@ -61,8 +61,9 @@ describe("addActivityToCollection with a new Activity", () => {
     expect(update.value).toEqual({ ...stored, items: [{ itemIdentifier: refTo(created) }] });
     expect(swapCommits).toEqual([HEAD]);
     expect(result).toEqual({
+      uri: collectionUri,
+      cid: update.cid,
       activity: { ...refTo(created), created: true, locations: [], contributors: [] },
-      collection: { uri: collectionUri, cid: update.cid },
     });
   });
 
@@ -103,7 +104,7 @@ describe("addActivityToCollection with a new Activity", () => {
     expect(update.value).toEqual(lexParse(JSON.stringify(expected)));
     // The CID the SDK computed for the updated Collection is the one the PDS computed from the wire
     // bytes, including the blob reference and the signature bytes the SDK carried over.
-    expect(result.collection.cid).toBe(update.cid);
+    expect(result.cid).toBe(update.cid);
   });
 
   it("creates nested records and reuses existing ones as createActivity does, reading the Collection last", async () => {
@@ -118,19 +119,17 @@ describe("addActivityToCollection with a new Activity", () => {
       context,
       call({
         activity: {
-          activity: {
-            ...activity,
-            image: png,
-            rights: { uri: rightsUri },
-            locations: [
-              {
-                lpVersion: "1.0",
-                srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-                locationType: "coordinate-decimal",
-                location: { string: "27.47,90.17" },
-              },
-            ],
-          },
+          ...activity,
+          image: png,
+          rights: { uri: rightsUri },
+          locations: [
+            {
+              lpVersion: "1.0",
+              srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+              locationType: "coordinate-decimal",
+              location: { string: "27.47,90.17" },
+            },
+          ],
         },
       }),
     );
@@ -183,8 +182,9 @@ describe("addActivityToCollection with an existing Activity", () => {
     ]);
     expect(swapCommits).toEqual([HEAD]);
     expect(result).toEqual({
+      uri: collectionUri,
+      cid: update.cid,
       activity: { uri: existing, cid: ACTIVITY_CID, created: false },
-      collection: { uri: collectionUri, cid: update.cid },
     });
   });
 
@@ -219,19 +219,19 @@ describe("addActivityToCollection when the input is wrong", () => {
       /invalid input: must be at most 100 characters at \$\.weight/,
     ],
     [
-      "a bare Activity as `activity`",
-      { activity },
-      /invalid input\.activity: .*Allowed fields: activity, uri/,
+      "the old `{ activity }` wrapper as `activity`",
+      { activity: { activity } },
+      /invalid input\.activity: Missing required key "title"/,
     ],
     [
-      "an `activity` with neither choice",
+      "an `activity` that is neither new data nor { uri }",
       { activity: {} },
-      /input\.activity must have exactly one of activity or uri, but has none/,
+      /invalid input\.activity: Missing required key "title"/,
     ],
     [
-      "an `activity` with both choices",
-      { activity: { activity, uri: `at://${DID}/${ACTIVITY}/3k2a4b5c6d7e8` } },
-      /input\.activity must have exactly one of activity or uri, but has both/,
+      "an `activity` that is data and { uri } at once",
+      { activity: { ...activity, uri: `at://${DID}/${ACTIVITY}/3k2a4b5c6d7e8` } },
+      /input\.activity\.uri combines `uri` with other fields/,
     ],
     [
       "a Feature URI",
@@ -250,8 +250,8 @@ describe("addActivityToCollection when the input is wrong", () => {
     ],
     [
       "an invalid field of the new Activity, named as the caller wrote it",
-      { activity: { activity: { ...activity, rights: { inline: "ARR" } } } },
-      /input\.activity\.activity\.rights does not accept \{ inline \}/,
+      { activity: { ...activity, rights: { inline: "ARR" } } },
+      /input\.activity\.rights does not accept \{ inline \}/,
     ],
     [
       "a weight that is not a number",
@@ -265,17 +265,17 @@ describe("addActivityToCollection when the input is wrong", () => {
     ],
     [
       "a record of another type",
-      { collectionUri: `at://${DID}/${ACTIVITY}/3k2a4b5c6d7e8` },
-      /collectionUri points at a record of type org\.hypercerts\.claim\.activity, but it must be of type org\.hypercerts\.collection/,
+      { collection: { uri: `at://${DID}/${ACTIVITY}/3k2a4b5c6d7e8` } },
+      /collection\.uri points at a record of type org\.hypercerts\.claim\.activity, but it must be of type org\.hypercerts\.collection/,
     ],
     [
       "a Collection of another account",
-      { collectionUri: "at://did:plc:someoneelse/org.hypercerts.collection/3k2a4b5c6d7e8" },
+      { collection: { uri: "at://did:plc:someoneelse/org.hypercerts.collection/3k2a4b5c6d7e8" } },
       /in the repository of did:plc:someoneelse, but the client is signed in as did:plc:testowner123.*own Collections/,
     ],
     [
       "a handle authority",
-      { collectionUri: "at://alice.test/org.hypercerts.collection/3k2a4b5c6d7e8" },
+      { collection: { uri: "at://alice.test/org.hypercerts.collection/3k2a4b5c6d7e8" } },
       /not a record URI/,
     ],
   ])("sends nothing, not even a read, for %s", async (_, input, message) => {
@@ -284,7 +284,7 @@ describe("addActivityToCollection when the input is wrong", () => {
 
     const error = await addActivityToCollection(
       context,
-      call({ activity: { activity: { ...activity, image } }, ...input }),
+      call({ activity: { ...activity, image }, ...input }),
     ).catch((e) => e);
 
     expect(error).toBeInstanceOf(TypeError);
@@ -329,7 +329,7 @@ describe("addActivityToCollection when the Collection cannot take the item", () 
     const image = new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
 
     await expect(
-      addActivityToCollection(context, call({ activity: { activity: { ...activity, image } } })),
+      addActivityToCollection(context, call({ activity: { ...activity, image } })),
     ).rejects.toThrow(message);
 
     expect(methods(requests)).not.toContain("com.atproto.repo.applyWrites");
@@ -355,9 +355,7 @@ describe("addActivityToCollection when the Collection cannot take the item", () 
     };
     const withLocations = (count: number) =>
       call({
-        activity: {
-          activity: { ...activity, locations: Array.from({ length: count }, () => location) },
-        },
+        activity: { ...activity, locations: Array.from({ length: count }, () => location) },
       });
     const { context, requests, creates, updates } = fakeRepo({
       records: { [collectionUri]: stored },
@@ -378,13 +376,11 @@ describe("addActivityToCollection when the Collection cannot take the item", () 
 describe("addActivityToCollection when the write fails", () => {
   const withRights = call({
     activity: {
-      activity: {
-        ...activity,
-        rights: {
-          rightsName: "CC BY",
-          rightsType: "CC-BY",
-          rightsDescription: "Share with credit",
-        },
+      ...activity,
+      rights: {
+        rightsName: "CC BY",
+        rightsType: "CC-BY",
+        rightsDescription: "Share with credit",
       },
     },
   });

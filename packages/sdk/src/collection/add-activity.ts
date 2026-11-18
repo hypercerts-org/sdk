@@ -25,6 +25,8 @@ import { submitWrites } from "../internal/submit-writes.js";
 // validating the updated record against the lexicon still decides what is valid.
 const MAX_ITEMS = 1000;
 
+const collectionRef = strictObject({ uri: l.string() });
+
 /**
  * How one public operation names the Collection it adds to, and what else it requires of it.
  *
@@ -32,8 +34,8 @@ const MAX_ITEMS = 1000;
  * the words of their messages and in the Project's check of the Collection's `type`.
  */
 export interface AddActivityTarget {
-  /** The input field that holds the URI, as the caller wrote it. */
-  readonly uriField: string;
+  /** The input field that holds the `{ uri }`, as the caller wrote it: "collection" or "project". */
+  readonly field: string;
   /** What the record is called in messages: "Collection" or "Project". */
   readonly noun: string;
   /**
@@ -64,11 +66,11 @@ export async function addActivity(
   operation: string,
   target: AddActivityTarget,
   input: unknown,
-): Promise<{ activity: ActivityEntryResult; collection: StrongRef }> {
+): Promise<StrongRef & { activity: ActivityEntryResult }> {
   const build = createBuildContext(context, operation);
-  const { uri, entry, weight } = parseAddInput(build, target.uriField, input);
+  const { uri, activity: activityValue, weight } = parseAddInput(build, target.field, input);
   const rkey = parseCollectionUri(build, target, uri);
-  const planned = planActivityEntry(build, "input.activity", entry);
+  const planned = planActivityEntry(build, "input.activity", activityValue);
   checkCollection(build, target, await readRecord(context, uri, build.operation));
 
   // The records that need the network are read as late as possible, to keep the window in which
@@ -87,42 +89,40 @@ export async function addActivity(
     updates: [updated],
     swapCommit: head,
   });
-  return { activity: planned.result(created, refOf), collection: updated.ref };
+  return { ...updated.ref, activity: planned.result(created, refOf) };
 }
 
-// The input of both public operations, which differ only in the name of the URI field: the
-// Collection's URI, the Activity entry (checked by `planActivityEntry`) and the weight of its item.
-function parseAddInput(build: BuildContext, uriField: string, input: unknown) {
+// The input of both public operations, which differ only in the name of the field that holds the
+// Collection's `{ uri }`: that, the Activity (checked by `planActivityEntry`) and the weight of its
+// item.
+function parseAddInput(build: BuildContext, field: string, input: unknown) {
   const shape: Record<string, l.Validator> = {
-    [uriField]: l.string(),
+    [field]: l.unknown(),
     activity: l.unknown(),
     weight: entryWeight,
   };
   const parsed = parseInput(build, "input", strictObject(shape), input);
-  return {
-    uri: parsed[uriField] as string,
-    entry: parsed.activity,
-    weight: parsed.weight as string | undefined,
-  };
+  const { uri } = parseInput(build, `input.${field}`, collectionRef, parsed[field]);
+  return { uri, activity: parsed.activity, weight: parsed.weight as string | undefined };
 }
 
 // Checked before any request: the URI must name a Collection in the signed-in account's repo.
 function parseCollectionUri(
   build: BuildContext,
-  { uriField, noun }: AddActivityTarget,
+  { field, noun }: AddActivityTarget,
   uri: string,
 ): RecordKeyString {
   const parsed = parseRecordUri(uri, build.operation);
   assertRecordUriOfType(
     build.operation,
-    uriField,
+    `${field}.uri`,
     uri,
     [collection.main.$type],
     `it must be of type ${collection.main.$type}`,
   );
   if (parsed.did !== build.did) {
     throw new TypeError(
-      `${build.operation}: ${uriField} is in the repository of ${parsed.did}, but the client is signed in as ${build.did} and this operation changes only the signed-in account's own ${noun}s: ${uri}.`,
+      `${build.operation}: ${field}.uri is in the repository of ${parsed.did}, but the client is signed in as ${build.did} and this operation changes only the signed-in account's own ${noun}s: ${uri}.`,
     );
   }
   return parsed.rkey;
