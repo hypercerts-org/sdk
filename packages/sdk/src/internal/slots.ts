@@ -482,6 +482,10 @@ export interface PreparedSlots {
   existing: Map<Slot, StrongRef>;
   created: Map<Slot, PreparedRecord>;
   refOf: ReferenceOf;
+  /** The slots that hold a new record. */
+  fresh: NewSlot[];
+  /** Whether the call creates exactly one record, with a key the input decided (see `createOnly`). */
+  createOnly: boolean;
 }
 
 /**
@@ -489,21 +493,32 @@ export interface PreparedSlots {
  * needs: input checks first, then the reads, then the uploads, so a bad input or a failed read has
  * no side effects. `otherWrites` counts the writes the caller adds to the same request.
  *
+ * With `createOnly`, a call that creates exactly one record with a chosen key skips the check that
+ * the key is free (`createOnly` in the result is then true): the caller writes it with
+ * `submitCreateOnly`, which reports an existing record even when two calls race.
+ *
  * Throws TypeError for two new records with the same key or more records than one write holds, and
  * what `readBeforeWriting` and `prepareNew` throw.
  */
 export async function prepareSlots(
   build: BuildContext,
   roots: readonly Slot[],
-  { checkKeys, otherWrites = 0 }: { checkKeys: boolean; otherWrites?: number },
+  {
+    checkKeys,
+    otherWrites = 0,
+    createOnly: allowCreateOnly = false,
+  }: { checkKeys?: boolean; otherWrites?: number; createOnly?: boolean },
 ): Promise<PreparedSlots> {
   const slots = flattenSlots(roots);
   const fresh = newSlots(slots);
   assertDistinctKeys(build, fresh);
   assertWithinWriteLimit(build.operation, fresh.length + otherWrites);
-  const existing = await readBeforeWriting(build, slots, { checkKeys });
+  const createOnly = allowCreateOnly && fresh.length === 1 && fresh[0]?.choice.key !== undefined;
+  const existing = await readBeforeWriting(build, slots, {
+    checkKeys: checkKeys ?? !createOnly,
+  });
   const created = await prepareNew(slots, existing);
-  return { existing, created, refOf: referenceLookup(existing, created) };
+  return { existing, created, refOf: referenceLookup(existing, created), fresh, createOnly };
 }
 
 /** The reference of the record in `slot`, with whether this call created it. */

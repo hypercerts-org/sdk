@@ -2,17 +2,8 @@ import type { SDKContext } from "../context.js";
 import { createBuildContext } from "./build-context.js";
 import type { RecordKind } from "./record-kind.js";
 import type { StrongRef } from "./resolve-record-ref.js";
-import {
-  assertDistinctKeys,
-  flattenSlots,
-  newSlots,
-  planNew,
-  prepareNew,
-  readBeforeWriting,
-  referenceLookup,
-  resultOf,
-} from "./slots.js";
-import { assertWithinWriteLimit, submitCreateOnly, submitWrites } from "./submit-writes.js";
+import { planNew, prepareSlots, resultOf } from "./slots.js";
+import { submitCreateOnly, submitWrites } from "./submit-writes.js";
 
 /**
  * Creates one record and every new record it points at: validates `input`, reads what the call
@@ -41,14 +32,9 @@ export async function createRecordTree<T extends { createdAt?: string | undefine
 ): Promise<TResult> {
   const build = createBuildContext(context, operation);
   const root = planNew(build, "input", kind, input);
-  const slots = flattenSlots([root]);
-  const fresh = newSlots(slots);
-  assertDistinctKeys(build, fresh);
-  assertWithinWriteLimit(operation, fresh.length);
-
-  const createOnly = fresh.length === 1 && root.choice.key !== undefined;
-  const existing = await readBeforeWriting(build, slots, { checkKeys: !createOnly });
-  const created = await prepareNew(slots, existing);
+  const { created, refOf, fresh, createOnly } = await prepareSlots(build, [root], {
+    createOnly: true,
+  });
   const records = [...created.values()];
   const [only] = records;
   if (createOnly && only !== undefined) {
@@ -59,7 +45,7 @@ export async function createRecordTree<T extends { createdAt?: string | undefine
     await submitWrites(context, build.did, records, operation, { retrySafe });
   }
 
-  return resultOf(root, created, referenceLookup(existing, created));
+  return resultOf(root, created, refOf);
 }
 
 /**
