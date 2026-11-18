@@ -324,7 +324,7 @@ function planFields(
       toSlot(build, `${field}.tags[${i}]`, tag, vocabularyTagKind, false),
     ),
     items: input.items?.map((item, i) =>
-      planItem(build, `${names?.items ?? `${field}.items`}[${i}]`, item, names?.activityImage?.(i)),
+      planItem(build, `${itemsField}[${i}]`, item, names?.activityImage?.(i)),
     ),
   };
 }
