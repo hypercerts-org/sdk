@@ -133,17 +133,17 @@ export async function prepareProject(
   value: unknown,
 ): Promise<PreparedProject> {
   const { collection, hasDefaultActivity } = readProject(build, value);
-  try {
-    const planned = planCollection(build, "input", collection);
-    // Reads before uploads: an unreadable URI or a taken tag key fails before anything is uploaded.
-    const { created, refOf } = await prepareSlots(build, [planned.slot], { checkKeys: true });
-    return {
-      writes: [...created.values()],
-      result: projectResult(planned.result(created, refOf)),
-    };
-  } catch (error) {
-    throw nameActivities(error, hasDefaultActivity);
-  }
+  const planned = planCollection(build, "input", collection, {
+    items: "input.activities",
+    // The default Activity's image is the Project's banner.
+    activityImage: (index) => (hasDefaultActivity && index === 0 ? "input.banner" : undefined),
+  });
+  // Reads before uploads: an unreadable URI or a taken tag key fails before anything is uploaded.
+  const { created, refOf } = await prepareSlots(build, [planned.slot], { checkKeys: true });
+  return {
+    writes: [...created.values()],
+    result: projectResult(planned.result(created, refOf)),
+  };
 }
 
 // The Project as a Collection's input: type `project`, its Activities (or the default) as items.
@@ -263,18 +263,6 @@ function inlineDescription(description: string | LeafletDocument | ExistingRecor
   return typeof description === "string"
     ? defs.descriptionString.build({ value: description })
     : description;
-}
-
-// `planCollection` names entries `input.items[i]`. Messages are renamed to what the caller passed:
-// `input.activities[i]`, and `input.banner` for the default Activity's image.
-function nameActivities(error: unknown, hasDefaultActivity: boolean): unknown {
-  if (error instanceof Error) {
-    const message = hasDefaultActivity
-      ? error.message.replaceAll("input.items[0].activity.image", "input.banner")
-      : error.message;
-    error.message = message.replaceAll("input.items[", "input.activities[");
-  }
-  return error;
 }
 
 function projectResult({ items, ...project }: CreateCollectionResult): CreateProjectResult {

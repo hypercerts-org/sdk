@@ -486,12 +486,16 @@ export interface PlannedActivity {
  * `path` names the Activity's data in messages when it is part of a larger input, for example
  * `activity` gives `activity.locations[0]`; omit it when the input is the Activity itself.
  *
+ * `imageField` names the `image` in upload and limit messages when the caller passed it under another
+ * name, for example a Project's `banner` copied into its default Activity.
+ *
  * Throws TypeError, naming the field, for any problem in the input.
  */
 export function planActivitySlot(
   build: BuildContext,
   input: unknown,
   path?: string,
+  imageField?: string,
 ): PlannedActivity {
   const field = path ?? "input";
   const at = path === undefined ? "" : `${path}.`;
@@ -508,7 +512,7 @@ export function planActivitySlot(
         const image =
           parsed.image === undefined
             ? undefined
-            : await mediaValue(build, `${at}image`, parsed.image, "image");
+            : await mediaValue(build, imageField ?? `${at}image`, parsed.image, "image");
         return prepareChecked(
           build,
           path ?? "the Activity",
