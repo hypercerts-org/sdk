@@ -46,7 +46,7 @@ attachment.tags?.[0]; // { uri, cid, created: true }
 ```
 
 - `subjects` is optional: omit it for an attachment recorded before the claim it supports.
-- `description` is a string (stored as `descriptionString`). Leaflet documents and `{ uri }` descriptions are not supported.
+- `description` is a string (stored as `descriptionString`), a Leaflet document (it needs `$type: "pub.leaflet.pages.linearDocument"`, stored as it is) or `{ uri }` of an existing record of any type (read, stored as a strong reference). The SDK never creates a document record.
 - A new tag's key is `<category>.<key>`; the SDK reads it first and a taken key throws `RecordAlreadyExistsError` with nothing written. Pass `{ uri }` to reuse a tag.
 
 ## createMeasurement
@@ -118,7 +118,7 @@ await createAcknowledgement(context, {
 | `subjects` | attachment, measurement | `{ uri }[]` | ≤ 100, any record type. |
 | `contentType` | attachment | `string` | ≤ 64. |
 | `content` | attachment, evaluation | `(Blob \| string)[]` | ≤ 100. Files uploaded, strings are URLs. |
-| `shortDescription`, `description`, `langs` | attachment | `string`, `string`, `string[]` | `description` is a plain string only. |
+| `shortDescription`, `description`, `langs` | attachment | `string`, `string \| LeafletDocument \| { uri }`, `string[]` | `description` is text, a Leaflet document or a reference to any record. |
 | `location` | attachment, evaluation | new location or `{ uri }` | |
 | `tags` | attachment | new vocabulary tags or `{ uri }`, ≤ 20 | |
 | `capturedAt` | attachment | ISO 8601 with timezone | Not `createdAt`; omit if unknown. |
@@ -135,7 +135,7 @@ await createAcknowledgement(context, {
 | `context`, `comment` | acknowledgement | `string \| { uri }`, `string` | |
 | `createdAt` | all | ISO 8601 | Defaults to the time of the call. Nested new records get the call's time. |
 
-Not supported: `signatures`, `shortDescriptionFacets`, `commentFacets`, and a non-string attachment `description`.
+Not supported: `signatures`, `shortDescriptionFacets`, and `commentFacets`.
 
 ## Failures
 

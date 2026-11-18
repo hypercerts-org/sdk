@@ -1,4 +1,5 @@
 // Entry point for @hypercerts-org/sdk/context.
+export type { LeafletDocument } from "../internal/long-description.js";
 export type { StrongRef } from "../internal/resolve-record-ref.js";
 export type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 export {
