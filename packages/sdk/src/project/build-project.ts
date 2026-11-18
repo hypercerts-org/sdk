@@ -28,7 +28,7 @@ import {
   prepareSlots,
   type SupportingRecordRef,
 } from "../internal/slots.js";
-import type { VocabularyTagResult } from "../tag/build-tag.js";
+import type { CreateVocabularyTagResult } from "../tag/build-tag.js";
 
 /**
  * One Activity of a new Project, with an optional `weight`.
@@ -75,7 +75,7 @@ export interface CreateProjectResult extends StrongRef {
   /** The location, when the input had `location`. */
   location?: SupportingRecordRef;
   /** The vocabulary tags, in input order. */
-  tags: readonly VocabularyTagResult[];
+  tags: readonly CreateVocabularyTagResult[];
   /** The Activities, in input order. `created` is `false` for one passed by `uri`. */
   activities: readonly ProjectActivityResult[];
 }
