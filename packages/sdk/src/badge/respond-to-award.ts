@@ -120,8 +120,8 @@ function recipientOf({ subject }: award.Main, uri: string): DidString {
  * valid `app.certified.badge.award`; its recipient cannot be determined; or the signed-in account is
  * not the recipient. Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
- * is not safe: it would create a second response if the first attempt had succeeded.
+ * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
+ * a retry can duplicate records under new keys.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *

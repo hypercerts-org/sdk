@@ -142,9 +142,8 @@ const createFeatureTree = creatorOf<FeatureInput, FeatureTree>("createFeature", 
  * key of a new tag cannot be checked, or an upload fails.
  * @throws {@link RecordAlreadyExistsError} If a new tag's key is taken. Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
- * is not safe: it would create a second Feature under a new key if the first attempt had
- * succeeded.
+ * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
+ * a retry can duplicate records under new keys.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *

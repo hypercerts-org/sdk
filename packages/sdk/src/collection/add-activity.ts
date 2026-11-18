@@ -30,7 +30,7 @@ const collectionRef = strictObject({ uri: l.string() });
 /**
  * How one public operation names the Collection it adds to, and what else it requires of it.
  *
- * Internal. `addActivityToCollection` and `addActivityToProject` do the same work; they differ in
+ * `addActivityToCollection` and `addActivityToProject` do the same work; they differ in
  * the words of their messages and in the Project's check of the Collection's `type`.
  */
 interface AddActivityTarget {
@@ -49,7 +49,7 @@ interface AddActivityTarget {
  * Adds one Activity, new or existing, to a Collection in the signed-in account's repo, in one atomic
  * write guarded by the repository's head commit.
  *
- * Internal. Order, so that a mistake costs as little as possible:
+ * Order, so that a mistake costs as little as possible:
  * 1. the URI and the entry are checked, with no request;
  * 2. the Collection is read and checked, so a missing, invalid or full one fails before any upload;
  * 3. an existing Activity is read and blobs are uploaded (see `prepareSlots`);

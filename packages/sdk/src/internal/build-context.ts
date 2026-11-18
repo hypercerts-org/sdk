@@ -57,7 +57,7 @@ export function parseInput<T>(
  * Splits `uri` into its parts (see `parseRecordUri`) and checks that it names a record of
  * `collection` in the signed-in account's own repo, before any request is sent.
  *
- * Internal. For operations that change a record the caller names by URI. The caller words the two
+ * For operations that change a record the caller names by URI. The caller words the two
  * refusals, because what to do about each depends on the operation.
  *
  * Throws TypeError: what `parseRecordUri` throws, or the message `reject` gives for a record of

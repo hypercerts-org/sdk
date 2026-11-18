@@ -42,8 +42,8 @@ const repostAction = recordRefAction(
  * @throws {@link Error} If the client is not authenticated, or the subject or the `via` record cannot
  * be read (missing, or the PDS cannot be reached). Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
- * is not safe: it would create a second like if the first attempt had succeeded.
+ * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
+ * a retry can duplicate records under new keys.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *
@@ -160,8 +160,8 @@ export const unlike = undoAction(likeAction);
  * @throws {@link Error} If the client is not authenticated, or the subject or the `via` record cannot
  * be read (missing, or the PDS cannot be reached). Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
- * is not safe: it would create a second repost if the first attempt had succeeded.
+ * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
+ * a retry can duplicate records under new keys.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *

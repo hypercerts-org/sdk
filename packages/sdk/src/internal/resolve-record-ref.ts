@@ -104,7 +104,7 @@ export async function readRecord(
  * Whether the client's own repo holds a record at `collection` and `rkey`, read with
  * `com.atproto.repo.getRecord` through the client.
  *
- * Internal. Used to find out, before anything is written, whether a record key that the caller
+ * Used to find out, before anything is written, whether a record key that the caller
  * chose is already taken. The answer is a snapshot: it does not stop another writer taking the key
  * afterwards.
  *
@@ -150,7 +150,7 @@ async function clientForRepo(
 /**
  * Splits a record URI into its parts without sending any request.
  *
- * Internal. Throws TypeError, naming `operation`, unless `uri` is `at://<did>/<collection>/<rkey>`.
+ * Throws TypeError, naming `operation`, unless `uri` is `at://<did>/<collection>/<rkey>`.
  */
 export function parseRecordUri(uri: string, operation: string) {
   // `at-uri` alone also accepts handle authorities and URIs without a collection or record key.
@@ -179,7 +179,7 @@ export const collectionOf = (uri: string): string | undefined => uri.split("/")[
  * "..., but " in the message, for example `it must be of type <nsid>`. A function instead gives the
  * whole message for a record of another type, for callers that word the refusal themselves.
  *
- * Internal. Checks the collection segment only and does not validate the URI's authority or
+ * Checks the collection segment only and does not validate the URI's authority or
  * shape: callers do that with `parseRecordUri`, before or after this check as suits their error
  * order. Sends no request.
  */

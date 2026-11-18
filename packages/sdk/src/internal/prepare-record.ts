@@ -29,7 +29,7 @@ export function fixedRecordKey(schema: l.RecordSchema): RecordKeyString | undefi
 /**
  * Validates a record and computes the URI and CID it will have in `did`'s repo, without writing it.
  *
- * Internal. Boundaries:
+ * Boundaries:
  * - Uses `chosenKey` when the input decides the key (a vocabulary tag's `<category>.<key>`), after
  *   checking it against the lexicon's key rule; otherwise the key the lexicon fixes (see
  *   `fixedRecordKey`); otherwise allocates a fresh TID (see `nextTid`). Builds the URI from `did`.
@@ -58,7 +58,7 @@ export async function prepareRecord<S extends l.RecordSchema>(
  * Like `prepareRecord`, but for replacing the existing record at `rkey` with `input` as its whole
  * new value.
  *
- * Internal. `rkey` is not checked against the lexicon's key rule: it is the key the record already
+ * `rkey` is not checked against the lexicon's key rule: it is the key the record already
  * has, which another app may have chosen, and rejecting it would make the record impossible to
  * update.
  *

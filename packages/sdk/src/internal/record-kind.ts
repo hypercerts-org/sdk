@@ -44,7 +44,7 @@ export const references = {
  * Everything the SDK needs to know to create one kind of supporting record: the lexicon that
  * validates it, the schema for the SDK's input and the fields that are not stored as given.
  *
- * Internal. Input fields are copied into the record under the same name (the input schema rejects
+ * Input fields are copied into the record under the same name (the input schema rejects
  * unknown fields, so nothing unintended is copied), which keeps each kind a declaration instead of
  * a hand-written mapping.
  */

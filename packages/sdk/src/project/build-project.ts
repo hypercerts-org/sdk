@@ -132,7 +132,7 @@ const ACTIVITY_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
  * Validates a Project's input, reads what it points at, uploads its files and prepares every record
  * it creates, the Project last.
  *
- * Internal. Plans the Project as a Collection of type `project` whose items are its `activities`.
+ * Plans the Project as a Collection of type `project` whose items are its `activities`.
  *
  * Throws TypeError, naming the field, for a problem in the input, and what `prepareSlots` throws.
  */

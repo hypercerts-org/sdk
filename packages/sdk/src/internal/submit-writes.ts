@@ -56,7 +56,7 @@ const MAX_WRITES_PER_REQUEST = 200;
  * Fails before anything is uploaded or written when a call would write more records than one
  * `applyWrites` request may hold.
  *
- * Internal. The SDK never splits a call into several requests: the records reference each other
+ * The SDK never splits a call into several requests: the records reference each other
  * and are committed together or not at all, which several requests could not guarantee.
  *
  * Throws TypeError, so the caller learns to shrink the input and that nothing was written.
@@ -73,7 +73,7 @@ export function assertWithinWriteLimit(operation: string, count: number): void {
  * `com.atproto.repo.applyWrites` request, which the PDS applies as a single commit: every write
  * happens or none does.
  *
- * Internal. Boundaries:
+ * Boundaries:
  * - Never retries and never splits the request; the caller decides what to do about a failure.
  *   `options.retrySafe` says whether calling again after an unknown outcome cannot duplicate records
  *   (see `SubmitOptions.retrySafe`, and `retrySafeReason` for the wording); it only changes the
@@ -138,7 +138,7 @@ export async function submitWrites(
  * Creates one record at a record key that its lexicon fixes or its data decides, only if there is
  * no record at that key yet, with `com.atproto.repo.putRecord` and `swapRecord: null`.
  *
- * Internal. Used for records whose key can already be taken (see `fixedRecordKey`, and a kind's
+ * Used for records whose key can already be taken (see `fixedRecordKey`, and a kind's
  * `recordKey`). `applyWrites` cannot tell the caller so: the reference PDS answers a `create` at a
  * taken key with a generic HTTP 500, which is indistinguishable from a server fault. `putRecord`
  * with `swapRecord: null` is the lexicon's own "only if absent": the PDS checks it together with
@@ -207,7 +207,7 @@ interface DeleteTarget {
  * Deletes one record from `did`'s repo with `com.atproto.repo.deleteRecord`, with
  * `swapRecord: target.cid` when the caller gave the CID.
  *
- * Internal. Boundaries:
+ * Boundaries:
  * - Never retries. With a CID it never deletes a record that has another version: the PDS refuses
  *   and nothing is deleted. Without one the delete is unconditional.
  * - Classifies a failure as the other write functions do: definite only when the PDS answered with

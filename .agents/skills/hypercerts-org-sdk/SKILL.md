@@ -3,7 +3,7 @@ name: hypercerts-org-sdk
 description: "Write Hypercerts and Certified records (org.hypercerts.*, app.certified.*) to a PDS from an app with @hypercerts-org/sdk: setting up the SDK context from an authenticated @atproto/lex Client, choosing the right operation and subpath, uploading blobs, and handling write errors without duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create, link or write hypercert-related records from an app. Not for changing the SDK's own source."
 metadata:
   author: hypercerts-org
-  version: "8"
+  version: "9"
 ---
 
 # @hypercerts-org/sdk
@@ -104,6 +104,7 @@ Things to know before opening a reference:
 
 - `create*` operations upload `Blob`/`File` values for you (`image`, a rights record's `attachment`, `content` of `createAttachment` and `createEvaluation`, a profile's `avatar` and `banner`, a location's `{ blob }`). Pass the file, not an upload result.
 - A string is stored as a URL and never fetched.
+- In a browser pass the `File` from an `<input type="file">`. In Node make a `Blob` that carries its type, because the SDK cannot guess it: `await openAsBlob("./avatar.png", { type: "image/png" })` from `node:fs`.
 - Use `uploadBlob` only when writing a record yourself with the client:
 
 ```ts
@@ -131,7 +132,9 @@ Uploads happen before the write and are not rolled back, so a call that throws c
 
 Order of work: validate input → read `{ uri }` records → upload blobs → validate against lexicons → one write. The SDK never retries.
 
-The three write errors are exported from `@hypercerts-org/sdk/activity`, `@hypercerts-org/sdk/actor`, `@hypercerts-org/sdk/badge`, `@hypercerts-org/sdk/location`, `@hypercerts-org/sdk/tag`, `@hypercerts-org/sdk/feature`, `@hypercerts-org/sdk/collection`, `@hypercerts-org/sdk/context`, `@hypercerts-org/sdk/organization`, `@hypercerts-org/sdk/project` and `@hypercerts-org/sdk/social` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order (an undo function called without `cid` has an empty `attempted`; its message names the URI): for `createActivity` the Activity is last; for `addActivityToCollection` and `addActivityToProject` the Collection or Project is last, after the new Activity and its records (it is the only entry for an existing Activity); for `createCollection` the Collection is last, after the records it points at; for `createProject` the Project is last, after its Activities and their records; for `awardBadge` the award is last, after a new definition; for `createOrganization` the organization is last. `instanceof WriteError` catches all three.
+`WriteError` is the base class of every error thrown when the write itself fails. Its subclasses `WriteRejectedError`, `WriteOutcomeUnknownError` and `WriteResultMismatchError` are exported, with `WriteError`, from every subpath that writes records (all except `/blob`). `RecordAlreadyExistsError`, a subclass of `WriteRejectedError`, is exported from `/actor`, `/collection`, `/context`, `/feature`, `/organization`, `/project` and `/tag`; `ProfileAlreadyExistsError` from `/actor` and `OrganizationAlreadyExistsError` from `/organization` extend it. `instanceof WriteError` catches all of them.
+
+Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order (an undo function called without `cid` has an empty `attempted`; its message names the URI): for `createActivity` the Activity is last; for `addActivityToCollection` and `addActivityToProject` the Collection or Project is last, after the new Activity and its records (it is the only entry for an existing Activity); for `createCollection` the Collection is last, after the records it points at; for `createProject` the Project is last, after its Activities and their records; for `awardBadge` the award is last, after a new definition; for `createOrganization` the organization is last.
 
 | Error                      | Meaning                                                                                        | What to do                                    |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
@@ -139,7 +142,7 @@ The three write errors are exported from `@hypercerts-org/sdk/activity`, `@hyper
 | `Error`                    | Not authenticated, a `{ uri }` record could not be read, or an upload failed. Nothing written. | Fix auth or the URI, then retry.              |
 | `WriteRejectedError`       | PDS answered 4xx. Nothing created or changed. `status`, `code`.                                | Safe to fix and retry. `InvalidSwap`: see [Concurrent changes](#concurrent-changes-invalidswap); undo functions throw it with `InvalidSwap` when you passed a `cid` the record no longer has; it was not deleted. |
 | `RecordAlreadyExistsError` | A key you chose is taken (a `WriteRejectedError`). `uri` names the record. Nothing written.    | Use it as `{ uri }`, or choose another key.   |
-| `WriteOutcomeUnknownError` | Network error, timeout or 5xx. The records may exist. `attempted` lists every URI (empty for an undo without `cid`; the message names the URI). | Check before retrying. Undo functions: calling again is safe. |
+| `WriteOutcomeUnknownError` | Network error, timeout or 5xx. The records may exist. `attempted` lists every URI (empty for an undo without `cid`; the message names the URI). | Check `attempted` before retrying. Which operations are safe to repeat: see [Pitfalls](#pitfalls). |
 | `WriteResultMismatchError` | Created, but the PDS reported other URIs/CIDs (`reported` vs `attempted`).                     | Do not retry. Log it and inspect the records. |
 
 ```ts
@@ -204,7 +207,7 @@ try {
 - `createSDKContext({ client: session })` or passing an `@atproto/api` `Agent` throws. Wrap it: `new Client(session)`.
 - `didResolver: oauthClient` throws. Pass `oauthClient.identityResolver`.
 - Passing an `uploadBlob` result as `image` throws. Pass the `Blob`/`File`.
-- Retrying blindly after `WriteOutcomeUnknownError` duplicates every record under new keys. The exception is a call whose records all have a fixed key and are only created if absent: `createProfile` and `createVocabularyTag`. `createOrganization` is also safe to repeat: the organization exists at most once, so a second call creates it or throws `OrganizationAlreadyExistsError`. Undo functions are safe to repeat too. `createFeature`, `createCollection`, `createProject`, `addActivityToCollection`, `addActivityToProject`, `createWorkScopeTag`, `createBadgeDefinition`, `awardBadge`, `respondToBadgeAward`, `followAccount`, `followEntity`, `like` and `repost` are not safe to repeat.
+- Retrying blindly after `WriteOutcomeUnknownError` duplicates every record under new keys. Calling again is safe only for operations that create what is absent: `createProfile`, `createVocabularyTag` (fixed keys; a refusal means a key is taken, so check each URI in `attempted`), `createOrganization` (it reads its fixed-key organization before every attempt) and the undo functions (`unlike`, `unrepost`, `unfollowAccount`, `unfollowEntity`). Every other operation is not safe to repeat: `createActivity`, `createRights`, `createContribution`, `createContributorInformation`, `createLocation`, `createWorkScopeTag`, `createFeature`, `createCollection`, `createProject`, `addActivityToCollection`, `addActivityToProject`, `createAttachment`, `createMeasurement`, `createEvaluation`, `createAcknowledgement`, `createBadgeDefinition`, `awardBadge`, `respondToBadgeAward`, `followAccount`, `followEntity`, `like` and `repost`. Check `attempted` first.
 - An item of `createCollection` is `{ activity }`, `{ feature }`, `{ collection }` or `{ uri }`, never a bare Activity input; `{ uri }` must be an Activity, Feature or Collection.
 - An entry of `createProject`'s `activities` is `{ activity, weight? }`, where `activity` is the data of a new Activity or `{ uri }` of an existing one (not `{ uri }` at the entry's top level), never a bare Activity input, and a Project takes no `type` or `items`. Without `activities` it creates one default Activity from the Project's own fields, which needs a `shortDescription`; see the [default Activity](references/project.md#the-default-activity) for what is copied and the limits (for example, a banner over 5 MB is not copied).
 - `addActivityToCollection` and `addActivityToProject` take `collection: { uri }` / `project: { uri }` (never a bare string) and `activity`: the data of a new Activity or `{ uri }` of an existing one, with `weight` beside it. The result is the updated record as `uri`/`cid` plus `activity`. The Collection or Project must be your own; `addActivityToProject` needs `type: "project"`.

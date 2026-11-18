@@ -58,7 +58,8 @@ export interface AddActivityToCollectionResult extends StrongRef {
  * @throws {@link Error} If a read or upload fails, or the Collection is invalid or full (1000
  * items). Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write. Nothing was changed.
- * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to retry.
+ * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
+ * a retry can duplicate records under new keys.
  *
  * @example
  * ```ts

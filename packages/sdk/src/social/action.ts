@@ -110,7 +110,7 @@ type ValidatedUndoInput<TField extends UndoField> = {
  * What differs between the four social actions. The shared create and undo logic is driven by one
  * of these (see `createAction` and `undoAction`).
  *
- * Internal. `TCreate` is the input of the create function and `TField` the field of the undo
+ * `TCreate` is the input of the create function and `TField` the field of the undo
  * function's input that holds the record to delete.
  */
 export interface SocialAction<TCreate extends ActionOptions, TField extends UndoField> {

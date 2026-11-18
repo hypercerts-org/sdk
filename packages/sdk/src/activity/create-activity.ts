@@ -196,7 +196,7 @@ const celWorkScope = strictObject({
 /**
  * The schemas of an Activity's text fields.
  *
- * Internal. `createProject` reads the fields its default Activity copies with these.
+ * `createProject` reads the fields its default Activity copies with these.
  */
 export const activityTextFields = {
   title: l.string(),
@@ -360,8 +360,8 @@ function supportingSlots(plan: ActivityPlan): Slot[] {
  * @throws {@link Error} If the client is not authenticated, an existing record cannot be read, or
  * an upload fails.
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
- * is not safe: it would create duplicates under new keys if the first attempt had succeeded.
+ * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
+ * a retry can duplicate records under new keys.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *
@@ -470,7 +470,7 @@ interface PreparedActivity {
  * request: no record is read, no file uploaded, no record written. The `image` is uploaded when the
  * slot is prepared (see `prepareNew`), after the records it points at have been built.
  *
- * Internal. `prepareActivity` plans, reads and prepares one Activity on its own. A call that
+ * `prepareActivity` plans, reads and prepares one Activity on its own. A call that
  * creates several Activities (see `createCollection`) plans them all, so that it can count the
  * records and read every existing one before anything is uploaded.
  *
@@ -523,7 +523,7 @@ export function planActivitySlot(
  * Does everything `createActivity` does before it writes: validates the input, reads the existing
  * records it points at, uploads blobs and prepares every new record, the Activity last.
  *
- * Internal. Uploads are not undone if the caller never submits the writes.
+ * Uploads are not undone if the caller never submits the writes.
  *
  * Throws what `createActivity` throws before its write: TypeError for invalid input and Error for
  * a failed read or upload.

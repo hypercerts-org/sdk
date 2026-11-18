@@ -21,8 +21,6 @@ export type ActivityEntryResult =
 
 /**
  * The schema of the optional weight of an entry (a collection item or project activity).
- *
- * Internal.
  */
 export const entryWeight = l.optional(weightString(WEIGHT_MAX_LENGTH));
 
@@ -30,7 +28,7 @@ export const entryWeight = l.optional(weightString(WEIGHT_MAX_LENGTH));
  * The slot of an existing Activity: `value` is `{ uri }`, and the URI must name an Activity (not a
  * Feature or a Collection) and use a DID.
  *
- * Internal. Throws TypeError, naming `field.uri`, for any other URI.
+ * Throws TypeError, naming `field.uri`, for any other URI.
  */
 export const existingActivitySlot = (build: BuildContext, field: string, value: unknown): Slot =>
   toExistingSlot(build, `${field}.uri`, value, [activity.main.$type]);
@@ -39,7 +37,7 @@ export const existingActivitySlot = (build: BuildContext, field: string, value: 
  * Validates an Activity given as the data of a new one or as `{ uri }` of an existing one, and plans
  * it, without sending any request.
  *
- * Internal. `field` names the Activity in messages, for example `input.activity`. Throws TypeError,
+ * `field` names the Activity in messages, for example `input.activity`. Throws TypeError,
  * naming the field, for any problem in it.
  */
 export function planActivityEntry(
