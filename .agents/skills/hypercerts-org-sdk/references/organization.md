@@ -71,7 +71,7 @@ A failed read of the profile or the organization (network error, 5xx, 403) throw
 
 ## Concurrent writes (`InvalidSwap`)
 
-The write is conditional on the account not having changed since the profile and the organization were read, so another call creating either one in between cannot make "reuse or create the profile" stale. When it did change you get `WriteRejectedError` with `code === "InvalidSwap"`: see [Concurrent changes](../SKILL.md#concurrent-changes-invalidswap) for the rule and the retry example. Calling again reads everything afresh and then throws `OrganizationAlreadyExistsError` if the other writer created the organization.
+The write is conditional on the account not having changed since the profile and the organization were read, so another call creating either one in between cannot make "reuse or create the profile" stale. When it did change you get `WriteRejectedError` with `code === "InvalidSwap"`, unless the account has an organization by then (another writer created it): the SDK checks once more and throws `OrganizationAlreadyExistsError` instead. See [Concurrent changes](../SKILL.md#concurrent-changes-invalidswap) for the rule and the retry example. Calling again reads everything afresh and then throws `OrganizationAlreadyExistsError` if the other writer created the organization.
 
 ## After `WriteOutcomeUnknownError`
 
