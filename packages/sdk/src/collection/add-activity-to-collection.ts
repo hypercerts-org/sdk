@@ -20,7 +20,7 @@ export interface AddActivityToCollectionInput {
 
 /** The result of {@link addActivityToCollection}. */
 export interface AddActivityToCollectionResult {
-  /** The Activity: created or reused, with the records created for it. See {@link ActivityEntryResult}. */
+  /** The Activity, created or reused. See {@link ActivityEntryResult}. */
   activity: ActivityEntryResult;
   /** The Collection after the update: its unchanged URI and the CID of its new version. */
   collection: StrongRef;
@@ -30,40 +30,32 @@ export interface AddActivityToCollectionResult {
  * Adds an Activity to an existing Collection (`org.hypercerts.collection`) in one atomic write.
  *
  * @remarks
- * `activity` is `{ activity }` (a new Activity, created as {@link createActivity} does) or `{ uri }`
- * (an existing Activity, read once for its CID and never changed). It is appended as the last item,
- * with `weight` if given. The rest of the Collection is kept as it is.
- *
- * The write fails with {@link WriteRejectedError} (`code` `"InvalidSwap"`) if the account was
- * written to after the Collection was read; nothing is written, so call again. Not checked or
- * changed: `signatures`, the existing items, and whether the Activity is already listed. Only your
- * own Collections are supported. See the SDK skill reference for ordering and rollback.
+ * `activity` is `{ activity }` (a new Activity, created as {@link createActivity} does) or
+ * `{ uri }` (an existing one, read once for its CID and never changed). It is appended as the
+ * last item, with `weight`, and the rest of the Collection is kept. Nothing is deduplicated. If the
+ * account was written to after the Collection was read, the write fails with
+ * {@link WriteRejectedError} (`code` `"InvalidSwap"`) and nothing is written: call again. Only your
+ * own Collections; `signatures` are neither checked nor re-signed. See the SDK skill reference.
  *
  * @param context - The shared context from {@link createSDKContext}, with an authenticated client.
  * @param input - The Collection, the Activity and an optional weight.
  * @returns The Activity (`created` is `false` for `{ uri }`) and the Collection's new version.
- * @throws {@link TypeError} If the input is not valid or `collectionUri` is not your own
- * Collection. Nothing was written.
- * @throws {@link Error} If a read or upload fails, or the Collection is invalid or already holds
- * 1000 items. Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write. Nothing was created or changed.
- * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to retry: it
- * could create the Activity twice.
+ * @throws {@link TypeError} If the input is invalid or the Collection is not your own. Nothing
+ * was written.
+ * @throws {@link Error} If a read or upload fails, or the Collection is invalid or full (1000
+ * items). Nothing was written.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write. Nothing was changed.
+ * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to retry.
  *
- * @example Adding a new and an existing Activity
+ * @example
  * ```ts
  * import { addActivityToCollection } from "@hypercerts-org/sdk/collection";
  *
  * // `context` comes from createSDKContext. `activity` is { activity } or { uri }, never bare data.
- * const collectionUri = "at://did:plc:abc123/org.hypercerts.collection/3k2a4b5c6d7e8";
- * await addActivityToCollection(context, {
- *   collectionUri,
+ * const { activity, collection } = await addActivityToCollection(context, {
+ *   collectionUri: "at://did:plc:abc123/org.hypercerts.collection/3k2a4b5c6d7e8",
  *   activity: { activity: { title: "Reforestation", shortDescription: "Planting trees." } },
  *   weight: "2",
- * });
- * await addActivityToCollection(context, {
- *   collectionUri,
- *   activity: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
  * ```
  */
