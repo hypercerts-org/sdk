@@ -71,7 +71,7 @@ async function uploadNamingField(
   file: Blob,
 ): Promise<TypedBlobRef> {
   try {
-    return await build.target.uploadBlob(file, file.type === "" ? undefined : file.type);
+    return await build.target.uploadBlob(file);
   } catch (error) {
     // `uploadBlob` prefixes its messages with its own name, which would follow ours.
     const reason = describeError(error).replace(/^uploadBlob: /, "");

@@ -55,24 +55,9 @@ export function assertWithinWriteLimit(operation: string, count: number): void {
 }
 
 /**
- * Creates all `records` in `did`'s repo, and replaces the records in `options.updates`, with one
- * `com.atproto.repo.applyWrites` request, which the PDS applies as a single commit: every write
- * happens or none does.
- *
- * Boundaries:
- * - Never retries and never splits the request; the caller decides what to do about a failure.
- *   `options.retrySafe` says whether calling again after an unknown outcome cannot duplicate records
- *   (see `SubmitOptions.retrySafe`, and `retrySafeReason` for the wording); it only changes the
- *   advice in the error message.
- * - Does not pass `validate`, so the PDS applies its own default; records are validated by the
- *   builders against their lexicons before they get here.
- * - Classifies a failure as definite only when the PDS answered with an HTTP 4xx other than 408.
- *   Everything else, including a 2xx whose body the client could not read, is outcome-unknown.
- * - Compares the PDS's reported URIs and CIDs with the computed ones, because records already
- *   reference each other by CID.
- * - `options.swapCommit` is the only guard against a concurrent change that `applyWrites` offers.
- *   It covers the whole repo, so any other write to the account since the head was read, not only
- *   one to the updated record, rejects the request: a false alarm the caller accepts.
+ * Creates all `records` in the target's repo, and replaces the records in `options.updates`, as one
+ * `WritePlan` (the PDS target applies it as a single commit: every write happens or none does).
+ * For the boundaries, see `pdsTarget`.
  *
  * Throws WriteRejectedError, WriteOutcomeUnknownError or WriteResultMismatchError. `build.operation`
  * names the public function for the message.
@@ -94,20 +79,9 @@ export function submitWrites(
 
 /**
  * Creates one record at a record key that its lexicon fixes or its data decides, only if there is
- * no record at that key yet, with `com.atproto.repo.putRecord` and `swapRecord: null`.
- *
- * Used for records whose key can already be taken (see `fixedRecordKey`, and a kind's
- * `recordKey`). `applyWrites` cannot tell the caller so: the reference PDS answers a `create` at a
- * taken key with a generic HTTP 500, which is indistinguishable from a server fault. `putRecord`
- * with `swapRecord: null` is the lexicon's own "only if absent": the PDS checks it together with
- * the write, so concurrent calls cannot overwrite each other, and answers a taken key with HTTP
- * 400 `InvalidSwap`, which this reports as a RecordAlreadyExistsError (the only reason this
- * request can fail that way). Checked against the reference PDS only.
- *
- * Otherwise the same boundaries as `submitWrites`: no retries, the same failure classification,
- * and the reported URI and CID are compared with the computed ones. Unlike `submitWrites`, a
- * caller may safely call again after an unknown outcome: the key is the same and the write is only
- * made if absent, so a second call cannot duplicate the record.
+ * no record at that key yet (see `fixedRecordKey`, and a kind's `recordKey`). Unlike
+ * `submitWrites`, calling again after an unknown outcome is safe. For the boundaries, see
+ * `pdsTarget`.
  *
  * Throws RecordAlreadyExistsError when the key is taken, and otherwise WriteRejectedError,
  * WriteOutcomeUnknownError or WriteResultMismatchError.
@@ -117,20 +91,8 @@ export function submitCreateOnly(build: BuildContext, record: PreparedRecord): P
 }
 
 /**
- * Deletes one record from `did`'s repo with `com.atproto.repo.deleteRecord`, with
- * `swapRecord: target.cid` when the caller gave the CID.
- *
- * Boundaries:
- * - Never retries. With a CID it never deletes a record that has another version: the PDS refuses
- *   and nothing is deleted. Without one the delete is unconditional.
- * - Classifies a failure as the other write functions do: definite only when the PDS answered with
- *   an HTTP 4xx other than 408 (and then nothing was deleted), outcome-unknown otherwise.
- * - Has no reported result to compare: `deleteRecord` answers with a commit, not with references.
- *   The reference PDS (`@atproto/pds`) treats a record that is already missing as nothing to do and
- *   answers success whatever `swapRecord` says, so that answer is indistinguishable from this call
- *   having deleted it, and calling again after any outcome is safe.
- * - `attempted` of the errors is `[{ uri, cid }]` with a CID, and empty without one: a reference to
- *   a record needs a CID, and none is known.
+ * Deletes one record from the target's repo, only if it still has `target.cid` when the caller gave
+ * the CID. For the boundaries, see `pdsTarget`.
  *
  * Throws WriteRejectedError (with `code` `InvalidSwap` when the record no longer has `target.cid`,
  * so it was not deleted) or WriteOutcomeUnknownError. Throws TypeError when `target.uri` is not a

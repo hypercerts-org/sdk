@@ -7,8 +7,8 @@ import { pdsTarget, type WriteTarget } from "./write-target.js";
 
 /**
  * What every step of one creation call shares: the client's repo, the timestamp used as the
- * default `createdAt` of every record the call creates, where the call writes (`target`), the public function's name for
- * error messages, and the call's uploads.
+ * default `createdAt` of every record the call creates, where the call writes (`target`), the
+ * public function's name for error messages, and the call's uploads.
  */
 export interface BuildContext {
   readonly context: SDKContext;
