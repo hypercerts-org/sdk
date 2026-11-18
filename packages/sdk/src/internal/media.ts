@@ -15,7 +15,7 @@ type BlobKind = "image" | "largeImage" | "blob";
  * `org.hypercerts.defs#uri` as it is, a `Blob` is uploaded and wrapped as `smallImage`,
  * `largeImage` or `smallBlob`.
  *
- * Internal. Boundaries:
+ * Boundaries:
  * - Never fetches a URL, and does not validate it here; the record's lexicon does.
  * - Checks a blob's type and size against the lexicon's limits before uploading, so a file the
  *   record would reject is never uploaded.
@@ -50,7 +50,7 @@ const WRAPPERS = {
  * Uploads a file for a record field, wrapping a failure in an `Error` that names the operation and
  * the field (`could not upload <field>`) and keeps the original as `cause`.
  *
- * Internal. For fields that do not go through `mediaValue`, for example a blob stored directly in
+ * For fields that do not go through `mediaValue`, for example a blob stored directly in
  * the record. Check the file against the lexicon first, see `assertFileAllowed`.
  *
  * The same `Blob` object is uploaded once per call and gives every field the same blob reference.
@@ -84,7 +84,7 @@ async function uploadNamingField(
  * Checks a file against a lexicon's rules before it is uploaded, so a file the record would reject
  * is never uploaded.
  *
- * Internal. `validate` runs the lexicon's own schema on a blob reference built from the file's type
+ * `validate` runs the lexicon's own schema on a blob reference built from the file's type
  * and size, with a well-formed CID standing in for the one the upload will return; that reference
  * must never be put in a record. `purpose` finishes the sentence "<field> cannot be ..." in the
  * error. A Blob with no type is left to `uploadBlob`, which explains how to supply one.
@@ -119,7 +119,7 @@ type PlaceholderBlobRef = { $type: "blob"; ref: Cid; mimeType: string; size: num
 /**
  * Checks a file against the limits of a blob `kind` before it is uploaded, as `mediaValue` does.
  *
- * Internal. Throws TypeError, naming `field`, for a file the lexicon does not allow.
+ * Throws TypeError, naming `field`, for a file the lexicon does not allow.
  */
 export function assertWithinLimits(
   build: BuildContext,

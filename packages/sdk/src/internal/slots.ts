@@ -121,7 +121,7 @@ const isSlotList = (target: Slot | readonly Slot[]): target is readonly Slot[] =
 /**
  * Reads one tagged choice from the caller's data without sending any request.
  *
- * Internal. `{ uri }` means an existing record and `{ inline }` an inline value; any other
+ * `{ uri }` means an existing record and `{ inline }` an inline value; any other
  * object is the data of a new record, whose own references are planned too (see `planNew`).
  * `uri` and `inline` are never mixed with record fields, because it would be unclear whether the
  * caller wants to create or to reuse.

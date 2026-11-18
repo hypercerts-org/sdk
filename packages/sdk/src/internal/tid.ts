@@ -15,7 +15,7 @@ let lastClock = 0n;
 /**
  * Allocates a record key for a new record: a TID (13 characters, sortable by creation time).
  *
- * Internal. The layout is the one atproto defines: a zero bit, 53 bits of microseconds since the
+ * The layout is the one atproto defines: a zero bit, 53 bits of microseconds since the
  * Unix epoch and a 10-bit clock identifier. Follows `@atcute/tid`: when calls outpace the clock the
  * timestamp is bumped, so a burst never reuses a timestamp; when the clock is corrected backwards
  * the timestamp follows it, but never back into timestamps a burst already handed out. Keys are

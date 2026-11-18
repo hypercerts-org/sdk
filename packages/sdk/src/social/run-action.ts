@@ -25,7 +25,7 @@ import {
  * the client's repo: validates the input, reads the records it must point at, builds the record and
  * writes it.
  *
- * Internal. Boundaries:
+ * Boundaries:
  * - Writes with a new TID key each call, and looks for nothing that exists already, so calling it
  *   again for the same subject creates another record.
  * - Reads `via` (and, for a like or a repost, the subject) from the PDS that hosts it, and writes
@@ -60,7 +60,7 @@ export function createAction<TCreate extends ActionOptions, TField extends UndoF
 /**
  * The function that deletes the one social record whose URI the input gives, from the client's repo.
  *
- * Internal. Boundaries:
+ * Boundaries:
  * - Deletes exactly that record, with one `submitDelete` request, and looks at nothing else: no scan
  *   of the collection, no read of the record or of what it points at, no indexer. Another record
  *   for the same subject, for example a duplicate like, is not touched.

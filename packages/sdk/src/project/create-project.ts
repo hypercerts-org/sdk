@@ -31,8 +31,8 @@ const OPERATION = "createProject";
  * {@link CreateProjectResult}.
  * @throws {@link TypeError} If the input is not valid. Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write. Nothing was created.
- * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. `attempted` lists the
- * new records, Project last. Not safe to retry: it could create everything twice.
+ * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
+ * a retry can duplicate records under new keys. `attempted` lists the new records, Project last.
  *
  * @example A Project with the default Activity
  * ```ts

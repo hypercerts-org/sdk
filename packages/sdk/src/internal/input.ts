@@ -4,7 +4,7 @@ import { l } from "@atproto/lex";
  * An object schema that also rejects properties it does not list, so a misspelled optional field
  * is an error instead of being silently ignored (or written into the record).
  *
- * Internal. Used for the SDK's input shapes, never for records: records are open objects.
+ * Used for the SDK's input shapes, never for records: records are open objects.
  */
 export function strictObject<const TShape extends Record<string, l.Validator>>(shape: TShape) {
   const known = new Set(Object.keys(shape));
@@ -69,7 +69,7 @@ export const WEIGHT_MAX_LENGTH = 100;
  * and how long they may be; this is the SDK's one rule for them. The string is kept as written,
  * not normalised.
  *
- * Internal. Pass the `maxLength` of the lexicon field the weight is stored in, so a too-long weight
+ * Pass the `maxLength` of the lexicon field the weight is stored in, so a too-long weight
  * is rejected before any request, with a message that names the field the caller wrote.
  */
 export const weightString = (maxLength: number) =>

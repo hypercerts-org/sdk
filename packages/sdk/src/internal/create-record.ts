@@ -11,7 +11,7 @@ import { submitCreateOnly, submitWrites } from "./submit-writes.js";
  * records and writes them. Nothing is written unless the whole input is valid, and nothing is
  * uploaded when an existing record cannot be read or a chosen record key is taken.
  *
- * Internal. Backs the standalone creators, which therefore share their builders with
+ * Backs the standalone creators, which therefore share their builders with
  * `createActivity`. Returns the new record's reference with `created: true`, and the result of
  * every record its reference fields point at under the same field names (see `referencedResults`).
  * `TResult` is the public result type of the caller, which declares the same shape.
@@ -51,7 +51,7 @@ export function creatorOf<T extends { createdAt?: string | undefined }, TResult>
 /**
  * Like `creatorOf` for a record that points at no other record: returns only its URI and CID.
  *
- * Internal. Used by the standalone creators.
+ * Used by the standalone creators.
  */
 export function standaloneCreatorOf<T extends { createdAt?: string | undefined }>(
   operation: string,

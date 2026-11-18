@@ -236,7 +236,7 @@ interface PlannedItem extends Planned<CreateCollectionItemResult> {
  * Validates the input of a Collection and plans it and every record it needs, at any depth,
  * without sending any request, so every problem in the data is found before the first one.
  *
- * Internal. `field` names the data in messages, for example `input` gives `input.items[0].uri`.
+ * `field` names the data in messages, for example `input` gives `input.items[0].uri`.
  * New child records are planned with their own record families' builders: Activities with
  * `planActivitySlot`, Features with `featureKind`, child Collections with this function.
  *

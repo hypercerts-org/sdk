@@ -43,7 +43,8 @@ export interface AddActivityToProjectResult extends StrongRef {
  * `false` for `{ uri }`).
  * @throws {@link TypeError} If the input is invalid, or the Collection is not your own Project.
  * @throws {@link WriteRejectedError} If the PDS rejected the write, including `"InvalidSwap"`.
- * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to retry.
+ * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
+ * a retry can duplicate records under new keys.
  *
  * @example
  * ```ts

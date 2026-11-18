@@ -15,7 +15,7 @@ const getLatestCommit = l.query(
  * Reads the CID of the head commit of `did`'s repo from the client's PDS, to pass as `swapCommit`
  * to a write that must not land on top of changes it has not seen.
  *
- * Internal. Read the head BEFORE reading the records the write is based on: a write that happens
+ * Read the head BEFORE reading the records the write is based on: a write that happens
  * in between then moves the head past the CID returned here, and the PDS rejects the request.
  * Reading in the other order would let that write go unnoticed.
  *

@@ -49,7 +49,8 @@ export const contributionKind: RecordKind<ContributionInput> = recordKind(
  * or a value the lexicon does not allow. Nothing was written.
  * @throws {@link Error} If the client is not authenticated.
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
- * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS.
+ * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
+ * a retry can duplicate records under new keys.
  * @throws {@link WriteResultMismatchError} If the PDS reported a different URI or CID than the SDK
  * computed.
  *

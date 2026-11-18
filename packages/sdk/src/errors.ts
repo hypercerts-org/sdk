@@ -96,13 +96,24 @@ export class RecordAlreadyExistsError extends WriteRejectedError {
  * `attempted` is empty, because a reference needs a CID, and the message names the record's URI.
  * Calling an undo function again is safe.
  *
- * The SDK does not retry. Retrying with new record keys would duplicate every record if the first
- * attempt had succeeded. The exception is a record whose key is fixed or decided by its data and
- * that is only created if absent (`createProfile`, and `createVocabularyTag`, whose nested tags are
- * checked before the write): calling again either creates it or is refused because it already
- * exists, most likely from the first attempt, so it cannot duplicate. `createOrganization` is
- * another: it reads its organization, which has a fixed key, before every attempt, so calling again
- * either creates everything or is refused because the organization already exists.
+ * @remarks
+ * The SDK does not retry, and by default calling again is not safe: every record gets a new key,
+ * so a second call duplicates every record if the first attempt had succeeded. This covers
+ * `createActivity`, `createRights`, `createContribution`, `createContributorInformation`,
+ * `createLocation`, `createWorkScopeTag`, `createFeature`, `createCollection`, `createProject`,
+ * `addActivityToCollection`, `addActivityToProject`, `createAttachment`, `createMeasurement`,
+ * `createEvaluation`, `createAcknowledgement`, `createBadgeDefinition`, `awardBadge`,
+ * `respondToBadgeAward`, `followAccount`, `followEntity`, `like` and `repost`. Check `attempted`
+ * first.
+ *
+ * Calling again is safe for these, because they only create what is absent:
+ * - `createProfile` and `createVocabularyTag`: their keys are fixed or decided by their data. A
+ *   retry either creates the record or is refused because it exists, most likely from the first
+ *   attempt. For `createVocabularyTag`, such a refusal only shows that one key is taken, so check
+ *   each URI in `attempted`; a retry that races the first write can throw this error again.
+ * - `createOrganization`: it reads its organization, which has a fixed key, before every attempt,
+ *   so a retry either creates everything or is refused because the organization exists.
+ * - `unlike`, `unrepost`, `unfollowAccount` and `unfollowEntity`: they only delete, see their TSDoc.
  */
 export class WriteOutcomeUnknownError extends WriteError {
   override readonly name = "WriteOutcomeUnknownError";

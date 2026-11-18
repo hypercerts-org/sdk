@@ -28,7 +28,7 @@ const isLeafletDocument = (value: unknown): value is LeafletDocument =>
  * The input schema of a long description: a string, a Leaflet document with its `$type`, or `{ uri }`
  * of an existing record.
  *
- * Internal. For lexicon fields that are the union of `org.hypercerts.defs#descriptionString`,
+ * For lexicon fields that are the union of `org.hypercerts.defs#descriptionString`,
  * `pub.leaflet.pages.linearDocument` and `com.atproto.repo.strongRef` (a Feature's `description`, an
  * organization's `longDescription`). Use it with `longDescriptionTransform` and
  * `longDescriptionReference`, which turn each of the three into the stored value.
@@ -63,7 +63,7 @@ export const longDescriptionReference: ReferenceField = {
  * Plans the `description` of a record built by hand: the slot of the existing record for `{ uri }`,
  * `undefined` for a string, a Leaflet document or no value.
  *
- * Internal. Pair it with `longDescriptionValue`. Throws TypeError, naming `field`, for any other
+ * Pair it with `longDescriptionValue`. Throws TypeError, naming `field`, for any other
  * value.
  */
 export function planLongDescription(
@@ -80,7 +80,7 @@ export function planLongDescription(
  * The value a record stores for a description planned by `planLongDescription`: `descriptionString`
  * for a string, the strong reference (with its `$type`) for `{ uri }`, a Leaflet document as it is.
  *
- * Internal. `existing` is the slot `planLongDescription` returned.
+ * `existing` is the slot `planLongDescription` returned.
  */
 export function longDescriptionValue(
   description: unknown,

@@ -14,7 +14,7 @@ import { describeError } from "./describe.js";
  * plc.directory and `did:web` from the domain, with its own in-memory cache and one shared lookup
  * for concurrent requests for the same DID.
  *
- * Internal. Each context gets its own, so documents are shared by the calls of one context only.
+ * Each context gets its own, so documents are shared by the calls of one context only.
  */
 export function createDefaultDidResolver(): DidDocumentResolver {
   return createDidResolver({
@@ -28,7 +28,7 @@ export function createDefaultDidResolver(): DidDocumentResolver {
 /**
  * Finds the PDS that hosts `did`'s repository from its DID document.
  *
- * Internal. Supports `did:plc` and `did:web`, the methods atproto allows, and asks
+ * Supports `did:plc` and `did:web`, the methods atproto allows, and asks
  * `context.didResolver` for the document, so repeated lookups are as cached as that resolver is.
  *
  * Throws Error when the DID method is not supported, the document cannot be fetched or is
