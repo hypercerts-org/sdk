@@ -44,7 +44,7 @@ export const dateRange = {
 };
 
 /** Types a record's optional fields as absent rather than `undefined`, which the lexicon types require. */
-export type Compacted<T> = {
+type Compacted<T> = {
   [K in keyof T as undefined extends T[K] ? never : K]: T[K];
 } & {
   [K in keyof T as undefined extends T[K] ? K : never]?: Exclude<T[K], undefined>;

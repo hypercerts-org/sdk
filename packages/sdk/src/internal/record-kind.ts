@@ -65,10 +65,10 @@ export interface RecordKind<T> {
 }
 
 /** A kind of any input, for fields that point at another kind. */
-export type AnyRecordKind = RecordKind<{ createdAt?: string | undefined }>;
+type AnyRecordKind = RecordKind<{ createdAt?: string | undefined }>;
 
 /** What `recordKind` takes besides the schema and the input's fields. */
-export interface RecordKindOptions {
+interface RecordKindOptions {
   /** Rules that span fields, checked in order. */
   readonly refinements?: readonly Refinement[];
   /** The fields that point at other records; they are added to the input's fields. */

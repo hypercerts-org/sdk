@@ -458,7 +458,7 @@ export async function createActivity(
 }
 
 /** An Activity and its new supporting records, validated and ready to submit. Nothing is written. */
-export interface PreparedActivity {
+interface PreparedActivity {
   /** The records to create, in the order to submit them: the new supporting records, then the Activity. */
   readonly writes: readonly PreparedRecord[];
   /** What the caller gets back once the writes are committed. */
@@ -528,10 +528,7 @@ export function planActivitySlot(
  * Throws what `createActivity` throws before its write: TypeError for invalid input and Error for
  * a failed read or upload.
  */
-export async function prepareActivity(
-  build: BuildContext,
-  input: unknown,
-): Promise<PreparedActivity> {
+async function prepareActivity(build: BuildContext, input: unknown): Promise<PreparedActivity> {
   const planned = planActivitySlot(build, input);
   // Reads first, then uploads: a URI that cannot be resolved fails before anything is uploaded.
   const { created, refOf } = await prepareSlots(build, [planned.slot], { checkKeys: true });

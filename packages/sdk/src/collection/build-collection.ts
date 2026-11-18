@@ -180,7 +180,7 @@ export interface CreateCollectionResult extends StrongRef {
  * How messages name the items of a Collection when the caller passed them under another name, as a
  * Project does with `activities`.
  */
-export interface ItemNames {
+interface ItemNames {
   /** The list of items, for example `input.activities` for `input.activities[0]`. */
   readonly items: string;
   /** The path of an existing item's URI within an item, when it is not `uri`: `activity.uri`. */

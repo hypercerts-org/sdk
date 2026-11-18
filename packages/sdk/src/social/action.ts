@@ -102,7 +102,7 @@ export type UndoInput<TField extends UndoField> = { [K in TField]: UndoTarget };
 export type UndoFunction<TInput> = (context: SDKContext, input: TInput) => Promise<void>;
 
 /** What an undo input is after validation: the same, with the `cid` known to be a CID. */
-export type ValidatedUndoInput<TField extends UndoField> = {
+type ValidatedUndoInput<TField extends UndoField> = {
   [K in TField]: { uri: string; cid?: CidString | undefined };
 };
 

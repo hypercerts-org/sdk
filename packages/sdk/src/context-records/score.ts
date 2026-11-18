@@ -20,7 +20,7 @@ export interface EvaluationScore {
  * `"0.10"` are equal and 30-digit values compare correctly. Both must match `decimalString`.
  * Negative when `a < b`, zero when equal, positive when `a > b`.
  */
-export function compareDecimals(a: string, b: string): number {
+function compareDecimals(a: string, b: string): number {
   const [x, y] = [parseDecimal(a), parseDecimal(b)];
   const scale = Math.max(x.fraction.length, y.fraction.length);
   const scaled = ({ negative, whole, fraction }: Decimal) =>
