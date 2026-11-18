@@ -1,4 +1,4 @@
-import type { DidString, l, RecordKeyString } from "@atproto/lex";
+import type { DidString, l, RecordKeyString, TypedBlobRef } from "@atproto/lex";
 import type { SDKContext } from "../context.js";
 import { describeError } from "./describe.js";
 import { type PreparedRecord, prepareRecord } from "./prepare-record.js";
@@ -6,14 +6,16 @@ import { parseRecordUri } from "./resolve-record-ref.js";
 
 /**
  * What every step of one creation call shares: the client's repo, the timestamp used as the
- * default `createdAt` of every record the call creates, and the public function's name for
- * error messages.
+ * default `createdAt` of every record the call creates, the public function's name for
+ * error messages, and the call's uploads.
  */
 export interface BuildContext {
   readonly context: SDKContext;
   readonly did: DidString;
   readonly createdAt: string;
   readonly operation: string;
+  /** The uploads of this call by `Blob` object, so a file used twice is uploaded once. */
+  readonly uploads: Map<Blob, Promise<TypedBlobRef>>;
 }
 
 /**
@@ -29,7 +31,7 @@ export function createBuildContext(context: SDKContext, operation: string): Buil
       `${operation}: the client is not authenticated, so there is no repository to write to. Sign in first, then create the context with \`createSDKContext({ client: new Client(session) })\`.`,
     );
   }
-  return { context, did, createdAt: new Date().toISOString(), operation };
+  return { context, did, createdAt: new Date().toISOString(), operation, uploads: new Map() };
 }
 
 /**

@@ -1,4 +1,4 @@
-import { type Cid, type l, parseCid, type UriString } from "@atproto/lex";
+import { type Cid, type l, parseCid, type TypedBlobRef, type UriString } from "@atproto/lex";
 import * as defs from "@hypercerts-org/lexicon/org/hypercerts/defs";
 import { uploadBlob } from "../blob/upload-blob.js";
 import type { BuildContext } from "./build-context.js";
@@ -52,12 +52,25 @@ const WRAPPERS = {
  *
  * Internal. For fields that do not go through `mediaValue`, for example a blob stored directly in
  * the record. Check the file against the lexicon first, see `assertFileAllowed`.
+ *
+ * The same `Blob` object is uploaded once per call and gives every field the same blob reference.
+ * Two objects with the same bytes are uploaded twice.
  */
-export async function uploadField(
+export function uploadField(build: BuildContext, field: string, file: Blob): Promise<TypedBlobRef> {
+  let upload = build.uploads.get(file);
+  if (upload === undefined) {
+    // A failed upload is reported under the field that asked first.
+    upload = uploadNamingField(build, field, file);
+    build.uploads.set(file, upload);
+  }
+  return upload;
+}
+
+async function uploadNamingField(
   build: BuildContext,
   field: string,
   file: Blob,
-): Promise<Awaited<ReturnType<typeof uploadBlob>>> {
+): Promise<TypedBlobRef> {
   try {
     return await uploadBlob(build.context, file);
   } catch (error) {
@@ -103,8 +116,17 @@ export function assertFileAllowed(
 
 type PlaceholderBlobRef = { $type: "blob"; ref: Cid; mimeType: string; size: number };
 
-// The check runs the lexicon's own blob schema on the wrapper object for this kind.
-function assertWithinLimits(build: BuildContext, field: string, file: Blob, kind: BlobKind): void {
+/**
+ * Checks a file against the limits of a blob `kind` before it is uploaded, as `mediaValue` does.
+ *
+ * Internal. Throws TypeError, naming `field`, for a file the lexicon does not allow.
+ */
+export function assertWithinLimits(
+  build: BuildContext,
+  field: string,
+  file: Blob,
+  kind: BlobKind,
+): void {
   const { schema, property, label } = WRAPPERS[kind];
   assertFileAllowed(build, field, file, `stored as a ${label}`, (ref) =>
     schema.safeValidate({ [property]: ref }),

@@ -2,6 +2,8 @@
 
 Read [../SKILL.md](../SKILL.md) first for setup, blob uploads and error handling. Every example assumes `context` from `createSDKContext`.
 
+To publish work, prefer `createProject` ([project.md](project.md)). An Activity on its own may not show up or work in other apps in the ecosystem; apps expect a project (a collection with type `project` that holds its activities). Use `createActivity` when you need the Activity record by itself.
+
 ## createActivity
 
 `createActivity(context, input)` writes the Activity and every **new** supporting record in one `applyWrites` request. Either all of them are created or none are.
@@ -171,7 +173,8 @@ Each `usedTags` entry is a new work-scope tag or `{ uri }` of an existing one; s
 - `weight` is a positive decimal **string** (`"0.5"`), not a number. Weights don't have to add up to anything.
 - A location's `location: { uri }` is a link to external data (e.g. a GeoJSON file). That is different from a whole location given as `{ uri }`, which reuses an existing location record.
 - Dates are ISO 8601 date-times (`"2024-03-01T00:00:00Z"`), not bare dates. `endDate` must not be before `startDate`.
-- Not supported yet: `signatures`, `shortDescriptionFacets`, non-string `description`, updates and deletes.
+- A `description` is a string, a Leaflet document (it needs its `$type`, `"pub.leaflet.pages.linearDocument"`) or `{ uri }` of an existing record of any type. A `{ uri }` is read once and stored as a strong reference; the SDK never creates the document record, and a handle instead of a DID throws a `TypeError`.
+- Not supported yet: `signatures`, updates and deletes.
 
 ## Field reference
 
@@ -179,18 +182,19 @@ Dates are ISO 8601 date-times. `createdAt` is optional on every record and defau
 
 ### `ActivityInput` (`org.hypercerts.claim.activity`)
 
-| Field                  | Type                           | Notes                                          |
-| ---------------------- | ------------------------------ | ---------------------------------------------- |
-| `title`                | `string`                       | Required. Max 256 chars.                       |
-| `shortDescription`     | `string`                       | Required. Max 300 chars.                       |
-| `description`          | `string`                       | Plain text or Markdown.                        |
-| `langs`                | `string[]`                     | BCP-47 tags of the text's languages, up to 3. Usually one; more only for mixed-language text. |
-| `image`                | `Blob \| string`               | JPEG/PNG/WebP up to 5 MB (uploaded), or a URL. |
-| `workScope`            | `string \| CelWorkScopeInput`  | Free-form, or a CEL scope (see below).         |
-| `startDate`, `endDate` | `string`                       | `endDate` ≥ `startDate`.                       |
-| `rights`               | `RightsInput \| { uri }`       |                                                |
-| `locations`            | `(LocationInput \| { uri })[]` |                                                |
-| `contributors`         | `ContributorInput[]`           | See below.                                     |
+| Field                    | Type                                   | Notes                                                                                         |
+| ------------------------ | -------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `title`                  | `string`                               | Required. Max 256 chars.                                                                      |
+| `shortDescription`       | `string`                               | Required. Max 300 chars.                                                                      |
+| `shortDescriptionFacets` | `app.bsky.richtext.facet[]`            | Rich-text facets of `shortDescription`, passed as given.                                      |
+| `description`            | `string \| LeafletDocument \| { uri }` | Plain text or Markdown, a Leaflet document, or an existing record as a strong reference.      |
+| `langs`                  | `string[]`                             | BCP-47 tags of the text's languages, up to 3. Usually one; more only for mixed-language text. |
+| `image`                  | `Blob \| string`                       | JPEG/PNG/WebP up to 5 MB (uploaded), or a URL.                                                |
+| `workScope`              | `string \| CelWorkScopeInput`          | Free-form, or a CEL scope (see below).                                                        |
+| `startDate`, `endDate`   | `string`                               | `endDate` ≥ `startDate`.                                                                      |
+| `rights`                 | `RightsInput \| { uri }`               |                                                                                               |
+| `locations`              | `(LocationInput \| { uri })[]`         |                                                                                               |
+| `contributors`           | `ContributorInput[]`                   | See below.                                                                                    |
 
 ### `ContributorInput`
 
