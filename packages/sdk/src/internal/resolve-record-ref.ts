@@ -169,13 +169,17 @@ export function parseRecordUri(uri: string, operation: string) {
   throw notARecordUri(uri, operation);
 }
 
+/** The collection segment of a record URI, or undefined when it has none. Does not validate `uri`. */
+export const collectionOf = (uri: string): string | undefined => uri.split("/")[3];
+
 /**
  * Throws TypeError, naming `operation` and `label` (the input field), unless the record URI `uri`
  * is of one of the `allowed` types (any type when `allowed` is undefined). `expectation` completes
  * "..., but " in the message, for example `it must be of type <nsid>`.
  *
- * Internal. Checks the collection segment only: callers validate the URI's authority and shape
- * with `parseRecordUri`. Sends no request.
+ * Internal. Checks the collection segment only and does not validate the URI's authority or
+ * shape: callers do that with `parseRecordUri`, before or after this check as suits their error
+ * order. Sends no request.
  */
 export function assertRecordUriOfType(
   operation: string,
@@ -184,7 +188,7 @@ export function assertRecordUriOfType(
   allowed: readonly string[] | undefined,
   expectation: string,
 ): void {
-  const actual = uri.split("/")[3];
+  const actual = collectionOf(uri);
   if (actual !== undefined && (allowed === undefined || allowed.includes(actual))) return;
   const target =
     actual === undefined ? "something that is not a record" : `a record of type ${actual}`;

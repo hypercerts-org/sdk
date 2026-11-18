@@ -6,6 +6,7 @@ import type { PreparedRecord } from "./prepare-record.js";
 import { buildRecord, type RecordKind, type ReferenceField, recordKeyOf } from "./record-kind.js";
 import {
   assertRecordUriOfType,
+  collectionOf,
   type PdsClients,
   parseRecordUri,
   recordExists,
@@ -283,7 +284,6 @@ const inlineValue = l.object({ inline: l.string() });
 const existingRecord = l.object({ uri: l.string({ format: "at-uri" }) });
 
 // The collection part of a record URI, which `at-uri` alone does not require.
-const collectionOf = (uri: string): string | undefined => uri.split("/")[3];
 
 function existing(
   build: BuildContext,

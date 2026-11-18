@@ -78,7 +78,7 @@ export interface AttachmentInput {
  * and the results for the records it points at.
  *
  * @remarks
- * `subjects`, `location` and `tags` mirror the input and appear only when the input had them.
+ * `subjects`, `location`, `tags` and `description` mirror the input and appear only when the input had them (`description` only when it is `{ uri }`).
  * Each entry belongs to the input entry at the same index, whether it was created or reused, and
  * a new tag nested in a new tag (`broader`) is reported under it. Filter on `created` for only the
  * records this call wrote.
@@ -88,6 +88,8 @@ export interface CreateAttachmentResult extends SupportingRecordRef {
   subjects?: readonly SupportingRecordRef[];
   /** The location. */
   location?: SupportingRecordRef;
+  /** The record a `{ uri }` description points at, with the CID it was pinned at. */
+  description?: SupportingRecordRef;
   /** The vocabulary tags, in input order. */
   tags?: readonly VocabularyTagResult[];
 }

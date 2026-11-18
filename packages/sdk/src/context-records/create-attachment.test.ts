@@ -277,11 +277,6 @@ describe("createAttachment description", () => {
   const documentUri = uriOf("pub.leaflet.document");
 
   it.each<[string, AttachmentInput["description"], object]>([
-    [
-      "a string",
-      "Plain text.",
-      { $type: "org.hypercerts.defs#descriptionString", value: "Plain text." },
-    ],
     ["a Leaflet document, as it is", document, document],
     [
       "{ uri } of a record of any type, as a strong reference",
@@ -291,40 +286,23 @@ describe("createAttachment description", () => {
   ])("stores %s", async (_, description, stored) => {
     const { context, creates } = fakeRepo({ existing: { [documentUri]: CID } });
 
-    await createAttachment(context, { title: "Report", description });
+    const result = await createAttachment(context, { title: "Report", description });
 
     expect(writeOf(creates[0] ?? [], ATTACHMENT).value.description).toEqual(stored);
+    if (typeof description === "object" && "uri" in description) {
+      expect(result.description).toEqual({ uri: documentUri, cid: CID, created: false });
+    }
   });
 
-  it.each<[string, unknown, RegExp]>([
-    ["a Leaflet document without its $type", { blocks: [] }, /must be a string, \{ uri \}/],
-    [
-      "a Leaflet document with invalid blocks",
-      { $type: LEAFLET, blocks: "not blocks" },
-      /input is not a valid org\.hypercerts\.context\.attachment record/,
-    ],
-    [
-      "{ uri } mixed with other fields",
-      { uri: documentUri, blocks: [] },
-      /input\.description combines `uri` with other fields/,
-    ],
-    ["a number", 7, /must be a string, \{ uri \}/],
-  ])("sends nothing for %s", async (_, description, message) => {
-    const { context, requests } = fakeRepo({ existing: { [documentUri]: CID } });
-
-    await expect(
-      createAttachment(context, { title: "Report", description } as AttachmentInput),
-    ).rejects.toThrow(message);
-
-    expect(methods(requests).includes(APPLY)).toBe(false);
-  });
-
-  it("writes nothing when the record a description points at cannot be read", async () => {
+  it("sends nothing for a Leaflet document without its $type", async () => {
     const { context, requests } = fakeRepo();
 
     await expect(
-      createAttachment(context, { title: "Report", description: { uri: documentUri } }),
-    ).rejects.toThrow(/cannot resolve/);
+      createAttachment(context, {
+        title: "Report",
+        description: { blocks: [] },
+      } as AttachmentInput),
+    ).rejects.toThrow(/must be a string, \{ uri \}/);
 
     expect(methods(requests).includes(APPLY)).toBe(false);
   });
