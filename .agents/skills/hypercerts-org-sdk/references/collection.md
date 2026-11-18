@@ -2,7 +2,7 @@
 
 Read [../SKILL.md](../SKILL.md) first for setup and error handling, [activity.md](activity.md) for an `activity` item, [feature.md](feature.md) for a `feature` item and [tag.md](tag.md) / [location.md](location.md) for tags and locations. Every example assumes `context` from `createSDKContext`.
 
-Two operations: `createCollection` creates a **new** Collection with its items; `createActivityInCollection` adds a new Activity to a Collection that **already exists**.
+Two operations: `createCollection` creates a **new** Collection with its items; `addActivityToCollection` adds an Activity (new or existing) to a Collection that **already exists**.
 
 For `type: "project"`, prefer `createProject` ([project.md](project.md)): `createCollection` can create a Project with Activities (and Features or child Collections) but also one with no Activity at all, while `createProject` guarantees it has at least one Activity. Use `createCollection` when a Project needs Features or child Collections. To publish work, create a project with `createProject`: an Activity on its own may not show up or work in other apps in the ecosystem, and apps expect a project that holds its activities.
 
@@ -63,47 +63,63 @@ Errors are as in [Handle failures](../SKILL.md#6-handle-failures). After `WriteO
 | `items`                  | `CollectionItemInput[]`                  | At most 1000. `{ activity \| feature \| collection \| uri, weight? }`.         |
 | `createdAt`              | `string`                                 | ISO 8601; defaults to the time of the call, for every new record.               |
 
-Not supported: `signatures`, adding items to a Collection that exists (see below), changing an existing record.
+Not supported: `signatures`, adding items other than an Activity to a Collection that exists (see below), changing an existing record.
 
-## createActivityInCollection
+## addActivityToCollection
 
-`createActivityInCollection(context, { collectionUri, activity, itemWeight? })` creates a **new** Activity (the same input as `createActivity`: new, `{ uri }` and `{ inline }` supporting values, `image`) and appends it to an **existing** `org.hypercerts.collection` record in your repo, in one `applyWrites` commit. The Activity, its new supporting records and the new Collection version all exist afterwards, or none of it does.
+`addActivityToCollection(context, { collectionUri, activity, weight? })` appends an Activity to an **existing** `org.hypercerts.collection` record in your repo, in one `applyWrites` commit. `activity` is **exactly one** of `{ activity }` (the data of a new Activity, the same input as `createActivity`; it and its new supporting records are created) or `{ uri }` (an existing Activity, reused unchanged). All of it exists afterwards, or none of it does.
 
 ```ts
-import { createActivityInCollection } from "@hypercerts-org/sdk/collection";
+import { addActivityToCollection } from "@hypercerts-org/sdk/collection";
 
-const { activity, collection } = await createActivityInCollection(context, {
-  collectionUri: "at://did:plc:abc123/org.hypercerts.collection/3k2a4b5c6d7e8", // placeholder: one of your own
+const collectionUri = "at://did:plc:abc123/org.hypercerts.collection/3k2a4b5c6d7e8"; // placeholder: one of your own
+
+// A new Activity, with its own rights record reused.
+const added = await addActivityToCollection(context, {
+  collectionUri,
   activity: {
-    title: "Reforestation in the Phobjikha valley",
-    shortDescription: "Planting 5,000 native trees.",
-    rights: { uri: "at://did:plc:abc123/org.hypercerts.claim.rights/3k2a4b5c6d7e8" }, // reused
+    activity: {
+      title: "Reforestation in the Phobjikha valley",
+      shortDescription: "Planting 5,000 native trees.",
+      rights: { uri: "at://did:plc:abc123/org.hypercerts.claim.rights/3k2a4b5c6d7e8" }, // reused
+    },
   },
-  itemWeight: "2", // optional positive decimal string, like a contributor's weight
+  weight: "2", // optional positive decimal string, like a contributor's weight
 });
-// activity: what createActivity returns. collection: { uri, cid }, the same URI with the new version's CID.
+added.activity; // { uri, cid, created: true, locations: [], contributors: [] }
+added.collection; // { uri, cid }: the same URI, the new version's CID
+
+// An existing Activity.
+await addActivityToCollection(context, {
+  collectionUri,
+  activity: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
+});
 ```
 
 - `collectionUri` must be `at://<did>/org.hypercerts.collection/<rkey>` with **your** DID. Another type of record, a handle, or another account's Collection throws `TypeError` before anything is sent.
+- `activity` is never a bare Activity input: `activity: { title, shortDescription }` is a `TypeError`, as are both or neither of `activity` and `uri`. `weight` goes next to `activity`, not inside it, and is a positive decimal string of at most 100 characters.
+- `{ uri }` must be an Activity (a Feature or a Collection is a `TypeError`) with a DID. It is read once for its CID, which the item stores (a strong reference), and never changed. It may belong to another account if public; the PDS is found with the context's `didResolver` ([SKILL.md](../SKILL.md#2-create-the-context-once)).
 - The item is appended last. Everything else in the Collection (`createdAt`, existing items, unknown fields, `signatures`) is kept as it was. `signatures` is not re-signed: after the append, an earlier signature no longer matches the content.
 - A Collection that holds 1000 items is full: `Error`, nothing written. A Collection that does not exist or is not a valid `org.hypercerts.collection` record: `Error`, nothing written.
-- Nothing is deduplicated: a second call creates a second Activity and a second item.
-- Not supported: adding an existing Activity, a Feature or a child Collection to an existing Collection, and adding to another account's Collection. To create a whole new Collection, use `createCollection`.
+- Nothing is deduplicated: a second call creates a second Activity and a second item, and the same `{ uri }` twice gives two items.
+- Not supported: adding a Feature or a child Collection to an existing Collection, and adding to another account's Collection. To create a whole new Collection, use `createCollection`.
+- The result is `{ activity, collection }`: `activity` is `created: true` with the nested results of `createActivity`, or `created: false` for a `{ uri }`; `collection` is the Collection's URI and the CID of its new version.
+- For a Collection of type `project`, `addActivityToProject` ([project.md](project.md)) also checks the type.
 
 ### Concurrent writes (`InvalidSwap`)
 
 The write is conditional on the account not having changed since the Collection was read, so a concurrent change to its `items` cannot be overwritten with a stale list. When it did change you get `WriteRejectedError` with `code === "InvalidSwap"`: see [Concurrent changes](../SKILL.md#concurrent-changes-invalidswap) for the rule and the retry example.
 
-Any other `WriteRejectedError` (4xx) is not fixed by calling again. After `WriteOutcomeUnknownError`, `attempted` lists the new records and, last, the Collection: check the Activity and whether the Collection lists it before retrying, or you create a second Activity.
+Any other `WriteRejectedError` (4xx) is not fixed by calling again. After `WriteOutcomeUnknownError`, `attempted` lists the new records and, last, the Collection (only the Collection for a `{ uri }`): check the Activity and whether the Collection lists it before retrying, or you add a second item.
 
 ### Uploads are outside the commit
 
-`Blob`/`File` values are uploaded before the repository is read and are not rolled back if the write fails; see [Uploads are not part of the atomic write](../SKILL.md#uploads-are-not-part-of-the-atomic-write). A bad URI, another account's Collection, a missing, invalid or full Collection, or an invalid `activity` fails before any upload (the Collection is read once up front, then again after the latest commit for the guarded write).
+`Blob`/`File` values are uploaded before the repository is read and are not rolled back if the write fails; see [Uploads are not part of the atomic write](../SKILL.md#uploads-are-not-part-of-the-atomic-write). A bad URI, a bad `activity`, another account's Collection, or a missing, invalid or full Collection fails before any upload (the Collection is read once up front, then again after the latest commit for the guarded write).
 
-### `CreateActivityInCollectionInput`
+### `AddActivityToCollectionInput`
 
-| Field           | Type            | Notes                                                                                                   |
-| --------------- | --------------- | ------------------------------------------------------------------------------------------------------- |
-| `collectionUri` | `string`        | Required. `at://<your did>/org.hypercerts.collection/<rkey>`. Must already exist and hold under 1000 items. |
-| `activity`      | `ActivityInput` | Required. The same input as `createActivity`; see [activity.md](activity.md). Always creates a new Activity. |
-| `itemWeight`    | `string`        | Optional. Positive decimal string, like a contributor's weight. Left out of the item when omitted.      |
+| Field           | Type                          | Notes                                                                                                         |
+| --------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `collectionUri` | `string`                      | Required. `at://<your did>/org.hypercerts.collection/<rkey>`. Must already exist and hold under 1000 items.   |
+| `activity`      | `{ activity } \| { uri }`     | Required. Exactly one: a new Activity (the input of `createActivity`, see [activity.md](activity.md)) or the URI of an existing one. |
+| `weight`        | `string`                      | Optional. Positive decimal string, at most 100 characters. Left out of the item when omitted.                 |
