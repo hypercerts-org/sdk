@@ -77,7 +77,9 @@ export class RecordAlreadyExistsError extends WriteRejectedError {
     message: string,
     uri: string,
     attempted: readonly StrongRef[],
-    details: { status: number; code: string | undefined },
+    // What the reference PDS answers for a taken key; the same values when the SDK finds the
+    // record itself before sending anything.
+    details: { status: number; code: string | undefined } = { status: 400, code: "InvalidSwap" },
     options?: ErrorOptions,
   ) {
     super(message, attempted, details, options);

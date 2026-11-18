@@ -6,7 +6,6 @@ import {
   WriteRejectedError,
   WriteResultMismatchError,
 } from "../errors.js";
-import { alreadyExists } from "./already-exists.js";
 import { describeError } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import { parseRecordUri, type StrongRef } from "./resolve-record-ref.js";
@@ -192,8 +191,7 @@ function toAlreadyExists(
   uri: string,
   rejected: WriteRejectedError,
 ): RecordAlreadyExistsError {
-  return alreadyExists(
-    RecordAlreadyExistsError,
+  return new RecordAlreadyExistsError(
     `${operation}: a record already exists at ${uri}, so nothing was written and the existing record is unchanged. ${operation} only creates records; it never overwrites one.`,
     uri,
     rejected.attempted,
