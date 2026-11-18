@@ -301,7 +301,7 @@ describe("createAttachment description", () => {
       createAttachment(context, {
         title: "Report",
         description: { blocks: [] },
-      } as AttachmentInput),
+      } as unknown as AttachmentInput),
     ).rejects.toThrow(/must be a string, \{ uri \}/);
 
     expect(methods(requests).includes(APPLY)).toBe(false);
