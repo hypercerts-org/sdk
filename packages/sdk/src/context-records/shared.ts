@@ -1,7 +1,14 @@
 import { l } from "@atproto/lex";
-import { blobOrUrl } from "../internal/input.js";
+import { creatorOf, type StandaloneCreator } from "../internal/create-record.js";
+import { blobOrUrl, strictObject } from "../internal/input.js";
 import { mediaValue } from "../internal/media.js";
-import { type FieldTransform, type ReferenceField, references } from "../internal/record-kind.js";
+import {
+  type FieldTransform,
+  type RecordKind,
+  type ReferenceField,
+  references,
+} from "../internal/record-kind.js";
+import type { StrongRef } from "../internal/resolve-record-ref.js";
 import { type ExistingRecord, isExistingRecord } from "../internal/slots.js";
 import { locationKind } from "../location/build-location.js";
 
@@ -18,15 +25,18 @@ export const contentInput = l.optional(l.array(blobOrUrl));
 export const contentTransform: FieldTransform = (build, field, value: readonly (Blob | string)[]) =>
   Promise.all(value.map((item, i) => mediaValue(build, `${field}[${i}]`, item, "blob")));
 
-/** A list of DIDs, for example `["did:plc:abc123"]`. */
-export const didListInput = l.array(l.string({ format: "did" }));
+/** A list of accounts, for example `[{ did: "did:plc:abc123" }]`. */
+export const didListInput = l.array(strictObject({ did: l.string({ format: "did" }) }));
 
 /**
  * The `recordKind` transform of a DID list: the lexicon stores each DID as an
  * `app.certified.defs#did` object.
  */
-export const didListTransform: FieldTransform = (_build, _field, dids: readonly string[]) =>
-  Promise.resolve(dids.map((did) => ({ did })));
+export const didListTransform: FieldTransform = (
+  _build,
+  _field,
+  accounts: readonly { did: string }[],
+) => Promise.resolve(accounts.map(({ did }) => ({ did })));
 
 const DECIMAL = /^-?\d+(\.\d+)?$/;
 
@@ -62,5 +72,21 @@ export const locationReference: ReferenceField = references.one(() => locationKi
 /** A field that holds an array of locations: each the data of a new one or `{ uri }` of an existing one. */
 export const locationsReference: ReferenceField = references.many(() => locationKind);
 
+/**
+ * Like `creatorOf`, but the top-level result is the new record's `StrongRef` with no `created`
+ * flag: the call always creates that record, so the flag would carry no information. Nested
+ * results keep theirs. `TResult` declares `uri` and `cid` and the nested results.
+ */
+export function creatorWithoutCreatedOf<
+  T extends { createdAt?: string | undefined },
+  TResult extends StrongRef,
+>(operation: string, kind: RecordKind<T>): StandaloneCreator<T, TResult> {
+  const create = creatorOf<T, TResult & { created: true }>(operation, kind);
+  return async (context, input) => {
+    const { created: _created, ...result } = await create(context, input);
+    return result as unknown as TResult;
+  };
+}
+
 /** Re-exported so the context records import everything they share from one place. */
-export { creatorOf } from "../internal/create-record.js";
+export { creatorOf, type StrongRef };

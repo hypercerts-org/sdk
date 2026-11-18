@@ -35,7 +35,7 @@ describe("createMeasurement", () => {
       methodType: "remote-sensing",
       methodURI: "https://example.org/method",
       evidenceURI: ["https://example.org/data.csv", uriOf("org.hypercerts.claim.evidence")],
-      measurers: ["did:plc:abc123", "did:plc:def456"],
+      measurers: [{ did: "did:plc:abc123" }, { did: "did:plc:def456" }],
       comment: "Season one.",
       createdAt: "2026-07-01T00:00:00.000Z",
     });

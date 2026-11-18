@@ -44,8 +44,8 @@ import {
 import { submitWrites } from "../internal/submit-writes.js";
 import { type LocationInput, locationKind } from "../location/build-location.js";
 import {
+  type CreateWorkScopeTagResult,
   type WorkScopeTagInput,
-  type WorkScopeTagResult,
   workScopeTagKind,
 } from "../tag/build-tag.js";
 import { type ContributionInput, contributionKind } from "./build-contribution.js";
@@ -171,7 +171,7 @@ export interface CreateActivityResult {
   /** The rights record, when the input had `rights`. */
   rights?: SupportingRecordRef;
   /** The work-scope tags of a CEL `workScope`, in input order. Absent for a free-form scope. */
-  workScope?: { usedTags: readonly WorkScopeTagResult[] };
+  workScope?: { usedTags: readonly CreateWorkScopeTagResult[] };
   /** The location records, in input order. */
   locations: readonly SupportingRecordRef[];
   /** The contributors, in input order. */
@@ -617,7 +617,7 @@ function summarise(
       workScope?.kind === "cel"
         ? {
             usedTags: workScope.usedTags.map((tag) =>
-              resultOf<WorkScopeTagResult>(tag, created, refOf),
+              resultOf<CreateWorkScopeTagResult>(tag, created, refOf),
             ),
           }
         : undefined,

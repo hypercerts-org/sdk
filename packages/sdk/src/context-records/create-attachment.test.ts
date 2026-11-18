@@ -89,7 +89,6 @@ describe("createAttachment", () => {
     });
     expect(result).toEqual({
       ...refTo(attachment),
-      created: true,
       subjects: [{ uri: activity, cid: CID, created: false }],
       location: { ...newLocation, created: true },
       tags: [
@@ -116,7 +115,7 @@ describe("createAttachment", () => {
       title: "Baseline photos",
       createdAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/),
     });
-    expect(result).toEqual({ ...refTo(write), created: true });
+    expect(result).toEqual(refTo(write));
   });
 
   it("accepts a subject of any record type", async () => {

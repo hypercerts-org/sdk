@@ -3,12 +3,13 @@ import * as acknowledgement from "@hypercerts-org/lexicon/org/hypercerts/context
 import * as defs from "@hypercerts-org/lexicon/org/hypercerts/defs";
 import { optionalText } from "../internal/input.js";
 import { type RecordKind, recordKind } from "../internal/record-kind.js";
+import type { StrongRef } from "../internal/resolve-record-ref.js";
 import {
   type ExistingRecord,
   isExistingRecord,
   type SupportingRecordRef,
 } from "../internal/slots.js";
-import { creatorOf, existingRecordInput, existingRecordReference } from "./shared.js";
+import { creatorWithoutCreatedOf, existingRecordInput, existingRecordReference } from "./shared.js";
 
 /** The data of a new `org.hypercerts.context.acknowledgement` record. */
 export interface AcknowledgementInput {
@@ -36,14 +37,14 @@ export interface AcknowledgementInput {
 }
 
 /**
- * The result of {@link createAcknowledgement}: the new Acknowledgement's URI and CID with
- * `created: true`, and the CIDs of the records it points at.
+ * The result of {@link createAcknowledgement}: the new Acknowledgement's URI and CID, and the CIDs
+ * of the records it points at.
  *
  * @remarks
  * `subject` is always present, and `context` only when the input's `context` was `{ uri }`. Both
  * have `created: false`: an acknowledgement creates no record besides itself.
  */
-export interface CreateAcknowledgementResult extends SupportingRecordRef {
+export interface CreateAcknowledgementResult extends StrongRef {
   /** The subject with the CID it was pinned at. */
   subject: SupportingRecordRef;
   /** The context with the CID it was pinned at, when `context` was `{ uri }`. */
@@ -105,7 +106,7 @@ const acknowledgementKind: RecordKind<AcknowledgementInput> = recordKind(
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the record is created in that account's repo.
  * @param input - The acknowledgement. See {@link AcknowledgementInput}.
- * @returns The new record's URI and CID with `created: true`, and the CIDs its `subject` and
+ * @returns The new record's URI and CID, and the CIDs its `subject` and
  * `{ uri }` `context` were pinned at. See {@link CreateAcknowledgementResult}.
  * @throws {@link TypeError} If `input` has an unknown field, a `subject` that is not `{ uri }`, an
  * `acknowledged` that is not a boolean, a `context` that is neither a string nor `{ uri }` (or
@@ -145,7 +146,7 @@ const acknowledgementKind: RecordKind<AcknowledgementInput> = recordKind(
  * });
  * ```
  */
-export const createAcknowledgement = creatorOf<AcknowledgementInput, CreateAcknowledgementResult>(
-  "createAcknowledgement",
-  acknowledgementKind,
-);
+export const createAcknowledgement = creatorWithoutCreatedOf<
+  AcknowledgementInput,
+  CreateAcknowledgementResult
+>("createAcknowledgement", acknowledgementKind);

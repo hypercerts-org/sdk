@@ -87,9 +87,9 @@ export interface VocabularyTagInput extends TagFields {
  * only when its input had them. Each entry is a result of the same shape, so a new tag nested at
  * any depth is reported with its URI and CID.
  */
-export interface VocabularyTagResult extends SupportingRecordRef {
-  broader?: readonly VocabularyTagResult[];
-  supersededBy?: VocabularyTagResult;
+export interface CreateVocabularyTagResult extends SupportingRecordRef {
+  broader?: readonly CreateVocabularyTagResult[];
+  supersededBy?: CreateVocabularyTagResult;
 }
 
 // The record key is `<category>.<key>`, so each part must be a record key and have no dot: with one,
@@ -144,7 +144,7 @@ export const vocabularyTagKind: RecordKind<VocabularyTagInput> = recordKind(
  * authenticated.
  * @param input - The tag's data. See {@link VocabularyTagInput}.
  * @returns The new tag's URI and CID with `created: true`, and the results for the tags it points
- * at. See {@link VocabularyTagResult}.
+ * at. See {@link CreateVocabularyTagResult}.
  * @throws {@link TypeError} If `input` has an unknown field, a `category` or `key` that is not a
  * valid record key or contains a dot, a `broader` or `supersededBy` entry that is not a tag's data
  * or `{ uri }` (or combines `uri` with other fields, or points at another type of record), two new
@@ -204,7 +204,7 @@ export const vocabularyTagKind: RecordKind<VocabularyTagInput> = recordKind(
  * }
  * ```
  */
-export const createVocabularyTag: StandaloneCreator<VocabularyTagInput, VocabularyTagResult> =
+export const createVocabularyTag: StandaloneCreator<VocabularyTagInput, CreateVocabularyTagResult> =
   creatorOf("createVocabularyTag", vocabularyTagKind);
 
 /** The data of a new `org.hypercerts.workscope.tag` record. */
@@ -241,9 +241,9 @@ export interface WorkScopeTagInput extends TagFields {
  * when its input had them. Each is a result of the same shape, so a new tag nested at any depth is
  * reported with its URI and CID.
  */
-export interface WorkScopeTagResult extends SupportingRecordRef {
-  parent?: WorkScopeTagResult;
-  supersededBy?: WorkScopeTagResult;
+export interface CreateWorkScopeTagResult extends SupportingRecordRef {
+  parent?: CreateWorkScopeTagResult;
+  supersededBy?: CreateWorkScopeTagResult;
 }
 
 export const workScopeTagKind: RecordKind<WorkScopeTagInput> = recordKind(
@@ -277,7 +277,7 @@ export const workScopeTagKind: RecordKind<WorkScopeTagInput> = recordKind(
  * authenticated.
  * @param input - The tag's data. See {@link WorkScopeTagInput}.
  * @returns The new tag's URI and CID with `created: true`, and the results for the tags it points
- * at. See {@link WorkScopeTagResult}.
+ * at. See {@link CreateWorkScopeTagResult}.
  * @throws {@link TypeError} If `input` has an unknown field, a `parent` or `supersededBy` that is
  * not a tag's data or `{ uri }` (or combines `uri` with other fields, or points at another type of
  * record), more new records than one write holds, or a value the lexicon does not allow. Nothing
@@ -316,5 +316,5 @@ export const workScopeTagKind: RecordKind<WorkScopeTagInput> = recordKind(
  * });
  * ```
  */
-export const createWorkScopeTag: StandaloneCreator<WorkScopeTagInput, WorkScopeTagResult> =
+export const createWorkScopeTag: StandaloneCreator<WorkScopeTagInput, CreateWorkScopeTagResult> =
   creatorOf("createWorkScopeTag", workScopeTagKind);

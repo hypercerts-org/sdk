@@ -44,16 +44,15 @@ export interface CreateOrganizationInput {
 }
 
 /**
- * The result of {@link createOrganization}.
+ * The result of {@link createOrganization}. Its `uri` and `cid` are those of the new organization
+ * record.
  *
  * @remarks
  * `location` and `additionalLocations` mirror the input: `additionalLocations[i]` belongs to the
  * input entry at the same index, whether it was created or reused. Filter on `created` for only the
  * records this call wrote.
  */
-export interface CreateOrganizationResult {
-  /** The URI and CID of the new organization record. */
-  organization: StrongRef;
+export interface CreateOrganizationResult extends StrongRef {
   /**
    * The account's profile. `created` is `true` when this call wrote it from `profileIfMissing`,
    * `false` when the account already had one, which is unchanged; its `cid` is then the one the SDK
@@ -176,7 +175,7 @@ const inputSchema = strictObject({
  *
  * // `context` comes from createSDKContext; `logoFile` is a File, for example from an
  * // <input type="file">.
- * const { organization, profile, location } = await createOrganization(context, {
+ * const { uri, profile, location } = await createOrganization(context, {
  *   organization: {
  *     legalName: "Phobjikha Conservation Society",
  *     organizationType: ["ngo"],
@@ -196,7 +195,7 @@ const inputSchema = strictObject({
  *   // Used only if the account has no profile yet; ignored (and its images not uploaded) otherwise.
  *   profileIfMissing: { displayName: "Phobjikha Conservation", avatar: "https://example.org/a.png" },
  * });
- * console.log(organization.uri); // at://<did>/app.certified.actor.organization/self
+ * console.log(uri); // at://<did>/app.certified.actor.organization/self
  * console.log(profile.created); // false when the account already had a profile
  * ```
  *
@@ -291,7 +290,7 @@ export async function createOrganization(
   }
 
   return {
-    organization: refOf(organizationSlot),
+    ...refOf(organizationSlot),
     profile:
       profilePlan.kind === "created"
         ? recordRef(profilePlan.slot, created, refOf)

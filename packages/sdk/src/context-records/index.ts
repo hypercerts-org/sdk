@@ -11,7 +11,7 @@ export type { LeafletDocument } from "../internal/long-description.js";
 export type { StrongRef } from "../internal/resolve-record-ref.js";
 export type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 export type { LocationInput } from "../location/build-location.js";
-export type { VocabularyTagInput, VocabularyTagResult } from "../tag/build-tag.js";
+export type { CreateVocabularyTagResult, VocabularyTagInput } from "../tag/build-tag.js";
 export {
   type AcknowledgementInput,
   type CreateAcknowledgementResult,
@@ -28,8 +28,8 @@ export {
   type EvaluationInput,
 } from "./build-evaluation.js";
 export {
+  type CreateMeasurementResult,
   createMeasurement,
   type MeasurementInput,
-  type MeasurementResult,
 } from "./build-measurement.js";
 export type { EvaluationScore } from "./score.js";

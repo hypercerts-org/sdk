@@ -4,29 +4,30 @@ import { type RecordKind, recordKind, references } from "../internal/record-kind
 import type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 import type { LocationInput } from "../location/build-location.js";
 import {
+  type CreateMeasurementResult,
   type MeasurementInput,
-  type MeasurementResult,
   measurementKind,
 } from "./build-measurement.js";
 import { type EvaluationScore, scoreInput } from "./score.js";
 import {
   contentInput,
   contentTransform,
-  creatorOf,
+  creatorWithoutCreatedOf,
   didListInput,
   didListTransform,
   existingRecordReference,
   locationReference,
+  type StrongRef,
 } from "./shared.js";
 
 /** The data of a new `org.hypercerts.context.evaluation` record. */
 export interface EvaluationInput {
   /**
-   * DIDs of the evaluators, at most 1000. Declared data: it is not proof that those accounts wrote
+   * The evaluators as `{ did }`, at most 1000. Declared data: it is not proof that those accounts wrote
    * or agree with the evaluation, and nothing is sent to them. The SDK does not default it to the
    * signed-in account.
    */
-  evaluators: readonly string[];
+  evaluators: readonly { did: string }[];
   /** A brief summary. At most 5000 characters and 1000 graphemes. */
   summary: string;
   /**
@@ -56,7 +57,7 @@ export interface EvaluationInput {
 }
 
 /**
- * The result of {@link createEvaluation}: the new Evaluation's URI and CID with `created: true`,
+ * The result of {@link createEvaluation}: the new Evaluation's URI and CID,
  * and the results for the records it points at.
  *
  * @remarks
@@ -65,11 +66,11 @@ export interface EvaluationInput {
  * reused, and a new measurement reports its own `locations`. Filter on `created` for only the
  * records this call wrote.
  */
-export interface CreateEvaluationResult extends SupportingRecordRef {
+export interface CreateEvaluationResult extends StrongRef {
   /** The subject with the CID it was pinned at. `created` is `false`. */
   subject?: SupportingRecordRef;
   /** The measurements, in input order. */
-  measurements?: readonly MeasurementResult[];
+  measurements?: readonly CreateMeasurementResult[];
   /** The location. */
   location?: SupportingRecordRef;
 }
@@ -106,7 +107,7 @@ const evaluationKind: RecordKind<EvaluationInput> = recordKind(
  * of an existing one. Nothing is deduplicated, and order is kept.
  *
  * `subject` is `{ uri }` of an existing record of any type; it is pinned by its current CID and
- * never modified, and does not learn about the evaluation. `evaluators` are DIDs stored as given:
+ * never modified, and does not learn about the evaluation. `evaluators` are `{ did }` accounts stored as given:
  * they are not proof that those accounts wrote or agree with the evaluation, and nobody is
  * notified. `score` takes decimal strings and is checked exactly, without JavaScript numbers:
  * `value` must be from `min` to `max`, inclusive.
@@ -129,10 +130,10 @@ const evaluationKind: RecordKind<EvaluationInput> = recordKind(
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the records are created in that account's repo.
  * @param input - The evaluation and the records it needs. See {@link EvaluationInput}.
- * @returns The new Evaluation's URI and CID with `created: true`, and the references of its
+ * @returns The new Evaluation's URI and CID, and the references of its
  * measurements (with their locations) and location. See {@link CreateEvaluationResult}.
- * @throws {@link TypeError} If `input` has an unknown field, an `evaluators` entry that is not a
- * DID, a `score` that is not decimal strings or has a `value` outside `min` to `max`, a mixed or
+ * @throws {@link TypeError} If `input` has an unknown field, an `evaluators` entry that is not
+ * `{ did }` with a DID, a `score` that is not decimal strings or has a `value` outside `min` to `max`, a mixed or
  * wrongly typed entry (a `measurements` URI that points at another record type, `{ uri }` combined
  * with record fields), more new records than one write holds, or any value the lexicons do not
  * allow. The message names the field. Nothing was written. Blobs may already have been uploaded
@@ -151,7 +152,7 @@ const evaluationKind: RecordKind<EvaluationInput> = recordKind(
  *
  * // `context` comes from createSDKContext.
  * const evaluation = await createEvaluation(context, {
- *   evaluators: ["did:plc:abc123"],
+ *   evaluators: [{ did: "did:plc:abc123" }],
  *   summary: "The restoration meets its stated targets.",
  *   subject: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  *   score: { min: "0", max: "5", value: "4.2" },
@@ -169,13 +170,13 @@ const evaluationKind: RecordKind<EvaluationInput> = recordKind(
  * import { createEvaluation } from "@hypercerts-org/sdk/context";
  *
  * await createEvaluation(context, {
- *   evaluators: ["did:plc:abc123"],
+ *   evaluators: [{ did: "did:plc:abc123" }],
  *   summary: "Strong results.",
  *   score: { min: "0", max: "5", value: "7" }, // TypeError: must have a value from min to max
  * });
  * ```
  */
-export const createEvaluation = creatorOf<EvaluationInput, CreateEvaluationResult>(
+export const createEvaluation = creatorWithoutCreatedOf<EvaluationInput, CreateEvaluationResult>(
   "createEvaluation",
   evaluationKind,
 );

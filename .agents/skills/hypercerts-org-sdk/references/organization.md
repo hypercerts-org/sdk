@@ -8,7 +8,7 @@ Read [../SKILL.md](../SKILL.md) first for setup, blob uploads and error handling
 import { createOrganization } from "@hypercerts-org/sdk/organization";
 
 // `logoFile` is a File, for example from an <input type="file">.
-const { organization, profile, location, additionalLocations } = await createOrganization(context, {
+const { uri, cid, profile, location, additionalLocations } = await createOrganization(context, {
   organization: {
     legalName: "Phobjikha Conservation Society",
     organizationType: ["ngo"],
@@ -28,7 +28,7 @@ const { organization, profile, location, additionalLocations } = await createOrg
   // Used only when the account has no profile. Ignored (and its images not uploaded) otherwise.
   profileIfMissing: { displayName: "Phobjikha Conservation", avatar: avatarFile },
 });
-organization; // { uri, cid }
+uri; // the new organization's uri and cid are on the result itself, not under a key
 profile; // { uri, cid, created: true } (false when the account already had one)
 location; // { uri, cid, created: true }
 additionalLocations; // [{ uri, cid, created: false }]

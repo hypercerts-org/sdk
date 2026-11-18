@@ -50,12 +50,12 @@ describe("createOrganization", () => {
       profileIfMissing: { displayName, description: "Planting trees." },
     });
 
-    expect(result.organization.uri).toBe(selfUri(collections.organization));
+    expect(result.uri).toBe(selfUri(collections.organization));
     expect(result.profile).toMatchObject({ uri: selfUri(collections.profile), created: true });
     expect(result.location).toMatchObject({ created: true });
     expect(await countRecords(user.client, collections.location)).toBe(locations + 1);
 
-    const stored = await expectStored(user.client, result.organization);
+    const stored = await expectStored(user.client, result);
     expect(stored).toMatchObject({
       legalName,
       organizationType: ["ngo"],
@@ -87,7 +87,7 @@ describe("createOrganization", () => {
     expect(result.profile).toEqual({ ...profile, created: false });
     expect(result.location).toEqual({ ...existingLocation, created: false });
     expect(await expectStored(user.client, result.profile)).toEqual(storedProfile);
-    expect(await expectStored(user.client, result.organization)).toMatchObject({
+    expect(await expectStored(user.client, result)).toMatchObject({
       location: { uri: existingLocation.uri, cid: existingLocation.cid },
     });
   });
@@ -107,12 +107,12 @@ describe("createOrganization", () => {
     expect(error).toBeInstanceOf(RecordAlreadyExistsError);
     expect(error).toBeInstanceOf(WriteRejectedError);
     expect(error).toMatchObject({
-      uri: first.organization.uri,
+      uri: first.uri,
       attempted: [],
       status: 400,
       code: "InvalidSwap",
     });
-    await expectStored(user.client, first.organization);
+    await expectStored(user.client, first);
     expect(await countRecords(user.client, collections.location)).toBe(locations);
   });
 
