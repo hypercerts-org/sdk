@@ -14,7 +14,7 @@ export type {
   ActionOptions,
   FollowAccountInput,
   RecordActionInput,
-  RecordTarget,
+  RecordSubject,
   UndoTarget,
   UnfollowAccountInput,
   UnfollowEntityInput,

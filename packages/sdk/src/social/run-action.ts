@@ -27,10 +27,10 @@ import {
  *
  * Internal. Boundaries:
  * - Writes with a new TID key each call, and looks for nothing that exists already, so calling it
- *   again for the same target creates another record.
- * - Reads `via` (and, for a like or a repost, the target) from the PDS that hosts it, and writes
+ *   again for the same subject creates another record.
+ * - Reads `via` (and, for a like or a repost, the subject) from the PDS that hosts it, and writes
  *   nothing if a read fails.
- * - Does not touch the target or `via`.
+ * - Does not touch the subject or `via`.
  *
  * The function throws TypeError for invalid input, and what the reads and `submitWrites` throw.
  */
@@ -63,9 +63,9 @@ export function createAction<TCreate extends ActionOptions, TField extends UndoF
  * Internal. Boundaries:
  * - Deletes exactly that record, with one `submitDelete` request, and looks at nothing else: no scan
  *   of the collection, no read of the record or of what it points at, no indexer. Another record
- *   for the same target, for example a duplicate like, is not touched.
+ *   for the same subject, for example a duplicate like, is not touched.
  * - Refuses, before anything is sent, a URI that is not in the action's collection or not in the
- *   signed-in account's repository, so a wrong URI (the target's, for example) cannot delete
+ *   signed-in account's repository, so a wrong URI (the subject's, for example) cannot delete
  *   anything. The PDS would refuse another account's record anyway; this says why.
  * - With `cid` the delete is guarded by it (see `submitDelete`); without it, it is not.
  *
@@ -89,7 +89,7 @@ export function undoAction<TCreate extends ActionOptions, TField extends UndoFie
 function assertOwnRecord(build: BuildContext, uri: string, collection: string) {
   parseOwnRecordUri(build, uri, collection, {
     collection: (actual) =>
-      `${build.operation}: ${uri} is a ${actual} record, not a ${collection} record. Pass the URI of the ${collection} record the account created (for example the \`uri\` its create function returned), not the URI of its target. Nothing was sent.`,
+      `${build.operation}: ${uri} is a ${actual} record, not a ${collection} record. Pass the URI of the ${collection} record the account created (for example the \`uri\` its create function returned), not the URI of its subject. Nothing was sent.`,
     repository: (did) =>
       `${build.operation}: ${uri} is in the repository of ${did}, not of the signed-in account (${build.did}). Only the account's own records can be deleted. Nothing was sent.`,
   });

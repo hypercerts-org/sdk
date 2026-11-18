@@ -4,7 +4,7 @@ import { strictObject } from "../internal/input.js";
 import { parseRecordUri, resolveRecordRef } from "../internal/resolve-record-ref.js";
 
 /** A record the action refers to, as `{ uri }`. */
-export interface RecordTarget {
+export interface RecordSubject {
   /**
    * A full record URI: `at://<did>/<collection>/<rkey>`, with a DID (not a handle) as the authority.
    * A bare DID or a URI without a collection and record key is rejected.
@@ -12,18 +12,18 @@ export interface RecordTarget {
   uri: string;
 }
 
-/** Options every operation that creates a social record accepts besides its target. */
+/** Options every operation that creates a social record accepts besides its subject. */
 export interface ActionOptions {
   /** An ISO 8601 date-time. Defaults to the time of the call. */
   createdAt?: string | undefined;
   /**
-   * The record through which the target was found, for example a starter pack or a repost, as
+   * The record through which the subject was found, for example a starter pack or a repost, as
    * `{ uri }`: `at://<did>/<collection>/<rkey>`. The SDK reads the record to pin its current
    * version and stores it as a strong reference, so callers never build one. It may be a record of
    * any Lexicon and of any account if it is public. A handle in place of the DID is rejected, and
    * so is a record that cannot be read: nothing is written then.
    */
-  via?: RecordTarget | undefined;
+  via?: RecordSubject | undefined;
 }
 
 /** The input of {@link followAccount}. */
@@ -33,7 +33,7 @@ export interface FollowAccountInput extends ActionOptions {
    * or a bare string is rejected. Stored as given and never looked up: the SDK does not check that
    * the account exists.
    */
-  target: { did: string };
+  subject: { did: string };
 }
 
 /** The input of {@link followEntity}, {@link like} and {@link repost}. */
@@ -46,7 +46,7 @@ export interface RecordActionInput extends ActionOptions {
    * does not exist is followed all the same. {@link like} and {@link repost} store the record's
    * CID, so they read it and pin the version they find; a record that cannot be read stops them.
    */
-  target: RecordTarget;
+  subject: RecordSubject;
 }
 
 /**
@@ -120,7 +120,7 @@ export interface SocialAction<TCreate extends ActionOptions, TField extends Undo
   readonly schema: l.RecordSchema;
   /** Validates the input of the create function. */
   readonly createInput: l.Schema<TCreate>;
-  /** The value stored in the record's `subject` for the input's target. */
+  /** The value stored in the record's `subject` for the input's subject. */
   readonly subject: (context: SDKContext, input: TCreate) => unknown;
   /** The field of the undo function's input that holds the record to delete. */
   readonly undoField: TField;
@@ -136,21 +136,21 @@ const recordUri = l.custom<string>(
   "must be a full record URI, at://<did>/<collection>/<rkey>, with a DID (not a handle) as the authority; a bare DID or a URI without a collection and record key is not accepted",
 );
 
-const recordTarget = strictObject({ uri: recordUri });
+const recordSubjectInput = strictObject({ uri: recordUri });
 
 const options = {
   createdAt: l.optional(l.string()),
-  via: l.optional(recordTarget),
+  via: l.optional(recordSubjectInput),
 };
 
-/** Validates the input of an action whose target is an account: `{ target: { did } }`. */
+/** Validates the input of an action whose subject is an account: `{ subject: { did } }`. */
 export const accountCreateInput = strictObject({
-  target: strictObject({ did: accountDid }),
+  subject: strictObject({ did: accountDid }),
   ...options,
 });
 
-/** Validates the input of an action whose target is a record: `{ target: { uri } }`. */
-export const recordCreateInput = strictObject({ target: recordTarget, ...options });
+/** Validates the input of an action whose subject is a record: `{ subject: { uri } }`. */
+export const recordCreateInput = strictObject({ subject: recordSubjectInput, ...options });
 
 const cid = l.optional(
   l.custom<CidString>(
@@ -181,8 +181,8 @@ function isRecordUri(value: unknown): value is string {
 }
 
 /**
- * The action of a record whose `subject` is a strong reference to the target: a like or a repost.
- * Creating one pins the version of the target current at the time.
+ * The action of a record whose `subject` is a strong reference to the subject: a like or a repost.
+ * Creating one pins the version of the subject current at the time.
  */
 export function recordRefAction<TField extends UndoField>(
   names: SocialAction<RecordActionInput, TField>["names"],
@@ -193,7 +193,7 @@ export function recordRefAction<TField extends UndoField>(
     names,
     schema,
     createInput: recordCreateInput,
-    subject: (context, { target }) => resolveRecordRef(context, target.uri, names.create),
+    subject: (context, { subject }) => resolveRecordRef(context, subject.uri, names.create),
     undoField,
   };
 }

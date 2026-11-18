@@ -14,32 +14,32 @@ const repostAction = recordRefAction(
  * Likes a record: creates an `app.certified.feed.like` record in the authenticated account's repo.
  *
  * @remarks
- * A like is social feedback and nothing more. It carries no protocol meaning about its target: it is
+ * A like is social feedback and nothing more. It carries no protocol meaning about its subject: it is
  * not an evaluation, an acknowledgement or proof of endorsement, and applications should not read
  * it as one.
  *
- * The SDK reads the target from the PDS that hosts it (public records of other accounts resolve
- * too) and pins the version it finds: the like stores the target's URI and its CID at that moment,
- * so a later edit of the target does not change which version was liked. If the target cannot be
- * read, nothing is written. The target is never modified or created. The record key is a new TID
+ * The SDK reads the subject from the PDS that hosts it (public records of other accounts resolve
+ * too) and pins the version it finds: the like stores the subject's URI and its CID at that moment,
+ * so a later edit of the subject does not change which version was liked. If the subject cannot be
+ * read, nothing is written. The subject is never modified or created. The record key is a new TID
  * chosen by the SDK, and `createdAt` defaults to the time of the call.
  *
  * Nothing is deduplicated: calling this again for the same record creates a second like.
  * {@link unlike} deletes only the record whose URI it is given, so each duplicate has to be undone
  * with its own URI.
  *
- * `via` is optional: `{ uri }` of the record through which the target was encountered, typically a
+ * `via` is optional: `{ uri }` of the record through which the subject was encountered, typically a
  * repost. The SDK reads it the same way. See {@link ActionOptions}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
  * @param input - The record to like and optional `createdAt` and `via`. See
  * {@link RecordActionInput}.
- * @returns The new like's URI and CID (not the target's).
- * @throws {@link TypeError} If `input` has an unknown field, a `target.uri` that is not a full record
+ * @returns The new like's URI and CID (not the subject's).
+ * @throws {@link TypeError} If `input` has an unknown field, a `subject.uri` that is not a full record
  * URI (a bare DID, a handle authority or a partial URI), a `via.uri` that is not a record URI, or a
  * `createdAt` the lexicon rejects. Nothing was written.
- * @throws {@link Error} If the client is not authenticated, or the target or the `via` record cannot
+ * @throws {@link Error} If the client is not authenticated, or the subject or the `via` record cannot
  * be read (missing, or the PDS cannot be reached). Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
  * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
@@ -53,7 +53,7 @@ const repostAction = recordRefAction(
  *
  * // `context` comes from createSDKContext.
  * const liked = await like(context, {
- *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
+ *   subject: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
  * console.log(liked.uri); // at://<your DID>/app.certified.feed.like/<tid>
  * ```
@@ -63,7 +63,7 @@ const repostAction = recordRefAction(
  * import { like } from "@hypercerts-org/sdk/social";
  *
  * await like(context, {
- *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
+ *   subject: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  *   via: { uri: "at://did:plc:def456/app.certified.feed.repost/3k2a4b5c6d7e9" }, // read and pinned for you
  * });
  * ```
@@ -113,7 +113,7 @@ export const like = createAction(likeAction);
  *
  * // `context` comes from createSDKContext.
  * const liked = await like(context, {
- *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
+ *   subject: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
  * // Keep `liked` (its `uri` and `cid`) to undo it later.
  * await unlike(context, { like: liked });
@@ -133,31 +133,31 @@ export const unlike = undoAction(likeAction);
 
 /**
  * Reposts a record: creates an `app.certified.feed.repost` record in the authenticated account's
- * repo, surfacing the target to the account's followers.
+ * repo, surfacing the subject to the account's followers.
  *
  * @remarks
- * The SDK reads the target from the PDS that hosts it (public records of other accounts resolve
- * too) and pins the version it finds: the repost stores the target's URI and its CID at that
- * moment, so a later edit of the target does not change which version was reposted. If the target
- * cannot be read, nothing is written. The target is never modified or created. The record key is a
+ * The SDK reads the subject from the PDS that hosts it (public records of other accounts resolve
+ * too) and pins the version it finds: the repost stores the subject's URI and its CID at that
+ * moment, so a later edit of the subject does not change which version was reposted. If the subject
+ * cannot be read, nothing is written. The subject is never modified or created. The record key is a
  * new TID chosen by the SDK, and `createdAt` defaults to the time of the call.
  *
  * Nothing is deduplicated: calling this again for the same record creates a second repost.
  * {@link unrepost} deletes only the record whose URI it is given, so each duplicate has to be undone
  * with its own URI.
  *
- * `via` is optional: `{ uri }` of the record through which the target was encountered, typically
+ * `via` is optional: `{ uri }` of the record through which the subject was encountered, typically
  * another repost. The SDK reads it the same way. See {@link ActionOptions}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
  * @param input - The record to repost and optional `createdAt` and `via`. See
  * {@link RecordActionInput}.
- * @returns The new repost's URI and CID (not the target's).
- * @throws {@link TypeError} If `input` has an unknown field, a `target.uri` that is not a full record
+ * @returns The new repost's URI and CID (not the subject's).
+ * @throws {@link TypeError} If `input` has an unknown field, a `subject.uri` that is not a full record
  * URI (a bare DID, a handle authority or a partial URI), a `via.uri` that is not a record URI, or a
  * `createdAt` the lexicon rejects. Nothing was written.
- * @throws {@link Error} If the client is not authenticated, or the target or the `via` record cannot
+ * @throws {@link Error} If the client is not authenticated, or the subject or the `via` record cannot
  * be read (missing, or the PDS cannot be reached). Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
  * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
@@ -171,7 +171,7 @@ export const unlike = undoAction(likeAction);
  *
  * // `context` comes from createSDKContext.
  * const reposted = await repost(context, {
- *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
+ *   subject: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
  * console.log(reposted.uri); // at://<your DID>/app.certified.feed.repost/<tid>
  * ```
@@ -181,7 +181,7 @@ export const unlike = undoAction(likeAction);
  * import { repost } from "@hypercerts-org/sdk/social";
  *
  * await repost(context, {
- *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
+ *   subject: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  *   via: { uri: "at://did:plc:def456/app.certified.feed.repost/3k2a4b5c6d7e9" }, // read and pinned for you
  * });
  * ```
@@ -231,7 +231,7 @@ export const repost = createAction(repostAction);
  *
  * // `context` comes from createSDKContext.
  * const reposted = await repost(context, {
- *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
+ *   subject: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
  * // Keep `reposted` (its `uri` and `cid`) to undo it later.
  * await unrepost(context, { repost: reposted });

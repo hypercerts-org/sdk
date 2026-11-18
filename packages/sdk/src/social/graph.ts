@@ -17,7 +17,7 @@ const followAccountAction: SocialAction<FollowAccountInput, "follow"> = {
   names: { create: "followAccount", undo: "unfollowAccount" },
   schema: follow.main,
   createInput: accountCreateInput,
-  subject: (_context, { target }) => target.did,
+  subject: (_context, { subject }) => subject.did,
   undoField: "follow",
 };
 
@@ -26,7 +26,7 @@ const followEntityAction: SocialAction<RecordActionInput, "follow"> = {
   schema: entityFollow.main,
   createInput: recordCreateInput,
   // The URI only: no CID, so the follow keeps pointing at the record when it is updated.
-  subject: (_context, { target }) => defs.recordSubject.build({ uri: asAtUriString(target.uri) }),
+  subject: (_context, { subject }) => defs.recordSubject.build({ uri: asAtUriString(subject.uri) }),
   undoField: "follow",
 };
 
@@ -35,7 +35,7 @@ const followEntityAction: SocialAction<RecordActionInput, "follow"> = {
  * account's repo.
  *
  * @remarks
- * `target.did` is the account being followed, a plain DID stored as given. It is never looked up:
+ * `subject.did` is the account being followed, a plain DID stored as given. It is never looked up:
  * ATProto lets a DID dangle, so the SDK does not check that the account exists or has a Certified
  * profile. The record key is a new TID chosen by the SDK, and `createdAt` defaults to the time of
  * the call.
@@ -52,7 +52,7 @@ const followEntityAction: SocialAction<RecordActionInput, "follow"> = {
  * @param input - The account to follow and optional `createdAt` and `via`. See
  * {@link FollowAccountInput}.
  * @returns The new record's URI and CID.
- * @throws {@link TypeError} If `input` has an unknown field, a `target.did` that is not a DID (a
+ * @throws {@link TypeError} If `input` has an unknown field, a `subject.did` that is not a DID (a
  * handle, for example), a `via.uri` that is not a record URI, or a `createdAt` the lexicon rejects.
  * Nothing was written.
  * @throws {@link Error} If the client is not authenticated, or the `via` record cannot be read.
@@ -69,7 +69,7 @@ const followEntityAction: SocialAction<RecordActionInput, "follow"> = {
  * import { followAccount } from "@hypercerts-org/sdk/social";
  *
  * // `context` comes from createSDKContext.
- * const follow = await followAccount(context, { target: { did: "did:plc:abc123" } });
+ * const follow = await followAccount(context, { subject: { did: "did:plc:abc123" } });
  * console.log(follow.uri); // at://<your DID>/app.certified.graph.follow/<tid>
  * ```
  *
@@ -77,16 +77,16 @@ const followEntityAction: SocialAction<RecordActionInput, "follow"> = {
  * ```ts
  * import { followAccount } from "@hypercerts-org/sdk/social";
  *
- * // TypeError: `target.did` must be a DID. Resolve the handle to a DID yourself first.
- * await followAccount(context, { target: { did: "alice.bsky.social" } });
+ * // TypeError: `subject.did` must be a DID. Resolve the handle to a DID yourself first.
+ * await followAccount(context, { subject: { did: "alice.bsky.social" } });
  * ```
  *
  * @example A DID is an object, not a bare string
  * ```ts
  * import { followAccount } from "@hypercerts-org/sdk/social";
  *
- * // TypeError: `target` is `{ did }`, not the DID itself.
- * await followAccount(context, { target: "did:plc:abc123" });
+ * // TypeError: `subject` is `{ did }`, not the DID itself.
+ * await followAccount(context, { subject: "did:plc:abc123" });
  * ```
  */
 export const followAccount = createAction(followAccountAction);
@@ -132,7 +132,7 @@ export const followAccount = createAction(followAccountAction);
  * import { followAccount, unfollowAccount } from "@hypercerts-org/sdk/social";
  *
  * // `context` comes from createSDKContext.
- * const follow = await followAccount(context, { target: { did: "did:plc:abc123" } });
+ * const follow = await followAccount(context, { subject: { did: "did:plc:abc123" } });
  * // Keep `follow` (its `uri` and `cid`) to undo it later.
  * await unfollowAccount(context, { follow });
  * ```
@@ -152,8 +152,8 @@ export const unfollowAccount = undoAction(followAccountAction);
  * authenticated account's repo.
  *
  * @remarks
- * The follow stores the target's URI as a `app.certified.defs#recordSubject` and no CID, so it
- * keeps pointing at the record through later updates. With no CID to pin, the target is a plain URI
+ * The follow stores the subject's URI as a `app.certified.defs#recordSubject` and no CID, so it
+ * keeps pointing at the record through later updates. With no CID to pin, the subject is a plain URI
  * stored as given and never read: ATProto lets a URI dangle, so the SDK does not check that the
  * record exists, and a follow of a record that is missing, private or of an unknown Lexicon is
  * created all the same. (A like or a repost differs: see {@link like}, which stores a CID and so
@@ -164,7 +164,7 @@ export const unfollowAccount = undoAction(followAccountAction);
  * {@link unfollowEntity} deletes only the record whose URI it is given, so each duplicate has to be
  * undone with its own URI.
  *
- * `via` is optional: `{ uri }` of a record through which the target was found. The SDK reads it to
+ * `via` is optional: `{ uri }` of a record through which the subject was found. The SDK reads it to
  * pin its current version. See {@link ActionOptions}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
@@ -172,7 +172,7 @@ export const unfollowAccount = undoAction(followAccountAction);
  * @param input - The record to follow and optional `createdAt` and `via`. See
  * {@link RecordActionInput}.
  * @returns The new record's URI and CID.
- * @throws {@link TypeError} If `input` has an unknown field, a `target.uri` that is not a full record
+ * @throws {@link TypeError} If `input` has an unknown field, a `subject.uri` that is not a full record
  * URI (a bare DID, a handle authority or a partial URI), a `via.uri` that is not a record URI, or a
  * `createdAt` the lexicon rejects. Nothing was written.
  * @throws {@link Error} If the client is not authenticated, or the `via` record cannot be read.
@@ -189,7 +189,7 @@ export const unfollowAccount = undoAction(followAccountAction);
  *
  * // `context` comes from createSDKContext.
  * const follow = await followEntity(context, {
- *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
+ *   subject: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
  * ```
  *
@@ -197,8 +197,8 @@ export const unfollowAccount = undoAction(followAccountAction);
  * ```ts
  * import { followAccount, followEntity } from "@hypercerts-org/sdk/social";
  *
- * await followEntity(context, { target: { uri: "did:plc:abc123" } }); // TypeError
- * await followAccount(context, { target: { did: "did:plc:abc123" } }); // follow an account like this
+ * await followEntity(context, { subject: { uri: "did:plc:abc123" } }); // TypeError
+ * await followAccount(context, { subject: { did: "did:plc:abc123" } }); // follow an account like this
  * ```
  */
 export const followEntity = createAction(followEntityAction);
@@ -210,7 +210,7 @@ export const followEntity = createAction(followEntityAction);
  * @remarks
  * Deletes exactly the record whose URI you give. The SDK does not scan the repository, ask an
  * indexer or read the followed record, so it does not look for other follow records of the same
- * target: after a duplicate follow (see {@link followEntity}), the other record stays until you
+ * subject: after a duplicate follow (see {@link followEntity}), the other record stays until you
  * delete it with its own URI. The followed record does not have to exist any more.
  *
  * Where the URI comes from: the `uri` that {@link followEntity} returned (keep it), or the
@@ -246,7 +246,7 @@ export const followEntity = createAction(followEntityAction);
  *
  * // `context` comes from createSDKContext.
  * const follow = await followEntity(context, {
- *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
+ *   subject: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
  * // Keep `follow` (its `uri` and `cid`) to undo it later.
  * await unfollowEntity(context, { follow });
