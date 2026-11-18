@@ -312,6 +312,7 @@ function planFields(
   names: ItemNames | undefined,
 ): CollectionPlan {
   const input = parseInput(build, field, collectionKind.input, value);
+  const itemsField = names?.items ?? `${field}.items`;
   return {
     input,
     description: planLongDescription(build, `${field}.description`, input.description),
