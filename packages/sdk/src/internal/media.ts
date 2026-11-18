@@ -1,6 +1,5 @@
 import { type Cid, type l, parseCid, type TypedBlobRef, type UriString } from "@atproto/lex";
 import * as defs from "@hypercerts-org/lexicon/org/hypercerts/defs";
-import { uploadBlob } from "../blob/upload-blob.js";
 import type { BuildContext } from "./build-context.js";
 import { describeError } from "./describe.js";
 
@@ -72,7 +71,7 @@ async function uploadNamingField(
   file: Blob,
 ): Promise<TypedBlobRef> {
   try {
-    return await uploadBlob(build.context, file);
+    return await build.target.uploadBlob(file, file.type === "" ? undefined : file.type);
   } catch (error) {
     // `uploadBlob` prefixes its messages with its own name, which would follow ours.
     const reason = describeError(error).replace(/^uploadBlob: /, "");

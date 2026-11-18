@@ -102,32 +102,6 @@ export async function readRecord(
 }
 
 /**
- * Whether the client's own repo holds a record at `collection` and `rkey`, read with
- * `com.atproto.repo.getRecord` through the client.
- *
- * Used to find out, before anything is written, whether a record key that the caller
- * chose is already taken. The answer is a snapshot: it does not stop another writer taking the key
- * afterwards.
- *
- * Throws what the client throws when the read fails for any reason other than the record being
- * absent.
- */
-export async function recordExists(
-  context: SDKContext,
-  did: DidString,
-  collection: NsidString,
-  rkey: RecordKeyString,
-): Promise<boolean> {
-  try {
-    await context.client.getRecord(collection, rkey, { repo: did });
-    return true;
-  } catch (error) {
-    if (isRecordNotFound(error)) return false;
-    throw error;
-  }
-}
-
-/**
  * Clients for other accounts' PDSes, keyed by DID, so that reads of several records from one
  * account share a single DID resolution, including reads still in flight. Scope one map to one
  * operation: a DID's PDS can change.

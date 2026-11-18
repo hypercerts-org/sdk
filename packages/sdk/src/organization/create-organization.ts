@@ -7,7 +7,6 @@ import { RecordAlreadyExistsError, WriteRejectedError } from "../errors.js";
 import { type BuildContext, createBuildContext, parseInput } from "../internal/build-context.js";
 import { describeError, isRecordNotFound } from "../internal/describe.js";
 import { strictObject } from "../internal/input.js";
-import { readRepoHead } from "../internal/read-repo-head.js";
 import { readRecord, type StoredRecord, type StrongRef } from "../internal/resolve-record-ref.js";
 import {
   type NewSlot,
@@ -322,9 +321,9 @@ interface StartingPoint {
 }
 
 // What the write is based on. The head is read first, so a change to either record after it moves
-// the head past the one the write is conditional on: see `readRepoHead`.
+// the head past the one the write is conditional on: see `WriteTarget.readHead`.
 async function readStartingPoint(build: BuildContext): Promise<StartingPoint> {
-  const head = await readRepoHead(build.context, build.did, OPERATION);
+  const head = await build.target.readHead();
   const [profileRecord, organizationRecord] = await Promise.all([
     readSingleton(build, profile.main.$type),
     readSingleton(build, organization.main.$type),
