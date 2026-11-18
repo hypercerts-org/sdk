@@ -53,7 +53,7 @@ export interface RecordActionInput extends ActionOptions {
  * The record an undo operation deletes: the `{ uri, cid }` the create function returned, which can
  * be passed as it is.
  */
-export interface UndoTarget {
+export interface UndoRecord {
   /**
    * The URI of the record to delete, in the signed-in account's repository. It is the URI of the
    * like, repost or follow record, not the URI of the record or account it points at.
@@ -71,32 +71,32 @@ export interface UndoTarget {
 /** The input of {@link unfollowAccount}: the `app.certified.graph.follow` record to delete. */
 export interface UnfollowAccountInput {
   /** The follow record {@link followAccount} returned. */
-  follow: UndoTarget;
+  follow: UndoRecord;
 }
 
 /** The input of {@link unfollowEntity}: the `app.certified.graph.entityFollow` record to delete. */
 export interface UnfollowEntityInput {
   /** The follow record {@link followEntity} returned. */
-  follow: UndoTarget;
+  follow: UndoRecord;
 }
 
 /** The input of {@link unlike}: the `app.certified.feed.like` record to delete. */
 export interface UnlikeInput {
   /** The like record {@link like} returned. */
-  like: UndoTarget;
+  like: UndoRecord;
 }
 
 /** The input of {@link unrepost}: the `app.certified.feed.repost` record to delete. */
 export interface UnrepostInput {
   /** The repost record {@link repost} returned. */
-  repost: UndoTarget;
+  repost: UndoRecord;
 }
 
 /** The names of the field that holds the record an undo input deletes. */
 export type UndoField = "follow" | "like" | "repost";
 
 /** An undo input: the record to delete under the action's field. */
-export type UndoInput<TField extends UndoField> = { [K in TField]: UndoTarget };
+export type UndoInput<TField extends UndoField> = { [K in TField]: UndoRecord };
 
 /** A function that deletes one of the account's own social records, as {@link unlike} does. */
 export type UndoFunction<TInput> = (context: SDKContext, input: TInput) => Promise<void>;
