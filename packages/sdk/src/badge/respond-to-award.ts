@@ -13,6 +13,7 @@ import {
   readRecord,
   type StrongRef,
 } from "../internal/resolve-record-ref.js";
+import type { ExistingRecord } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
 
 const OPERATION = "respondToBadgeAward";
@@ -20,10 +21,11 @@ const OPERATION = "respondToBadgeAward";
 /** The input of {@link respondToBadgeAward}. */
 export interface RespondToBadgeAwardInput {
   /**
-   * The award to respond to, as `at://<did>/app.certified.badge.award/<rkey>`, identified by a DID,
-   * not a handle. It may be in any account's repository if it is public.
+   * The award to respond to: `{ uri }` as `at://<did>/app.certified.badge.award/<rkey>`, identified
+   * by a DID, not a handle. It may be in any account's repository if it is public. The SDK reads it
+   * and pins the CID it read.
    */
-  awardUri: string;
+  award: ExistingRecord;
   /** Whether the recipient accepts or rejects the award. */
   response: "accepted" | "rejected";
   /**
@@ -41,7 +43,7 @@ const BADGE_RESPONSE_WEIGHT_MAX_LENGTH = 50;
 
 const inputSchema = l.refine(
   strictObject({
-    awardUri: l.string(),
+    award: strictObject({ uri: l.string() }),
     response: l.enum(["accepted", "rejected"]),
     weight: l.optional(weightString(BADGE_RESPONSE_WEIGHT_MAX_LENGTH)),
     createdAt: optionalText,
@@ -58,7 +60,7 @@ function assertAwardUri(uri: string): void {
   parseRecordUri(uri, OPERATION);
   assertRecordUriOfType(
     OPERATION,
-    "awardUri",
+    "award.uri",
     uri,
     [award.main.$type],
     `it must be of type ${award.main.$type}`,
@@ -110,7 +112,7 @@ function recipientOf({ subject }: award.Main, uri: string): DidString {
  * authenticated as the recipient.
  * @param input - The award, the answer and an optional weight. See {@link RespondToBadgeAwardInput}.
  * @returns The new response's URI and CID.
- * @throws {@link TypeError} If `awardUri` is not `at://<did>/app.certified.badge.award/<rkey>`, if
+ * @throws {@link TypeError} If `award.uri` is not `at://<did>/app.certified.badge.award/<rkey>`, if
  * `response` is not `"accepted"` or `"rejected"`, if `weight` is given with a rejected response or
  * is not a positive decimal number of at most 50 characters, if `input` has an unknown field, or if
  * a value is not allowed by the lexicon. Nothing was written.
@@ -129,7 +131,7 @@ function recipientOf({ subject }: award.Main, uri: string): DidString {
  *
  * // `context` comes from createSDKContext, signed in as the award's recipient.
  * const response = await respondToBadgeAward(context, {
- *   awardUri: "at://did:plc:issuer/app.certified.badge.award/3k2a4b5c6d7e8",
+ *   award: { uri: "at://did:plc:issuer/app.certified.badge.award/3k2a4b5c6d7e8" },
  *   response: "accepted",
  *   weight: "2",
  * });
@@ -141,7 +143,7 @@ function recipientOf({ subject }: award.Main, uri: string): DidString {
  * import { respondToBadgeAward } from "@hypercerts-org/sdk/badge";
  *
  * await respondToBadgeAward(context, {
- *   awardUri: "at://did:plc:issuer/app.certified.badge.award/3k2a4b5c6d7e8",
+ *   award: { uri: "at://did:plc:issuer/app.certified.badge.award/3k2a4b5c6d7e8" },
  *   response: "rejected", // a weight here throws a TypeError
  * });
  * ```
@@ -152,20 +154,20 @@ export async function respondToBadgeAward(
 ): Promise<StrongRef> {
   const build = createBuildContext(context, OPERATION);
   const parsed = parseInput(build, "input", inputSchema, input);
-  assertAwardUri(parsed.awardUri);
+  assertAwardUri(parsed.award.uri);
 
-  const stored = await readRecord(context, parsed.awardUri, OPERATION);
+  const stored = await readRecord(context, parsed.award.uri, OPERATION);
   const checked = award.main.safeValidate(stored.value);
   if (!checked.success) {
     throw new Error(
-      `${OPERATION}: ${parsed.awardUri} is not a valid ${award.main.$type} record (${describeError(checked.reason)}), so the SDK does not respond to it. No record was written.`,
+      `${OPERATION}: ${parsed.award.uri} is not a valid ${award.main.$type} record (${describeError(checked.reason)}), so the SDK does not respond to it. No record was written.`,
       { cause: checked.reason },
     );
   }
-  const recipient = recipientOf(checked.value, parsed.awardUri);
+  const recipient = recipientOf(checked.value, parsed.award.uri);
   if (recipient !== build.did) {
     throw new Error(
-      `${OPERATION}: only the recipient can respond to a badge award, but ${parsed.awardUri} is for ${recipient} and the client is signed in as ${build.did}. No record was written. For an award to a record, the recipient is the account whose repository holds that record.`,
+      `${OPERATION}: only the recipient can respond to a badge award, but ${parsed.award.uri} is for ${recipient} and the client is signed in as ${build.did}. No record was written. For an award to a record, the recipient is the account whose repository holds that record.`,
     );
   }
 

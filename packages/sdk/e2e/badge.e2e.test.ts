@@ -96,7 +96,7 @@ describe("awardBadge", () => {
     });
 
     expect(result.definition.created).toBe(true);
-    const award = await expectStored(user.client, result.award);
+    const award = await expectStored(user.client, { uri: result.uri, cid: result.cid });
     expect(award).toMatchObject({
       subject: { $type: defs.did.$type, did: other.did },
       note: "Completed the stewardship course.",
@@ -122,7 +122,7 @@ describe("awardBadge", () => {
     });
 
     expect(result.definition).toEqual({ uri: definition.uri, cid: definition.cid, created: false });
-    const award = await expectStored(user.client, result.award);
+    const award = await expectStored(user.client, { uri: result.uri, cid: result.cid });
     expect(award.subject).toEqual({ $type: strongRef.main.$type, ...otherActivity });
     expect(
       (await expectReferencesResolve(user.client, award)).map((ref) => ref.uri).sort(),
@@ -155,11 +155,16 @@ describe("respondToBadgeAward", () => {
   const awardTo = (account: Account) =>
     awardBadge(user.context, { definition: newDefinition(), subject: { did: account.did } });
 
+  const awardRef = async (account: Account) => {
+    const { uri, cid } = await awardTo(account);
+    return { uri, cid };
+  };
+
   it("lets the recipient accept an award, the response pinning the award's CID", async () => {
-    const { award } = await awardTo(other);
+    const award = await awardRef(other);
 
     const response = await respondToBadgeAward(other.context, {
-      awardUri: award.uri,
+      award: { uri: award.uri },
       response: "accepted",
       weight: "2.5",
     });
@@ -172,11 +177,11 @@ describe("respondToBadgeAward", () => {
   });
 
   it("writes nothing when the issuer responds to an award made for someone else", async () => {
-    const { award } = await awardTo(other);
+    const award = await awardRef(other);
     const before = await snapshotCounts(user.client);
 
     const error = await respondToBadgeAward(user.context, {
-      awardUri: award.uri,
+      award: { uri: award.uri },
       response: "accepted",
     }).catch((e) => e);
 

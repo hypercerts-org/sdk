@@ -97,7 +97,7 @@ Things to know before opening a reference:
 - `location: { uri }` inside a location is a link to external data; a whole location given as `{ uri }` in `createActivity` reuses an existing record.
 - `createOrganization` takes the name, avatar, banner and website in `profileIfMissing`, not in `organization`, and an existing location as `{ uri }`, never a bare string.
 - Social create functions take the **subject**: `subject: { did }` for an account, `subject: { uri }` (a full record URI) for a record, and `via: { uri }`. Undo functions (`unlike`, `unrepost`, `unfollowAccount`, `unfollowEntity`) take **your own like, repost or follow record** as the create function returned it (`{ like: liked }`, `{ repost }`, `{ follow }`), not the subject, and return `void`. Keep what the create function returned.
-- `awardBadge` takes `{ did }` or `{ uri }` as the subject and `{ uri }` or new fields as the definition; never build strong references or DID objects. `respondToBadgeAward` works only as the award's recipient.
+- `awardBadge` returns `{ uri, cid, definition }` (the award is at the top) and takes `{ did }` or `{ uri }` as the subject and `{ uri }` or new fields as the definition; never build strong references or DID objects. `respondToBadgeAward` takes `award: { uri }` and works only as the award's recipient.
 - `createAttachment`, `createMeasurement`, `createEvaluation` and `createAcknowledgement` take a subject as `{ uri }`, never a bare string, and a measured value or score as a decimal string, never a number.
 
 ## 5. Images and files

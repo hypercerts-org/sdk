@@ -55,7 +55,7 @@ describe("awardBadge", () => {
     expect(awarded.value).not.toHaveProperty("validFrom");
     expect(awarded.value).not.toHaveProperty("validUntil");
     expect(result).toEqual({
-      award: refTo(awarded),
+      ...refTo(awarded),
       definition: { ...refTo(created), created: true },
     });
   });
@@ -380,7 +380,7 @@ describe("awardBadge when the write fails", () => {
     const first = await awardBadge(context, award());
     const second = await awardBadge(context, award());
 
-    expect(first.award.uri).not.toBe(second.award.uri);
+    expect(first.uri).not.toBe(second.uri);
     expect(creates).toHaveLength(2);
   });
 });
