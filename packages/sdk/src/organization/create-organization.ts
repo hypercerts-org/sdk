@@ -3,6 +3,8 @@ import * as organization from "@hypercerts-org/lexicon/app/certified/actor/organ
 import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
 import { type ProfileInput, profileKind } from "../actor/build-profile.js";
 import type { SDKContext } from "../context.js";
+import { RecordAlreadyExistsError } from "../errors.js";
+import { alreadyExists } from "../internal/already-exists.js";
 import { type BuildContext, createBuildContext, parseInput } from "../internal/build-context.js";
 import { describeError, isRecordNotFound } from "../internal/describe.js";
 import { strictObject } from "../internal/input.js";
@@ -16,7 +18,7 @@ import {
   referencedResults,
   type SupportingRecordRef,
 } from "../internal/slots.js";
-import { RecordAlreadyExistsError, submitWrites } from "../internal/submit-writes.js";
+import { submitWrites } from "../internal/submit-writes.js";
 import { type OrganizationInput, organizationKind } from "./build-organization.js";
 
 const OPERATION = "createOrganization";
@@ -362,11 +364,11 @@ async function readSingleton(
 }
 
 function organizationExists(uri: string): OrganizationAlreadyExistsError {
-  return new OrganizationAlreadyExistsError(
+  return alreadyExists(
+    OrganizationAlreadyExistsError,
     `${OPERATION}: the account already has an organization (${uri}), so nothing was uploaded or written and the existing one is unchanged. ${OPERATION} only creates an organization; it never overwrites one, and the SDK cannot update an organization yet.`,
     uri,
     [],
-    { status: 400, code: "InvalidSwap" },
   );
 }
 

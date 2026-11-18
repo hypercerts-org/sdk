@@ -18,8 +18,6 @@ import {
   vocabularyTagKind,
 } from "../tag/build-tag.js";
 
-export type { LeafletDocument };
-
 /** The data of a new `org.hypercerts.entity.feature` record. */
 export interface FeatureInput {
   /**

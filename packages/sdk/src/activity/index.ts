@@ -1,14 +1,14 @@
 // Entry point for @hypercerts-org/sdk/activity.
 
-export type { LeafletDocument } from "../internal/long-description.js";
-export type { StrongRef } from "../internal/resolve-record-ref.js";
-export type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 export {
   WriteError,
   WriteOutcomeUnknownError,
   WriteRejectedError,
   WriteResultMismatchError,
-} from "../internal/submit-writes.js";
+} from "../errors.js";
+export type { LeafletDocument } from "../internal/long-description.js";
+export type { StrongRef } from "../internal/resolve-record-ref.js";
+export type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 export type { LocationInput, LocationValue } from "../location/build-location.js";
 export type { WorkScopeTagInput, WorkScopeTagResult } from "../tag/build-tag.js";
 export type {

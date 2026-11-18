@@ -1,12 +1,13 @@
 import { l } from "@atproto/lex";
 import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
 import type { SDKContext } from "../context.js";
+import { RecordAlreadyExistsError } from "../errors.js";
+import { alreadyExists as recordAlreadyExists } from "../internal/already-exists.js";
 import { createStandalone } from "../internal/create-record.js";
 import { optionalMedia, optionalText } from "../internal/input.js";
 import { mediaTransform } from "../internal/media.js";
 import { type RecordKind, recordKind } from "../internal/record-kind.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
-import { RecordAlreadyExistsError } from "../internal/submit-writes.js";
 
 /** The data of the `app.certified.actor.profile` record of an account. */
 export interface ProfileInput {
@@ -145,7 +146,8 @@ export async function createProfile(context: SDKContext, input: ProfileInput): P
 }
 
 function alreadyExists(exists: RecordAlreadyExistsError): ProfileAlreadyExistsError {
-  return new ProfileAlreadyExistsError(
+  return recordAlreadyExists(
+    ProfileAlreadyExistsError,
     `createProfile: the account already has a profile, so nothing was written and the existing one is unchanged (${exists.uri}). createProfile only creates a profile; it never overwrites one, and the SDK cannot update a profile yet.`,
     exists.uri,
     exists.attempted,

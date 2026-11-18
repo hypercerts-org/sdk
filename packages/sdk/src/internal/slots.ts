@@ -1,5 +1,7 @@
 import { isDidString, l, type NsidString, type RecordKeyString } from "@atproto/lex";
 import * as strongRef from "@hypercerts-org/lexicon/com/atproto/repo/strongRef";
+import { RecordAlreadyExistsError } from "../errors.js";
+import { alreadyExists } from "./already-exists.js";
 import { type BuildContext, parseInput } from "./build-context.js";
 import { describeError, describeValue } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
@@ -13,7 +15,7 @@ import {
   resolveRecordRef,
   type StrongRef,
 } from "./resolve-record-ref.js";
-import { assertWithinWriteLimit, RecordAlreadyExistsError } from "./submit-writes.js";
+import { assertWithinWriteLimit } from "./submit-writes.js";
 
 /**
  * Points at a record that already exists, to reuse it as it is.
@@ -404,11 +406,11 @@ async function assertKeysFree(build: BuildContext, slots: readonly NewSlot[]): P
         );
       }
       if (taken) {
-        throw new RecordAlreadyExistsError(
+        throw alreadyExists(
+          RecordAlreadyExistsError,
           `${build.operation}: ${field} is a new ${collection} record with the key ${key}, but ${uri} already exists, so nothing was written and the existing record is unchanged. Pass { uri: "${uri}" } where the input accepts an existing record, or choose another key.`,
           uri,
           [],
-          { status: 400, code: "InvalidSwap" },
         );
       }
     }),

@@ -13,7 +13,6 @@ import {
   type FeatureTree,
   featureKind,
   featureResult,
-  type LeafletDocument,
 } from "../feature/build-feature.js";
 import { type BuildContext, parseInput } from "../internal/build-context.js";
 import {
@@ -23,6 +22,7 @@ import {
   strictObject,
   weightString,
 } from "../internal/input.js";
+import type { LeafletDocument } from "../internal/long-description.js";
 import { longDescriptionValue, planLongDescription } from "../internal/long-description.js";
 import { mediaTransform } from "../internal/media.js";
 import type { PreparedRecord } from "../internal/prepare-record.js";
