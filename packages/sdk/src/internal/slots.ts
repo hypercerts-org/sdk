@@ -53,6 +53,15 @@ export type ResultOf<TResult> = (
 ) => TResult;
 
 /**
+ * A record to create or reuse, planned: its slot and what the call reports once its records are
+ * prepared. Nothing is read, uploaded or written yet.
+ */
+export interface Planned<TResult> {
+  readonly slot: Slot;
+  readonly result: ResultOf<TResult>;
+}
+
+/**
  * A new record to create, with its input already validated and the slots of the records it points
  * at planned.
  */

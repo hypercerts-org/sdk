@@ -1,18 +1,12 @@
 import { l } from "@atproto/lex";
-import { createRecordTree, type StandaloneCreator } from "../internal/create-record.js";
 import { blobOrUrl } from "../internal/input.js";
 import { mediaValue } from "../internal/media.js";
-import {
-  type FieldTransform,
-  type RecordKind,
-  type ReferenceField,
-  references,
-} from "../internal/record-kind.js";
+import { type FieldTransform, type ReferenceField, references } from "../internal/record-kind.js";
 import { type ExistingRecord, isExistingRecord } from "../internal/slots.js";
 import { locationKind } from "../location/build-location.js";
 
 // What more than one of the context records have in common: `content`, DID lists, decimal strings,
-// links to other records, and the way a creator is bound to its kind.
+// and links to other records.
 
 /** Input schema of an optional `content` array: files to upload and URLs to keep. */
 export const contentInput = l.optional(l.array(blobOrUrl));
@@ -68,16 +62,5 @@ export const locationReference: ReferenceField = references.one(() => locationKi
 /** A field that holds an array of locations: each the data of a new one or `{ uri }` of an existing one. */
 export const locationsReference: ReferenceField = references.many(() => locationKind);
 
-/**
- * The public creator of a record kind: creates the record and every new record it points at in one
- * write (see `createRecordTree`) and returns the record's reference with the results for the
- * records it points at. `TResult` is the creator's public result type, which declares that shape.
- * `operation` is the public function's name, used in error messages.
- */
-export const creatorOf =
-  <TInput extends { createdAt?: string | undefined }, TResult>(
-    operation: string,
-    kind: RecordKind<TInput>,
-  ): StandaloneCreator<TInput, TResult> =>
-  (context, input) =>
-    createRecordTree(context, operation, kind, input);
+/** Re-exported so the context records import everything they share from one place. */
+export { creatorOf } from "../internal/create-record.js";

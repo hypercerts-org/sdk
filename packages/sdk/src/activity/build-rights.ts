@@ -1,6 +1,6 @@
 import { l } from "@atproto/lex";
 import * as rights from "@hypercerts-org/lexicon/org/hypercerts/claim/rights";
-import { createStandalone, type StandaloneCreator } from "../internal/create-record.js";
+import { type StandaloneCreator, standaloneCreatorOf } from "../internal/create-record.js";
 import { optionalMedia } from "../internal/input.js";
 import { mediaTransform } from "../internal/media.js";
 import { type RecordKind, recordKind } from "../internal/record-kind.js";
@@ -71,5 +71,7 @@ export const rightsKind: RecordKind<RightsInput> = recordKind(
  * console.log(rights.uri, rights.cid);
  * ```
  */
-export const createRights: StandaloneCreator<RightsInput> = (context, input) =>
-  createStandalone(context, "createRights", rightsKind, input);
+export const createRights: StandaloneCreator<RightsInput> = standaloneCreatorOf(
+  "createRights",
+  rightsKind,
+);

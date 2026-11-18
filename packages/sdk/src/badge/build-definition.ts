@@ -2,7 +2,7 @@ import { type DidString, l } from "@atproto/lex";
 import * as definition from "@hypercerts-org/lexicon/app/certified/badge/definition";
 import * as certifiedDefs from "@hypercerts-org/lexicon/app/certified/defs";
 import type { BuildContext } from "../internal/build-context.js";
-import { createStandalone, type StandaloneCreator } from "../internal/create-record.js";
+import { type StandaloneCreator, standaloneCreatorOf } from "../internal/create-record.js";
 import { blob, optionalText } from "../internal/input.js";
 import { assertFileAllowed, uploadField } from "../internal/media.js";
 import { type RecordKind, recordKind } from "../internal/record-kind.js";
@@ -129,5 +129,7 @@ export const badgeDefinitionKind: RecordKind<BadgeDefinitionInput> = recordKind(
  * });
  * ```
  */
-export const createBadgeDefinition: StandaloneCreator<BadgeDefinitionInput> = (context, input) =>
-  createStandalone(context, "createBadgeDefinition", badgeDefinitionKind, input);
+export const createBadgeDefinition: StandaloneCreator<BadgeDefinitionInput> = standaloneCreatorOf(
+  "createBadgeDefinition",
+  badgeDefinitionKind,
+);

@@ -25,12 +25,12 @@ import {
 import type { LeafletDocument } from "../internal/long-description.js";
 import { longDescriptionValue, planLongDescription } from "../internal/long-description.js";
 import { mediaTransform } from "../internal/media.js";
-import type { PreparedRecord } from "../internal/prepare-record.js";
 import { buildRecord, recordKind } from "../internal/record-kind.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import {
   type ExistingRecord,
   type NewSlot,
+  type Planned,
   planNew,
   type ReferenceOf,
   recordRef,
@@ -190,17 +190,6 @@ export interface ItemNames {
   readonly activityImage?: ((index: number) => string | undefined) | undefined;
 }
 
-/** A Collection and every record it needs, planned: nothing is read, uploaded or written yet. */
-export interface PlannedCollection {
-  /** The Collection as a record to create. Everything it points at is a reference of the slot. */
-  readonly slot: NewSlot;
-  /** What the caller gets back for the Collection once its records are prepared. */
-  readonly result: (
-    created: ReadonlyMap<Slot, PreparedRecord>,
-    refOf: ReferenceOf,
-  ) => CreateCollectionResult;
-}
-
 // The choices of `description`, `location`, `tags` and `items` are read below, where what each may
 // hold is known, so the schema only says where they are. The stored value of an item is not the
 // input's, so the record is built by hand from the plan and `buildRecord` only completes it.
@@ -240,13 +229,8 @@ const ITEM_TYPES = {
   [collection.main.$type]: "collection",
 } as const satisfies Record<(typeof ITEM_COLLECTIONS)[number], CollectionItemType>;
 
-interface PlannedItem {
-  readonly slot: Slot;
+interface PlannedItem extends Planned<CreateCollectionItemResult> {
   readonly weight: string | undefined;
-  readonly result: (
-    created: ReadonlyMap<Slot, PreparedRecord>,
-    refOf: ReferenceOf,
-  ) => CreateCollectionItemResult;
 }
 
 /**
@@ -266,7 +250,7 @@ export function planCollection(
   field: string,
   value: unknown,
   names?: ItemNames,
-): PlannedCollection {
+): Planned<CreateCollectionResult> {
   // Hand-written instead of a `recordKind` with `references`: an item stores a strong reference plus
   // a weight, which a reference field (a plain list of strong references) cannot express.
   const plan = planFields(build, field, value, names);
@@ -373,7 +357,7 @@ function planNewItem(
   field: string,
   item: l.InferOutput<typeof itemInput>,
   activityImage: string | undefined,
-): Omit<PlannedItem, "weight"> {
+): Planned<CreateCollectionItemResult> {
   if (item.activity !== undefined) {
     const planned = planActivitySlot(build, item.activity, `${field}.activity`, activityImage);
     return {
@@ -411,7 +395,7 @@ function existingItem(
   build: BuildContext,
   field: string,
   uri: string,
-): Omit<PlannedItem, "weight"> {
+): Planned<CreateCollectionItemResult> {
   const slot = toExistingSlot(build, field, { uri }, ITEM_COLLECTIONS);
   const type = ITEM_TYPES[slot.collection];
   return { slot, result: (_created, refOf) => ({ ...refOf(slot), type, created: false }) };

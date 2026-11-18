@@ -217,7 +217,7 @@ export async function awardBadge(
   );
 
   const writes = badge.created === undefined ? [record] : [badge.created, record];
-  await submitWrites(context, build.did, writes, OPERATION);
+  await submitWrites(build, writes);
   return {
     award: record.ref,
     definition: { ...badge.ref, created: badge.created !== undefined },

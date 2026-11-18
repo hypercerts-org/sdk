@@ -45,7 +45,7 @@ export function createAction<TCreate extends ActionOptions, TUndo extends UndoOp
       compact({ subject, createdAt: parsed.createdAt ?? build.createdAt, via }) as never,
     );
     // No retry: a second request would create a second record under a new key.
-    await submitWrites(context, build.did, [record], build.operation);
+    await submitWrites(build, [record]);
     return record.ref;
   };
 }
@@ -72,7 +72,7 @@ export function undoAction<TCreate extends ActionOptions, TUndo extends UndoOpti
     const { build, parsed } = start(context, action.names.undo, action.undoInput, input);
     const uri = action.undoUri(parsed);
     assertOwnRecord(build, uri, action.schema.$type);
-    await submitDelete(context, build.did, { uri, cid: parsed.cid }, build.operation);
+    await submitDelete(build, { uri, cid: parsed.cid });
   };
 }
 

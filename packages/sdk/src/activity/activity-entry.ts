@@ -3,7 +3,7 @@ import * as activity from "@hypercerts-org/lexicon/org/hypercerts/claim/activity
 import { type BuildContext, parseInput } from "../internal/build-context.js";
 import { strictObject, weightString } from "../internal/input.js";
 import {
-  type ResultOf,
+  type Planned,
   type Slot,
   type SupportingRecordRef,
   toExistingSlot,
@@ -95,14 +95,6 @@ export function chooseActivity(
 export const existingActivitySlot = (build: BuildContext, field: string, uri: string): Slot =>
   toExistingSlot(build, `${field}.uri`, { uri }, [activity.main.$type]);
 
-/** An entry planned: nothing is read, uploaded or written yet. */
-export interface PlannedActivityEntry {
-  /** The Activity to create, or the existing one to read for its CID. */
-  readonly slot: Slot;
-  /** What the caller gets back for the entry once its records are prepared. */
-  readonly result: ResultOf<ActivityEntryResult>;
-}
-
 /**
  * Validates an {@link ActivityEntry} and plans its Activity, without sending any request.
  *
@@ -113,7 +105,7 @@ export function planActivityEntry(
   build: BuildContext,
   field: string,
   value: unknown,
-): PlannedActivityEntry {
+): Planned<ActivityEntryResult> {
   const choice = chooseActivity(build, field, parseInput(build, field, activityEntry, value));
   if ("uri" in choice) {
     const slot = existingActivitySlot(build, field, choice.uri);

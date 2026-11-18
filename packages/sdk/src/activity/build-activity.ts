@@ -25,6 +25,7 @@ import {
   type ExistingRecord,
   isInputObject,
   type NewSlot,
+  type Planned,
   prepareSlots,
   type ReferenceOf,
   recordRef,
@@ -445,7 +446,7 @@ export async function createActivity(
 ): Promise<CreateActivityResult> {
   const build = createBuildContext(context, "createActivity");
   const { writes, result } = await prepareActivity(build, input);
-  await submitWrites(context, build.did, writes, "createActivity");
+  await submitWrites(build, writes);
   return result;
 }
 
@@ -455,23 +456,6 @@ export interface PreparedActivity {
   readonly writes: readonly PreparedRecord[];
   /** What the caller gets back once the writes are committed. */
   readonly result: CreateActivityResult;
-}
-
-/**
- * An Activity whose input is validated and whose supporting records are planned, with nothing read,
- * uploaded or written yet.
- */
-export interface PlannedActivity {
-  /**
-   * The Activity as a record to create. The supporting records it points at are its references,
-   * so `flattenSlots` finds them, and they are prepared before it.
-   */
-  readonly slot: NewSlot;
-  /** What the caller gets back for the Activity, once its records are prepared. */
-  readonly result: (
-    created: ReadonlyMap<Slot, PreparedRecord>,
-    refOf: ReferenceOf,
-  ) => CreateActivityResult;
 }
 
 /**
@@ -496,7 +480,7 @@ export function planActivitySlot(
   input: unknown,
   path?: string,
   imageField?: string,
-): PlannedActivity {
+): Planned<CreateActivityResult> {
   const field = path ?? "input";
   const at = path === undefined ? "" : `${path}.`;
   const parsed = parseInput(build, field, activityInput, input);

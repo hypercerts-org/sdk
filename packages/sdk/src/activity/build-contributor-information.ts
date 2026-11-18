@@ -1,5 +1,5 @@
 import * as contributorInformation from "@hypercerts-org/lexicon/org/hypercerts/claim/contributorInformation";
-import { createStandalone, type StandaloneCreator } from "../internal/create-record.js";
+import { type StandaloneCreator, standaloneCreatorOf } from "../internal/create-record.js";
 import { optionalMedia, optionalText } from "../internal/input.js";
 import { mediaTransform } from "../internal/media.js";
 import { type RecordKind, recordKind } from "../internal/record-kind.js";
@@ -66,7 +66,5 @@ export const contributorInformationKind: RecordKind<ContributorInformationInput>
  * });
  * ```
  */
-export const createContributorInformation: StandaloneCreator<ContributorInformationInput> = (
-  context,
-  input,
-) => createStandalone(context, "createContributorInformation", contributorInformationKind, input);
+export const createContributorInformation: StandaloneCreator<ContributorInformationInput> =
+  standaloneCreatorOf("createContributorInformation", contributorInformationKind);

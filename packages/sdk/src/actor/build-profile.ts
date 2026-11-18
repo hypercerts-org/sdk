@@ -2,7 +2,7 @@ import { l } from "@atproto/lex";
 import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
 import type { SDKContext } from "../context.js";
 import { RecordAlreadyExistsError } from "../errors.js";
-import { createStandalone } from "../internal/create-record.js";
+import { standaloneCreatorOf } from "../internal/create-record.js";
 import { optionalMedia, optionalText } from "../internal/input.js";
 import { mediaTransform } from "../internal/media.js";
 import { type RecordKind, recordKind } from "../internal/record-kind.js";
@@ -64,6 +64,8 @@ export const profileKind: RecordKind<ProfileInput> = recordKind(
 export class ProfileAlreadyExistsError extends RecordAlreadyExistsError {
   override readonly name = "ProfileAlreadyExistsError";
 }
+
+const createStandaloneProfile = standaloneCreatorOf("createProfile", profileKind);
 
 /**
  * Creates the account's profile record (`app.certified.actor.profile`) if it does not have one.
@@ -138,7 +140,7 @@ export class ProfileAlreadyExistsError extends RecordAlreadyExistsError {
  */
 export async function createProfile(context: SDKContext, input: ProfileInput): Promise<StrongRef> {
   try {
-    return await createStandalone(context, "createProfile", profileKind, input);
+    return await createStandaloneProfile(context, input);
   } catch (error) {
     throw error instanceof RecordAlreadyExistsError ? alreadyExists(error) : error;
   }

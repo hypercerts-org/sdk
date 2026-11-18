@@ -151,6 +151,6 @@ export async function createCollection(
   // Reads first, then uploads: a URI that cannot be resolved, or a taken tag key, fails before
   // anything is uploaded.
   const { created, refOf } = await prepareSlots(build, [planned.slot], { checkKeys: true });
-  await submitWrites(context, build.did, [...created.values()], OPERATION);
+  await submitWrites(build, [...created.values()]);
   return planned.result(created, refOf);
 }

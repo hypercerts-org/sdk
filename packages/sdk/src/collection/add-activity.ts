@@ -83,7 +83,7 @@ export async function addActivity(
   const item = compact({ itemIdentifier: refOf(planned.slot), itemWeight: weight });
   const updated = await appendItem(build, target, stored, rkey, item);
 
-  await submitWrites(context, build.did, [...created.values()], build.operation, {
+  await submitWrites(build, [...created.values()], {
     updates: [updated],
     swapCommit: head,
   });

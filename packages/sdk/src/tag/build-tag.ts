@@ -1,7 +1,7 @@
 import { l, type RecordKeyString } from "@atproto/lex";
 import * as vocabularyTag from "@hypercerts-org/lexicon/org/hypercerts/vocab/tag";
 import * as workScopeTag from "@hypercerts-org/lexicon/org/hypercerts/workscope/tag";
-import { createRecordTree, type StandaloneCreator } from "../internal/create-record.js";
+import { creatorOf, type StandaloneCreator } from "../internal/create-record.js";
 import { optionalMedia, optionalText } from "../internal/input.js";
 import { mediaTransform } from "../internal/media.js";
 import { type RecordKind, recordKind, references } from "../internal/record-kind.js";
@@ -204,10 +204,8 @@ export const vocabularyTagKind: RecordKind<VocabularyTagInput> = recordKind(
  * }
  * ```
  */
-export const createVocabularyTag: StandaloneCreator<VocabularyTagInput, VocabularyTagResult> = (
-  context,
-  input,
-) => createRecordTree(context, "createVocabularyTag", vocabularyTagKind, input);
+export const createVocabularyTag: StandaloneCreator<VocabularyTagInput, VocabularyTagResult> =
+  creatorOf("createVocabularyTag", vocabularyTagKind);
 
 /** The data of a new `org.hypercerts.workscope.tag` record. */
 export interface WorkScopeTagInput extends TagFields {
@@ -318,7 +316,5 @@ export const workScopeTagKind: RecordKind<WorkScopeTagInput> = recordKind(
  * });
  * ```
  */
-export const createWorkScopeTag: StandaloneCreator<WorkScopeTagInput, WorkScopeTagResult> = (
-  context,
-  input,
-) => createRecordTree(context, "createWorkScopeTag", workScopeTagKind, input);
+export const createWorkScopeTag: StandaloneCreator<WorkScopeTagInput, WorkScopeTagResult> =
+  creatorOf("createWorkScopeTag", workScopeTagKind);

@@ -177,6 +177,6 @@ export async function respondToBadgeAward(
       createdAt: (parsed.createdAt ?? build.createdAt) as DatetimeString,
     }),
   );
-  await submitWrites(context, build.did, [record], OPERATION);
+  await submitWrites(build, [record]);
   return record.ref;
 }

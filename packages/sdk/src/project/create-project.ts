@@ -64,6 +64,6 @@ export async function createProject(
 ): Promise<CreateProjectResult> {
   const build = createBuildContext(context, OPERATION);
   const { writes, result } = await prepareProject(build, input);
-  await submitWrites(context, build.did, writes, OPERATION);
+  await submitWrites(build, writes);
   return result;
 }

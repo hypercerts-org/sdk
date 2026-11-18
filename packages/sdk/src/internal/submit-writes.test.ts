@@ -1,6 +1,7 @@
 import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
 import * as rights from "@hypercerts-org/lexicon/org/hypercerts/claim/rights";
 import { describe, expect, it } from "vitest";
+import type { SDKContext } from "../context.js";
 import {
   WriteOutcomeUnknownError,
   WriteRejectedError,
@@ -8,8 +9,11 @@ import {
 } from "../errors.js";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, HEAD, methods } from "../test-utils/fake-repo.js";
+import { createBuildContext } from "./build-context.js";
 import { prepareRecord, prepareUpdate } from "./prepare-record.js";
 import { submitCreateOnly, submitDelete, submitWrites } from "./submit-writes.js";
+
+const build = (context: SDKContext) => createBuildContext(context, "op");
 
 async function prepared() {
   return prepareRecord(DID, rights.main, {
@@ -42,7 +46,7 @@ describe("submitWrites", () => {
     });
     const record = await prepared();
 
-    const error = await submitWrites(context, DID, [record], "op").catch((e) => e);
+    const error = await submitWrites(build(context), [record]).catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteRejectedError);
     expect(error).toMatchObject({ status: 400, code: "InvalidRequest", attempted: [record.ref] });
@@ -62,7 +66,7 @@ describe("submitWrites", () => {
     const { context, requests } = fakeRepo({ applyWrites });
     const record = await prepared();
 
-    const error = await submitWrites(context, DID, [record], "op").catch((e) => e);
+    const error = await submitWrites(build(context), [record]).catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteOutcomeUnknownError);
     expect(error.attempted).toEqual([record.ref]);
@@ -73,7 +77,7 @@ describe("submitWrites", () => {
   it("accepts a PDS that omits the results", async () => {
     const { context } = fakeRepo({ applyWrites: () => json(200, {}) });
 
-    await expect(submitWrites(context, DID, [await prepared()], "op")).resolves.toBeUndefined();
+    await expect(submitWrites(build(context), [await prepared()])).resolves.toBeUndefined();
   });
 
   it("reports results that differ from the computed references", async () => {
@@ -87,7 +91,7 @@ describe("submitWrites", () => {
         }),
     });
 
-    const error = await submitWrites(context, DID, [record], "op").catch((e) => e);
+    const error = await submitWrites(build(context), [record]).catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteResultMismatchError);
     expect(error.reported).toEqual([{ uri: record.ref.uri, cid: CID }]);
@@ -98,7 +102,7 @@ describe("submitWrites", () => {
       const { context, requests, creates, updates, swapCommits } = fakeRepo();
       const [created, update] = [await prepared(), await updated()];
 
-      await submitWrites(context, DID, [created], "op", { updates: [update], swapCommit: HEAD });
+      await submitWrites(build(context), [created], { updates: [update], swapCommit: HEAD });
 
       expect(methods(requests)).toEqual(["com.atproto.repo.applyWrites"]);
       expect(creates[0]?.map((write) => write.rkey)).toEqual([created.rkey]);
@@ -120,7 +124,7 @@ describe("submitWrites", () => {
           }),
       });
 
-      const error = await submitWrites(context, DID, [created], "op", {
+      const error = await submitWrites(build(context), [created], {
         updates: [update],
       }).catch((e) => e);
 
@@ -135,7 +139,7 @@ describe("submitWrites", () => {
       });
       const update = await updated();
 
-      const error = await submitWrites(context, DID, [await prepared()], "op", {
+      const error = await submitWrites(build(context), [await prepared()], {
         updates: [update],
       }).catch((e) => e);
 
@@ -151,11 +155,11 @@ describe("submitWrites", () => {
       });
       const options = { updates: [await updated()] };
 
-      const conditional = await submitWrites(context, DID, [], "op", {
+      const conditional = await submitWrites(build(context), [], {
         ...options,
         swapCommit: HEAD,
       }).catch((e) => e);
-      const unconditional = await submitWrites(context, DID, [], "op", options).catch((e) => e);
+      const unconditional = await submitWrites(build(context), [], options).catch((e) => e);
 
       expect(conditional).toMatchObject({ code: "InvalidSwap" });
       expect(conditional.message).toMatch(/the repository changed since it was read/);
@@ -176,7 +180,7 @@ describe("submitCreateOnly", () => {
     const record = await prepareProfile();
     const { context } = fakeRepo({ putRecord: () => json(200, { uri: record.ref.uri, cid: CID }) });
 
-    const error = await submitCreateOnly(context, DID, record, "op").catch((e) => e);
+    const error = await submitCreateOnly(build(context), record).catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteResultMismatchError);
     expect(error.reported).toEqual([{ uri: record.ref.uri, cid: CID }]);
@@ -191,7 +195,7 @@ describe("submitDelete", () => {
       deleteRecord: () => json(403, { error: "Forbidden", message: "no delete permission" }),
     });
 
-    const error = await submitDelete(context, DID, ref, "op").catch((e) => e);
+    const error = await submitDelete(build(context), ref).catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteRejectedError);
     expect(error).toMatchObject({ status: 403, code: "Forbidden", attempted: [ref] });
@@ -209,7 +213,7 @@ describe("submitDelete", () => {
   ])("treats %s as an unknown outcome", async (_, deleteRecord) => {
     const { context } = fakeRepo({ deleteRecord });
 
-    const error = await submitDelete(context, DID, ref, "op").catch((e) => e);
+    const error = await submitDelete(build(context), ref).catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteOutcomeUnknownError);
     expect(error.attempted).toEqual([ref]);
@@ -221,7 +225,7 @@ describe("submitDelete", () => {
       deleteRecord: () => json(400, { error: "InvalidSwap", message: "Record CID did not match" }),
     });
 
-    const error = await submitDelete(context, DID, ref, "op").catch((e) => e);
+    const error = await submitDelete(build(context), ref).catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteRejectedError);
     expect(error).toMatchObject({ status: 400, code: "InvalidSwap", attempted: [ref] });
@@ -237,12 +241,8 @@ describe("submitDelete", () => {
       deleteRecord: () => json(500, { error: "InternalServerError", message: "boom" }),
     });
 
-    const rejection = await submitDelete(rejected.context, DID, { uri: ref.uri }, "op").catch(
-      (e) => e,
-    );
-    const outcome = await submitDelete(unknown.context, DID, { uri: ref.uri }, "op").catch(
-      (e) => e,
-    );
+    const rejection = await submitDelete(build(rejected.context), { uri: ref.uri }).catch((e) => e);
+    const outcome = await submitDelete(build(unknown.context), { uri: ref.uri }).catch((e) => e);
 
     expect(rejection).toBeInstanceOf(WriteRejectedError);
     expect(rejection.attempted).toEqual([]);
