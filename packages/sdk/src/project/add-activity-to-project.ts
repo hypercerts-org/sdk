@@ -35,22 +35,15 @@ export interface AddActivityToProjectResult
  * Adds an Activity to an existing Project (a Collection of type `project`) in one atomic write.
  *
  * @remarks
- * `activity` is `{ activity }` (a new Activity, created as {@link createActivity} does) or
- * `{ uri }` (an existing one, read once for its CID and never changed). It is appended as the
- * last item, with `weight`, and the rest of the Project is kept. A Collection of another type is
- * refused; use {@link addActivityToCollection}. Nothing is deduplicated. If the account was written
- * to after the Project was read, the write fails with {@link WriteRejectedError} (`code`
- * `"InvalidSwap"`) and nothing is written: call again. Only your own Projects. See the SDK skill
- * reference for details.
+ * Works like {@link addActivityToCollection}, which also covers the `activity` forms, the
+ * concurrency check and what is not deduplicated or re-signed. It also checks that the Collection's
+ * type is `project`; a Collection of another type is refused with a `TypeError`.
  *
  * @param context - The shared context from {@link createSDKContext}, with an authenticated client.
  * @param input - The Project, the Activity and an optional weight.
  * @returns The Activity (`created` is `false` for `{ uri }`) and the Project's new version.
  * @throws {@link TypeError} If the input is invalid, or the Collection is not your own Project.
- * Nothing was written.
- * @throws {@link Error} If a read or upload fails, or the Project is invalid or full (1000 items).
- * Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write. Nothing was changed.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write, including `"InvalidSwap"`.
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to retry.
  *
  * @example
