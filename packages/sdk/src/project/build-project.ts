@@ -20,12 +20,15 @@ import { compact, optionalMedia, strictObject } from "../internal/input.js";
 import type { LeafletDocument } from "../internal/long-description.js";
 import { assertWithinLimits } from "../internal/media.js";
 import type { PreparedRecord } from "../internal/prepare-record.js";
+import type { StrongRef } from "../internal/resolve-record-ref.js";
 import {
   type ExistingRecord,
   isExistingRecord,
   isInputObject,
   prepareSlots,
+  type SupportingRecordRef,
 } from "../internal/slots.js";
+import type { VocabularyTagResult } from "../tag/build-tag.js";
 
 /**
  * One Activity of a new Project, with an optional `weight`.
@@ -65,10 +68,14 @@ export interface ProjectInput
 export type ProjectActivityResult = ActivityEntryResult;
 
 /**
- * The result of {@link createProject}: {@link CreateCollectionResult} with `activities` in place of
- * `items`. Each result has the index of its input entry.
+ * The result of {@link createProject}: the Project's `uri` and `cid`, its `location` and `tags`, and
+ * `activities` in place of the Collection's `items`. Each result has the index of its input entry.
  */
-export interface CreateProjectResult extends Omit<CreateCollectionResult, "items"> {
+export interface CreateProjectResult extends StrongRef {
+  /** The location, when the input had `location`. */
+  location?: SupportingRecordRef;
+  /** The vocabulary tags, in input order. */
+  tags: readonly VocabularyTagResult[];
   /** The Activities, in input order. `created` is `false` for one passed by `uri`. */
   activities: readonly ProjectActivityResult[];
 }

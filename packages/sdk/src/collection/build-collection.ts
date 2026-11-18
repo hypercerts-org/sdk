@@ -167,11 +167,7 @@ export type CreateCollectionItemResult =
  * `items[i]` and `tags[i]` belong to the input entry at the same index, whether it was created or
  * reused. Filter on `created` for only the records this call wrote.
  */
-export interface CreateCollectionResult {
-  /** The URI of the new Collection. */
-  uri: StrongRef["uri"];
-  /** The CID of the new Collection. */
-  cid: StrongRef["cid"];
+export interface CreateCollectionResult extends StrongRef {
   /** The location, when the input had `location`. */
   location?: SupportingRecordRef;
   /** The vocabulary tags, in input order. */
