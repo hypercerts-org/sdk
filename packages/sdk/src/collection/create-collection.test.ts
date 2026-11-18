@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, methods, type ReceivedCreate, refTo, writeOf } from "../test-utils/fake-repo.js";
+import { location, png, uriOf } from "../test-utils/records.js";
 import {
   type CollectionInput,
   type CollectionItemInput,
@@ -25,17 +26,8 @@ const ACTIVITY_CID = "bafkreiagkgddx5ozaitcwf6emipmgqcuj7ybm5jfipmzvewx2iuhfwfek
 const FEATURE_CID = "bafkreibk2vrddf3hcvyipxna33ddsh2eph4kasdjvmgmru5jynrx3lttwu";
 const COLLECTION_CID = "bafkreih2oslojlueamdn6qn5mweaaojoetnyvrdwofm5nppyui5srrcoua";
 
-const uriOf = (collection: string, rkey = "3k2a4b5c6d7e8") => `at://${DID}/${collection}/${rkey}`;
-const png = () => new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
 const activity = { title: "Trees", shortDescription: "Planting trees" };
 const tag = (category: string, key: string) => ({ category, key, name: key, status: "accepted" });
-const location = (name: string) => ({
-  lpVersion: "1.0",
-  srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-  locationType: "coordinate-decimal",
-  location: { string: "90.17,27.47" },
-  name,
-});
 
 describe("createCollection with existing records only", () => {
   const activityUri = uriOf(ACTIVITY, "3jzfcijpj2z2a");

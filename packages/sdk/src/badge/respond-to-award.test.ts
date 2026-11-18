@@ -1,8 +1,8 @@
-import { type LexMap, lexParse } from "@atproto/lex";
-import { cidForLex } from "@atproto/lex-cbor";
+import type { LexMap } from "@atproto/lex";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
+import { cidOf } from "../test-utils/records.js";
 import {
   type RespondToBadgeAwardInput,
   respondToBadgeAward,
@@ -28,8 +28,6 @@ const storedAward = (subject: LexMap): LexMap => ({
   subject,
   createdAt: "2024-01-01T00:00:00.000Z",
 });
-const cidOf = async (value: LexMap) =>
-  (await cidForLex(lexParse(JSON.stringify(value)))).toString();
 
 // Serves the issuer's DID document and the records of its repository, and counts the reads.
 function stubIssuerPds(records: Record<string, LexMap>) {

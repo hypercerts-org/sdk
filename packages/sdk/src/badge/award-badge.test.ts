@@ -1,8 +1,8 @@
-import { type LexMap, lexParse } from "@atproto/lex";
-import { cidForLex } from "@atproto/lex-cbor";
+import type { LexMap } from "@atproto/lex";
 import { describe, expect, it } from "vitest";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
+import { cidOf, png } from "../test-utils/records.js";
 import { type AwardBadgeInput, awardBadge, WriteOutcomeUnknownError } from "./index.js";
 
 const DEFINITION = "app.certified.badge.definition";
@@ -20,10 +20,6 @@ const stored = (extra: LexMap = {}): LexMap => ({
   createdAt: "2024-01-01T00:00:00.000Z",
   ...extra,
 });
-// The CID the fake PDS reports for a stored record, as a PDS computes it from the stored value.
-const cidOf = async (value: LexMap) =>
-  (await cidForLex(lexParse(JSON.stringify(value)))).toString();
-const png = () => new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
 
 const award = (input: Partial<AwardBadgeInput> = {}): AwardBadgeInput => ({
   definition: { uri: definitionUri },

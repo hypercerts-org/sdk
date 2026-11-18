@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSDKContext } from "../context.js";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
+import { uriOf } from "../test-utils/records.js";
 import { type AcknowledgementInput, createAcknowledgement } from "./index.js";
 
 const ACKNOWLEDGEMENT = "org.hypercerts.context.acknowledgement";
@@ -10,7 +11,6 @@ const CONTRIBUTOR = "org.hypercerts.claim.contributorInformation";
 const ACTIVITY = "org.hypercerts.claim.activity";
 const APPLY = "com.atproto.repo.applyWrites";
 
-const uriOf = (collection: string, rkey = "3k2a4b5c6d7e8") => `at://${DID}/${collection}/${rkey}`;
 const subject = uriOf(CONTRIBUTOR);
 const activity = uriOf(ACTIVITY, "3k2a4b5c6d7e9");
 

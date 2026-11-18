@@ -1,7 +1,8 @@
 import { isTidString } from "@atproto/lex";
 import { describe, expect, it } from "vitest";
-import { CID, DID, json } from "../test-utils/fake-pds.js";
+import { CID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
+import { uriOf } from "../test-utils/records.js";
 import {
   type AttachmentInput,
   createAttachment,
@@ -16,7 +17,6 @@ const WORKSCOPE = "org.hypercerts.workscope.tag";
 const LOCATION = "app.certified.location";
 const LEAFLET = "pub.leaflet.pages.linearDocument";
 
-const uriOf = (collection: string, rkey = "3k2a4b5c6d7e8") => `at://${DID}/${collection}/${rkey}`;
 const tag = (category: string, key: string) => ({ category, key, name: key, status: "accepted" });
 const location = {
   lpVersion: "1.0",
