@@ -339,8 +339,9 @@ export function cgsTarget(
     const notAttempted = steps.slice(index + 1).map((step) => step.record.ref);
     return new PartialWriteError(
       `${operation}: ${landed.length} of ${steps.length} records were written to ${repo} before ${failed.uri} failed, and ${notAttempted.length} were not sent. ` +
-        `Written: ${landed.map((ref) => ref.uri).join(", ")}. The failure: ${failure.message} ` +
-        "The SDK does not roll back or retry. Keep what was written, or call again and pass the written records as { uri } where the input accepts existing records.",
+        `Written: ${landed.map((ref) => ref.uri).join(", ")}. Cause: ${describeError(failure.cause ?? failure)}. ` +
+        "The written records are in the repository and stay there; the SDK does not roll back or retry. Do not call again with the same input, which would create them a second time: " +
+        "keep them, or call again and pass the written records as { uri } where the input accepts existing records. `error.failure` has the full error.",
       { written: landed, failed, failure, notAttempted },
     );
   }

@@ -12,7 +12,7 @@ const OPERATION = "addActivityToCollection";
 export interface AddActivityToCollectionInput {
   /**
    * The Collection to add to: `{ uri }` as `at://<did>/org.hypercerts.collection/<rkey>`. It must
-   * belong to the account the client is signed in as, and be identified by a DID, not a handle. The
+   * be in the repository written to (your own, or `{ repo }`), and be identified by a DID, not a handle. The
    * SDK reads it and writes the new version.
    */
   collection: ExistingRecord;

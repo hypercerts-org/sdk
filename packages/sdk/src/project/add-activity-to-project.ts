@@ -17,7 +17,7 @@ export interface AddActivityToProjectInput
   extends Omit<AddActivityToCollectionInput, "collection"> {
   /**
    * The Project to add to: `{ uri }` as `at://<did>/org.hypercerts.collection/<rkey>`, a Collection
-   * of type `project` that belongs to the account the client is signed in as, identified by a DID.
+   * of type `project` in the repository written to (your own, or `{ repo }`), identified by a DID.
    */
   project: ExistingRecord;
 }

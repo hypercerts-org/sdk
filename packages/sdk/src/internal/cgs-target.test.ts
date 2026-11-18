@@ -154,6 +154,11 @@ describe("cgsTarget.submit", () => {
     expect(error.failure.status).toBe(400);
     expect(error.cause).toBe(error.failure);
     expect(error.message).toContain(a.ref.uri);
+    expect(error.message).toContain("bad record");
+    // Single-request advice from the failed step would contradict a partial write.
+    expect(error.message).not.toContain("nothing was written");
+    expect(error.message).not.toContain("Nothing needs cleaning up");
+    expect(error.message).not.toContain("and call again.");
     // Stopped at the failure: the third was never sent.
     expect(cgs.requests).toHaveLength(2);
   });
