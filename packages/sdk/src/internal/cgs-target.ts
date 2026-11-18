@@ -24,7 +24,13 @@
 import { Client, type DidString, l, type NsidString } from "@atproto/lex";
 import type { BlobData } from "../blob/upload-blob.js";
 import type { CgsConfig, SDKContext } from "../context.js";
-import { PartialWriteError, WriteOutcomeUnknownError, WriteRejectedError } from "../errors.js";
+import {
+  PartialWriteError,
+  RecordAlreadyExistsError,
+  WriteOutcomeUnknownError,
+  WriteRejectedError,
+  WriteResultMismatchError,
+} from "../errors.js";
 import { describeError } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import {
@@ -230,7 +236,7 @@ export function cgsTarget(
         continue;
       }
       if (landed.length === 0) throw failure;
-      throw partialWrite(landed, steps, i, failure);
+      throw partialWrite(plan, landed, steps, i, failure);
     }
   }
 
@@ -332,6 +338,7 @@ export function cgsTarget(
   }
 
   function partialWrite(
+    plan: WritePlan,
     landed: readonly StrongRef[],
     steps: readonly Step[],
     index: number,
@@ -339,12 +346,34 @@ export function cgsTarget(
   ): PartialWriteError {
     const failed = steps[index]?.record.ref as StrongRef;
     const notAttempted = steps.slice(index + 1).map((step) => step.record.ref);
+    // The failed step's own message advises for a single request ("nothing was written", "call
+    // again"), which is wrong after a partial write, so only its reason is used.
+    const retry = plan.retrySafe ?? plan.createOnly;
     return new PartialWriteError(
       `${operation}: ${landed.length} of ${steps.length} records were written to ${repo} before ${failed.uri} failed, and ${notAttempted.length} were not sent. ` +
-        `Written: ${landed.map((ref) => ref.uri).join(", ")}. Cause: ${describeError(failure.cause ?? failure)}. ` +
-        "The written records are in the repository and stay there; the SDK does not roll back or retry. Do not call again with the same input, which would create them a second time: " +
-        "keep them, or call again and pass the written records as { uri } where the input accepts existing records. `error.failure` has the full error.",
+        `Written: ${landed.map((ref) => ref.uri).join(", ")}. Cause: ${failureReason(failure)}. ` +
+        "The written records are in the repository and stay there; the SDK does not roll back or retry. " +
+        (retry
+          ? `Calling ${operation} again is safe: ${plan.retrySafeReason ?? "every record has a fixed key and is only created if absent, so the call creates what is missing or fails because a record exists"}. `
+          : "Do not call again with the same input, which would create them a second time: keep them, or call again and pass the written records as { uri } where the input accepts existing records. ") +
+        "`error.failure` has the full error.",
       { written: landed, failed, failure, notAttempted },
     );
+  }
+
+  // Why one step failed, without the advice its own message gives for a single-request write.
+  function failureReason(failure: Error): string {
+    if (failure instanceof RecordAlreadyExistsError) {
+      return `a record already exists at ${failure.uri}`;
+    }
+    const raw = describeError(failure.cause ?? failure);
+    if (failure instanceof WriteRejectedError) return `rejected by ${CGS_SERVICE}: ${raw}`;
+    if (failure instanceof WriteOutcomeUnknownError)
+      return `no usable answer from ${CGS_SERVICE}: ${raw}`;
+    if (failure instanceof WriteResultMismatchError) {
+      return `${CGS_SERVICE} reported different URIs or CIDs than the SDK computed`;
+    }
+    // The service-auth failure: its message holds the reason and the scope hint.
+    return failure.message.replace(`${operation}: `, "");
   }
 }

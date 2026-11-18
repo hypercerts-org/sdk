@@ -159,8 +159,48 @@ describe("cgsTarget.submit", () => {
     expect(error.message).not.toContain("nothing was written");
     expect(error.message).not.toContain("Nothing needs cleaning up");
     expect(error.message).not.toContain("and call again.");
+    expect(error.message).toContain("rejected by the Certified Group Service");
+    expect(error.message).toContain("Do not call again");
     // Stopped at the failure: the third was never sent.
     expect(cgs.requests).toHaveLength(2);
+  });
+
+  it("says calling again is safe after a partial write of a retry-safe plan", async () => {
+    const cgs = fakeCgs({
+      answer: (_request, index) =>
+        index === 1 ? json(400, { error: "InvalidRequest", message: "bad record" }) : undefined,
+    });
+
+    const error = await target(cgs)
+      .submit({
+        creates: [await rec("A"), await rec("B")],
+        updates: [],
+        createOnly: false,
+        retrySafe: true,
+        retrySafeReason: "the profile is reused",
+      })
+      .catch((e) => e);
+
+    expect(error).toBeInstanceOf(PartialWriteError);
+    expect(error.message).toContain("again is safe: the profile is reused");
+    expect(error.message).not.toContain("Do not call again");
+    expect(error.message).not.toContain("nothing was written");
+  });
+
+  it("keeps 'already exists' in a partial write whose failed step hit a taken key", async () => {
+    const taken = await rec("Theirs", "4444444444444");
+    const mine = await rec("Mine", "4444444444444");
+    const cgs = fakeCgs({ records: { [taken.ref.uri]: taken.value } });
+
+    const error = await target(cgs)
+      .submit({ creates: [await rec("A"), mine], updates: [], createOnly: true })
+      .catch((e) => e);
+
+    expect(error).toBeInstanceOf(PartialWriteError);
+    expect(error.failure).toBeInstanceOf(RecordAlreadyExistsError);
+    expect(error.message).toContain(`a record already exists at ${mine.ref.uri}`);
+    expect(error.message).not.toContain("nothing was written");
+    expect(error.message).toContain("again is safe");
   });
 
   it("fails an update whose swapRecord is stale as 'the record changed', after the creates landed", async () => {
