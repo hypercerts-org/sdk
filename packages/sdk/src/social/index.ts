@@ -15,7 +15,7 @@ export type {
   FollowAccountInput,
   RecordActionInput,
   RecordSubject,
-  UndoTarget,
+  UndoRecord,
   UnfollowAccountInput,
   UnfollowEntityInput,
   UnlikeInput,
