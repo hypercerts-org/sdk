@@ -16,7 +16,7 @@ export const context = createSDKContext({
 });
 ```
 
-With OAuth the session needs the scope `rpc:app.certified.group.repo.*?aud=<cgs did>` (the bare DID, without `#certified_group_service`). The SDK asks the account's PDS for a service-auth token before every CGS request, so a missing scope fails with a plain `Error` that names the scope.
+With OAuth the session needs the scope `rpc:app.certified.group.repo.*?aud=<cgs did>` (`aud` is the `cgs.did` you configured, as given). The SDK asks the account's PDS for a service-auth token before every CGS request, so a missing scope fails with a plain `Error` that names the scope.
 
 ## Calls
 

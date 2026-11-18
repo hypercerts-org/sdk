@@ -84,6 +84,23 @@ function selectTarget(
 }
 
 /**
+ * Starts a creation call (see {@link createBuildContext}) and checks `input` against `schema`, so
+ * a missing session or setup is reported before a bad input is.
+ *
+ * Throws what `createBuildContext` and `parseInput` throw.
+ */
+export function startCall<T>(
+  context: SDKContext,
+  operation: string,
+  schema: l.Schema<T>,
+  input: unknown,
+  options: WriteOptions | undefined,
+): { build: BuildContext; parsed: T } {
+  const build = createBuildContext(context, operation, options);
+  return { build, parsed: parseInput(build, "input", schema, input) };
+}
+
+/**
  * Checks caller data against an input schema. `field` names the data in the message, for example
  * `input` or `locations[1]`.
  *

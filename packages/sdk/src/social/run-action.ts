@@ -1,17 +1,13 @@
-import type { l } from "@atproto/lex";
-import type { SDKContext } from "../context.js";
 import {
   type BuildContext,
-  createBuildContext,
-  parseInput,
   parseOwnRecordUri,
   prepareChecked,
+  startCall,
 } from "../internal/build-context.js";
 import type { StandaloneCreator } from "../internal/create-record.js";
 import { compact } from "../internal/input.js";
 import { resolveRecordRef } from "../internal/resolve-record-ref.js";
 import { submitDelete, submitWrites } from "../internal/submit-writes.js";
-import type { WriteOptions } from "../write-options.js";
 import {
   type ActionOptions,
   type SocialAction,
@@ -39,7 +35,7 @@ export function createAction<TCreate extends ActionOptions, TField extends UndoF
   action: SocialAction<TCreate, TField>,
 ): StandaloneCreator<TCreate> {
   return async (context, input, options) => {
-    const { build, parsed } = start(
+    const { build, parsed } = startCall(
       context,
       action.names.create,
       action.createInput,
@@ -84,7 +80,7 @@ export function undoAction<TCreate extends ActionOptions, TField extends UndoFie
 ): UndoFunction<UndoInput<TField>> {
   const schema = undoInputSchema(action.undoField);
   return async (context, input, options) => {
-    const { build, parsed } = start(context, action.names.undo, schema, input, options);
+    const { build, parsed } = startCall(context, action.names.undo, schema, input, options);
     const { uri, cid } = parsed[action.undoField];
     assertOwnRecord(build, uri, action.schema.$type);
     await submitDelete(build, { uri, cid });
@@ -100,16 +96,4 @@ function assertOwnRecord(build: BuildContext, uri: string, collection: string) {
     repository: (did) =>
       `${build.operation}: ${uri} is in the repository of ${did}, not of the signed-in account (${build.did}). Only the account's own records can be deleted. Nothing was sent.`,
   });
-}
-
-// Checks that the client is signed in, then the input, before anything is sent.
-function start<T>(
-  context: SDKContext,
-  operation: string,
-  schema: l.Schema<T>,
-  input: unknown,
-  options: WriteOptions | undefined,
-): { build: BuildContext; parsed: T } {
-  const build = createBuildContext(context, operation, options);
-  return { build, parsed: parseInput(build, "input", schema, input) };
 }

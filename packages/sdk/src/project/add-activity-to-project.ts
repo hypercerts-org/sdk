@@ -1,8 +1,9 @@
-import type { ActivityEntryResult } from "../activity/activity-entry.js";
 import { addActivity } from "../collection/add-activity.js";
-import type { AddActivityToCollectionInput } from "../collection/add-activity-to-collection.js";
+import type {
+  AddActivityToCollectionInput,
+  AddActivityToCollectionResult,
+} from "../collection/add-activity-to-collection.js";
 import type { SDKContext } from "../context.js";
-import type { StrongRef } from "../internal/resolve-record-ref.js";
 import type { ExistingRecord } from "../internal/slots.js";
 import type { WriteOptions } from "../write-options.js";
 
@@ -25,10 +26,7 @@ export interface AddActivityToProjectInput
  * The result of {@link addActivityToProject}: the Project's new version as `uri` and `cid`, and the
  * Activity as `activity`. Same shape as {@link AddActivityToCollectionResult}.
  */
-export interface AddActivityToProjectResult extends StrongRef {
-  /** The Activity, created or reused. See {@link ActivityEntryResult}. */
-  activity: ActivityEntryResult;
-}
+export type AddActivityToProjectResult = AddActivityToCollectionResult;
 
 /**
  * Adds an Activity to an existing Project (a Collection of type `project`) in one atomic write.

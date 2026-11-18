@@ -4,7 +4,7 @@ import * as response from "@hypercerts-org/lexicon/app/certified/badge/response"
 import * as certifiedDefs from "@hypercerts-org/lexicon/app/certified/defs";
 import * as strongRef from "@hypercerts-org/lexicon/com/atproto/repo/strongRef";
 import type { SDKContext } from "../context.js";
-import { createBuildContext, parseInput, prepareChecked } from "../internal/build-context.js";
+import { prepareChecked, startCall } from "../internal/build-context.js";
 import { describeError } from "../internal/describe.js";
 import { compact, optionalText, strictObject, weightString } from "../internal/input.js";
 import {
@@ -155,8 +155,7 @@ export async function respondToBadgeAward(
   input: RespondToBadgeAwardInput,
   options?: WriteOptions,
 ): Promise<StrongRef> {
-  const build = createBuildContext(context, OPERATION, options);
-  const parsed = parseInput(build, "input", inputSchema, input);
+  const { build, parsed } = startCall(context, OPERATION, inputSchema, input, options);
   assertAwardUri(parsed.award.uri);
 
   const stored = await readRecord(context, parsed.award.uri, OPERATION);

@@ -1,12 +1,7 @@
 import { type DatetimeString, l, type UriString } from "@atproto/lex";
 import * as award from "@hypercerts-org/lexicon/app/certified/badge/award";
 import type { SDKContext } from "../context.js";
-import {
-  type BuildContext,
-  createBuildContext,
-  parseInput,
-  prepareChecked,
-} from "../internal/build-context.js";
+import { type BuildContext, prepareChecked, startCall } from "../internal/build-context.js";
 import { compact, endsBeforeStart, optionalText, strictObject } from "../internal/input.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
@@ -194,8 +189,7 @@ export async function awardBadge(
   input: AwardBadgeInput,
   options?: WriteOptions,
 ): Promise<AwardBadgeResult> {
-  const build = createBuildContext(context, OPERATION, options);
-  const parsed = parseInput(build, "input", awardInput, input);
+  const { build, parsed } = startCall(context, OPERATION, awardInput, input, options);
   assertValidityRange(build, parsed);
   const subject = parseSubject(build, parsed.subject);
   const plan = planDefinition(build, parsed.definition);
