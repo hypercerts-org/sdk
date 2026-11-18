@@ -1,7 +1,12 @@
 import { l } from "@atproto/lex";
 import * as attachment from "@hypercerts-org/lexicon/org/hypercerts/context/attachment";
-import * as defs from "@hypercerts-org/lexicon/org/hypercerts/defs";
 import { optionalText } from "../internal/input.js";
+import {
+  type LeafletDocument,
+  longDescription,
+  longDescriptionReference,
+  longDescriptionTransform,
+} from "../internal/long-description.js";
 import { type RecordKind, recordKind, references } from "../internal/record-kind.js";
 import type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 import type { LocationInput } from "../location/build-location.js";
@@ -41,8 +46,11 @@ export interface AttachmentInput {
   content?: readonly (Blob | string)[] | undefined;
   /** A summary for previews. At most 3000 characters and 300 graphemes. */
   shortDescription?: string | undefined;
-  /** A long description as plain text or Markdown. */
-  description?: string | undefined;
+  /**
+   * A long description: plain text or Markdown, a {@link LeafletDocument}, or `{ uri }` of an
+   * existing record of any type, which is read and stored as a strong reference.
+   */
+  description?: string | LeafletDocument | ExistingRecord | undefined;
   /** Languages of the text fields as BCP-47 tags (up to three), for example `["en"]`. */
   langs?: readonly string[] | undefined;
   /**
@@ -70,7 +78,7 @@ export interface AttachmentInput {
  * and the results for the records it points at.
  *
  * @remarks
- * `subjects`, `location` and `tags` mirror the input and appear only when the input had them.
+ * `subjects`, `location`, `tags` and `description` mirror the input and appear only when the input had them (`description` only when it is `{ uri }`).
  * Each entry belongs to the input entry at the same index, whether it was created or reused, and
  * a new tag nested in a new tag (`broader`) is reported under it. Filter on `created` for only the
  * records this call wrote.
@@ -80,6 +88,8 @@ export interface CreateAttachmentResult extends SupportingRecordRef {
   subjects?: readonly SupportingRecordRef[];
   /** The location. */
   location?: SupportingRecordRef;
+  /** The record a `{ uri }` description points at, with the CID it was pinned at. */
+  description?: SupportingRecordRef;
   /** The vocabulary tags, in input order. */
   tags?: readonly VocabularyTagResult[];
 }
@@ -91,20 +101,20 @@ const attachmentKind: RecordKind<AttachmentInput> = recordKind(
     contentType: optionalText,
     content: contentInput,
     shortDescription: optionalText,
-    description: optionalText,
+    description: l.optional(longDescription),
     langs: l.optional(l.array(l.string())),
     capturedAt: optionalText,
   },
   {
     content: contentTransform,
-    description: (_build, _field, value: string) =>
-      Promise.resolve(defs.descriptionString.build({ value })),
+    description: longDescriptionTransform,
   },
   {
     references: {
       subjects: existingRecordsReference,
       location: locationReference,
       tags: references.many(() => vocabularyTagKind),
+      description: longDescriptionReference,
     },
   },
 );
@@ -140,8 +150,12 @@ const attachmentKind: RecordKind<AttachmentInput> = recordKind(
  * not rolled back if it fails; see {@link uploadBlob}. A lexicon rule that rejects a record (for
  * example more than 100 `content` entries) is found only after the uploads.
  *
- * Not supported: the lexicon's `signatures` and `shortDescriptionFacets`, a `description` that is
- * not a string, and a blob that was uploaded already.
+ * `description` is a string, a Leaflet document (with `$type: "pub.leaflet.pages.linearDocument"`)
+ * or `{ uri }` of an existing record of any type, which is read and stored as a strong reference.
+ * The SDK never creates a document record.
+ *
+ * Not supported: the lexicon's `signatures` and `shortDescriptionFacets`, and a blob that was
+ * uploaded already.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the records are created in that account's repo.

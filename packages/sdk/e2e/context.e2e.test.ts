@@ -90,6 +90,26 @@ describe("createAttachment", () => {
     await expectStored(user.client, defined(result.location));
   });
 
+  it("stores a description that is a Leaflet document or points at an existing record", async () => {
+    const document = { $type: "pub.leaflet.pages.linearDocument" as const, blocks: [] };
+    const asDocument = await createAttachment(user.context, {
+      title: unique("E2E attachment"),
+      description: document,
+    });
+    const asReference = await createAttachment(user.context, {
+      title: unique("E2E attachment"),
+      description: { uri: target.uri },
+    });
+
+    expect(await expectStored(user.client, asDocument)).toMatchObject({ description: document });
+    const stored = await storedOwn(asReference, contexts.attachment);
+    expect(stored.description).toEqual({
+      $type: "com.atproto.repo.strongRef",
+      uri: target.uri,
+      cid: target.cid,
+    });
+  });
+
   it("throws and writes nothing, not even its new location, when a subject cannot be read", async () => {
     const before = await countRecords(user.client, contexts.attachment);
     const locations = await countRecords(user.client, collections.location);

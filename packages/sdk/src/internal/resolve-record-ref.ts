@@ -169,6 +169,34 @@ export function parseRecordUri(uri: string, operation: string) {
   throw notARecordUri(uri, operation);
 }
 
+/** The collection segment of a record URI, or undefined when it has none. Does not validate `uri`. */
+export const collectionOf = (uri: string): string | undefined => uri.split("/")[3];
+
+/**
+ * Throws TypeError, naming `operation` and `label` (the input field), unless the record URI `uri`
+ * is of one of the `allowed` types (any type when `allowed` is undefined). `expectation` completes
+ * "..., but " in the message, for example `it must be of type <nsid>`.
+ *
+ * Internal. Checks the collection segment only and does not validate the URI's authority or
+ * shape: callers do that with `parseRecordUri`, before or after this check as suits their error
+ * order. Sends no request.
+ */
+export function assertRecordUriOfType(
+  operation: string,
+  label: string,
+  uri: string,
+  allowed: readonly string[] | undefined,
+  expectation: string,
+): void {
+  const actual = collectionOf(uri);
+  if (actual !== undefined && (allowed === undefined || allowed.includes(actual))) return;
+  const target =
+    actual === undefined ? "something that is not a record" : `a record of type ${actual}`;
+  throw new TypeError(
+    `${operation}: ${label} points at ${target}, but ${expectation}: ${uri}. Expected at://<did>/${allowed?.join("|") ?? "<collection>"}/<rkey>.`,
+  );
+}
+
 function notARecordUri(uri: string, operation: string): TypeError {
   return new TypeError(
     `${operation}: ${JSON.stringify(uri)} is not a record URI. Expected at://<did>/<collection>/<rkey>, for example at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8. Handles are not accepted as the authority.`,

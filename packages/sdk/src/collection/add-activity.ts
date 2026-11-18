@@ -6,17 +6,18 @@ import {
   planActivityEntry,
 } from "../activity/activity-entry.js";
 import type { SDKContext } from "../context.js";
-import {
-  type BuildContext,
-  createBuildContext,
-  parseInput,
-  parseOwnRecordUri,
-} from "../internal/build-context.js";
+import { type BuildContext, createBuildContext, parseInput } from "../internal/build-context.js";
 import { describeError } from "../internal/describe.js";
 import { compact, strictObject } from "../internal/input.js";
 import { type PreparedRecord, prepareUpdate } from "../internal/prepare-record.js";
 import { readRepoHead } from "../internal/read-repo-head.js";
-import { readRecord, type StoredRecord, type StrongRef } from "../internal/resolve-record-ref.js";
+import {
+  assertRecordUriOfType,
+  parseRecordUri,
+  readRecord,
+  type StoredRecord,
+  type StrongRef,
+} from "../internal/resolve-record-ref.js";
 import { prepareSlots } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
 
@@ -111,12 +112,20 @@ function parseCollectionUri(
   { uriField, noun }: AddActivityTarget,
   uri: string,
 ): RecordKeyString {
-  return parseOwnRecordUri(build, uri, collection.main.$type, {
-    collection: (type) =>
-      `${build.operation}: ${uriField} points at a record of type ${type}, but it must be of type ${collection.main.$type}: ${uri}. Expected at://<did>/${collection.main.$type}/<rkey>.`,
-    repository: (did) =>
-      `${build.operation}: ${uriField} is in the repository of ${did}, but the client is signed in as ${build.did} and this operation changes only the signed-in account's own ${noun}s: ${uri}.`,
-  }).rkey;
+  const parsed = parseRecordUri(uri, build.operation);
+  assertRecordUriOfType(
+    build.operation,
+    uriField,
+    uri,
+    [collection.main.$type],
+    `it must be of type ${collection.main.$type}`,
+  );
+  if (parsed.did !== build.did) {
+    throw new TypeError(
+      `${build.operation}: ${uriField} is in the repository of ${parsed.did}, but the client is signed in as ${build.did} and this operation changes only the signed-in account's own ${noun}s: ${uri}.`,
+    );
+  }
+  return parsed.rkey;
 }
 
 type Item = NonNullable<collection.Main["items"]>[number];

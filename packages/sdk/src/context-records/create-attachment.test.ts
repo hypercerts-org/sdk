@@ -2,13 +2,19 @@ import { isTidString } from "@atproto/lex";
 import { describe, expect, it } from "vitest";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
-import { type AttachmentInput, createAttachment, RecordAlreadyExistsError } from "./index.js";
+import {
+  type AttachmentInput,
+  createAttachment,
+  type LeafletDocument,
+  RecordAlreadyExistsError,
+} from "./index.js";
 
 const ATTACHMENT = "org.hypercerts.context.attachment";
 const ACTIVITY = "org.hypercerts.claim.activity";
 const VOCAB = "org.hypercerts.vocab.tag";
 const WORKSCOPE = "org.hypercerts.workscope.tag";
 const LOCATION = "app.certified.location";
+const LEAFLET = "pub.leaflet.pages.linearDocument";
 
 const uriOf = (collection: string, rkey = "3k2a4b5c6d7e8") => `at://${DID}/${collection}/${rkey}`;
 const tag = (category: string, key: string) => ({ category, key, name: key, status: "accepted" });
@@ -263,5 +269,41 @@ describe("createAttachment", () => {
     ).rejects.toThrow(/createAttachment: could not upload input\.content\[1\]/);
 
     expect(methods(requests)).toEqual([UPLOAD]);
+  });
+});
+
+describe("createAttachment description", () => {
+  const document: LeafletDocument = { $type: LEAFLET, blocks: [] };
+  const documentUri = uriOf("pub.leaflet.document");
+
+  it.each<[string, AttachmentInput["description"], object]>([
+    ["a Leaflet document, as it is", document, document],
+    [
+      "{ uri } of a record of any type, as a strong reference",
+      { uri: documentUri },
+      { $type: "com.atproto.repo.strongRef", uri: documentUri, cid: CID },
+    ],
+  ])("stores %s", async (_, description, stored) => {
+    const { context, creates } = fakeRepo({ existing: { [documentUri]: CID } });
+
+    const result = await createAttachment(context, { title: "Report", description });
+
+    expect(writeOf(creates[0] ?? [], ATTACHMENT).value.description).toEqual(stored);
+    if (typeof description === "object" && "uri" in description) {
+      expect(result.description).toEqual({ uri: documentUri, cid: CID, created: false });
+    }
+  });
+
+  it("sends nothing for a Leaflet document without its $type", async () => {
+    const { context, requests } = fakeRepo();
+
+    await expect(
+      createAttachment(context, {
+        title: "Report",
+        description: { blocks: [] },
+      } as unknown as AttachmentInput),
+    ).rejects.toThrow(/must be a string, \{ uri \}/);
+
+    expect(methods(requests).includes(APPLY)).toBe(false);
   });
 });
