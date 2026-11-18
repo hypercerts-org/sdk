@@ -41,6 +41,15 @@ export interface SupportingRecordRef extends StrongRef {
 export type ReferenceOf = (slot: Slot) => StrongRef;
 
 /**
+ * What a call reports for one planned record, built once the records it writes are prepared:
+ * `created` holds those, and `refOf` gives the reference of any slot.
+ */
+export type ResultOf<TResult> = (
+  created: ReadonlyMap<Slot, PreparedRecord>,
+  refOf: ReferenceOf,
+) => TResult;
+
+/**
  * A new record to create, with its input already validated and the slots of the records it points
  * at planned.
  */

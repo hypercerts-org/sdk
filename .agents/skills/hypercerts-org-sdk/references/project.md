@@ -4,7 +4,7 @@ Read [../SKILL.md](../SKILL.md) first for setup and error handling, [activity.md
 
 Create a project with `createProject`. An Activity on its own may not show up or work in other apps in the ecosystem; apps expect a project (a collection with type `project` that holds its activities). That is why `createProject` exists.
 
-One operation: `createProject` creates a **new** Project with its Activities. To add an Activity to a Project that **already exists**, use `createActivityInCollection` from `@hypercerts-org/sdk/collection`. For Features, child Collections or another `type`, use `createCollection`.
+Two operations: `createProject` creates a **new** Project with its Activities; `addActivityToProject` adds an Activity (new or existing) to a Project that **already exists**. For Features, child Collections or another `type`, use `createCollection`.
 
 ## createProject
 
@@ -90,4 +90,40 @@ Errors are as in [Handle failures](../SKILL.md#6-handle-failures). After `WriteO
 | `shortDescriptionFacets` | `app.bsky.richtext.facet[]`            | Rich-text facets of `shortDescription`, passed as given. Copied into the default Activity.                                      |
 | `createdAt`              | `string`                               | ISO 8601; defaults to the time of the call, for every new record.                                                               |
 
-Not supported: `type` and `items` (a Project is always `type: "project"`; its items are its `activities`), Features and child Collections in a Project (use `createCollection`), `signatures`, adding Activities to a Project that exists (use `createActivityInCollection`), changing an existing record.
+Not supported: `type` and `items` (a Project is always `type: "project"`; its items are its `activities`), Features and child Collections in a Project (use `createCollection`), `signatures`, adding Activities to a Project that exists (use `addActivityToProject`), changing an existing record.
+
+## addActivityToProject
+
+`addActivityToProject(context, { projectUri, activity, weight? })` appends an Activity to an **existing** Project in your repo in one `applyWrites` commit. It is [`addActivityToCollection`](collection.md#addactivitytocollection) for a Collection of type `project`, with `projectUri` in place of `collectionUri` and `project` in place of `collection` in the result.
+
+```ts
+import { addActivityToProject } from "@hypercerts-org/sdk/project";
+
+const projectUri = "at://did:plc:abc123/org.hypercerts.collection/3k2a4b5c6d7e8"; // placeholder: one of your own
+
+const added = await addActivityToProject(context, {
+  projectUri,
+  activity: { activity: { title: "Wetland survey", shortDescription: "Mapping the wetlands." } }, // created
+  weight: "1",
+});
+added.activity; // { uri, cid, created: true, locations: [], contributors: [] }
+added.project; // { uri, cid }: the same URI, the new version's CID
+
+await addActivityToProject(context, {
+  projectUri,
+  activity: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" }, // reused
+});
+```
+
+- `activity` is **exactly one** of `{ activity }` (a new Activity) or `{ uri }` (an existing Activity), never a bare Activity input; `weight` goes beside it. Validation, the item's position and weight, `signatures`, the 1000-item limit, no deduplication, `InvalidSwap` and uploads are all as in [addActivityToCollection](collection.md#addactivitytocollection).
+- The Collection must have `type: "project"`. Any other type, or none, is a `TypeError` that names `addActivityToCollection`; the check also runs on the second read, so a Collection that stopped being a Project in between is refused. A Collection of another type: use `addActivityToCollection`.
+- `projectUri` must be your own Project, with a DID. Another account's Project is a `TypeError`.
+- After `WriteOutcomeUnknownError`, `attempted` lists the new records and, last, the Project (only the Project for a `{ uri }`). Check before retrying, or you add a second item.
+
+### `AddActivityToProjectInput`
+
+| Field        | Type                      | Notes                                                                                                  |
+| ------------ | ------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `projectUri` | `string`                  | Required. `at://<your did>/org.hypercerts.collection/<rkey>` of a Collection with `type: "project"`.  |
+| `activity`   | `{ activity } \| { uri }` | Required. Exactly one: a new Activity or the URI of an existing one. See [activity.md](activity.md).   |
+| `weight`     | `string`                  | Optional. Positive decimal string, at most 100 characters.                                             |

@@ -49,7 +49,7 @@ const OPERATION = "createCollection";
  * {@link uploadBlob}.
  *
  * Not supported: the lexicon's `signatures`, a blob that was uploaded already, adding items to a
- * Collection that exists (see {@link createActivityInCollection} for an Activity), and changing
+ * Collection that exists (see {@link addActivityToCollection} for an Activity), and changing
  * an existing record.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be

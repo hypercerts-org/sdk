@@ -528,14 +528,7 @@ export function planActivitySlot(
  * Does everything `createActivity` does before it writes: validates the input, reads the existing
  * records it points at, uploads blobs and prepares every new record, the Activity last.
  *
- * Internal. `createActivity` submits the result as it is; operations that put the Activity in a
- * larger write (see `createActivityInCollection`) submit it together with their own writes. Uploads
- * are not undone if the caller never submits the writes.
- *
- * `options.path` names the Activity's data in messages when it is part of a larger input, for
- * example `activity` gives `activity.locations[0]`; omit it when the input is the Activity itself.
- * `options.otherWrites` counts the writes the caller adds to the same request, so a call that
- * would not fit in one write fails before anything is uploaded.
+ * Internal. Uploads are not undone if the caller never submits the writes.
  *
  * Throws what `createActivity` throws before its write: TypeError for invalid input and Error for
  * a failed read or upload.
@@ -543,16 +536,10 @@ export function planActivitySlot(
 export async function prepareActivity(
   build: BuildContext,
   input: unknown,
-  options: { path?: string; otherWrites?: number } = {},
 ): Promise<PreparedActivity> {
-  const { path, otherWrites = 0 } = options;
-  const planned = planActivitySlot(build, input, path);
+  const planned = planActivitySlot(build, input);
   // Reads first, then uploads: a URI that cannot be resolved fails before anything is uploaded.
-  // The write limit counts the Activity itself too.
-  const { created, refOf } = await prepareSlots(build, [planned.slot], {
-    checkKeys: true,
-    otherWrites,
-  });
+  const { created, refOf } = await prepareSlots(build, [planned.slot], { checkKeys: true });
   return { writes: [...created.values()], result: planned.result(created, refOf) };
 }
 

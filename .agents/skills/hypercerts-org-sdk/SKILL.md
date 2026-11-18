@@ -3,7 +3,7 @@ name: hypercerts-org-sdk
 description: "Write Hypercerts and Certified records (org.hypercerts.*, app.certified.*) to a PDS from an app with @hypercerts-org/sdk: setting up the SDK context from an authenticated @atproto/lex Client, choosing the right operation and subpath, uploading blobs, and handling write errors without duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create, link or write hypercert-related records from an app. Not for changing the SDK's own source."
 metadata:
   author: hypercerts-org
-  version: "7"
+  version: "8"
 ---
 
 # @hypercerts-org/sdk
@@ -68,8 +68,8 @@ export const context = createSDKContext({
 | `@hypercerts-org/sdk/badge`    | `createBadgeDefinition`, `awardBadge`, `respondToBadgeAward`, the same `Write*` errors, input/result types                                                                                              |
 | `@hypercerts-org/sdk/context`  | `createAttachment`, `createMeasurement`, `createEvaluation`, `createAcknowledgement`, `RecordAlreadyExistsError`, the same `Write*` errors, input/result types |
 | `@hypercerts-org/sdk/blob`     | `uploadBlob`                                                                                                                                                                                           |
-| `@hypercerts-org/sdk/collection` | `createCollection`, `createActivityInCollection`, `RecordAlreadyExistsError`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types                                                         |
-| `@hypercerts-org/sdk/project`  | `createProject`, `RecordAlreadyExistsError`, the same `Write*` errors, `ProjectInput`, `ProjectActivityInput`, `CreateProjectResult`, `ProjectActivityResult`                                           |
+| `@hypercerts-org/sdk/collection` | `createCollection`, `addActivityToCollection`, `RecordAlreadyExistsError`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types                                                         |
+| `@hypercerts-org/sdk/project`  | `createProject`, `addActivityToProject`, `RecordAlreadyExistsError`, the same `Write*` errors, `ProjectInput`, `ProjectActivityInput`, `CreateProjectResult`, `ProjectActivityResult`                                           |
 
 The root entry does not re-export operations. `import { createActivity } from "@hypercerts-org/sdk"` fails.
 
@@ -84,8 +84,8 @@ Operations are grouped by domain, each under its own subpath. Read the domain's 
 | Location (a standalone `app.certified.location`, shared by several activities) | `@hypercerts-org/sdk/location` | [references/location.md](references/location.md) |
 | Tag (`org.hypercerts.vocab.tag`, `org.hypercerts.workscope.tag`) | `@hypercerts-org/sdk/tag` | [references/tag.md](references/tag.md) |
 | Feature (`org.hypercerts.entity.feature`, with its tags and locations) | `@hypercerts-org/sdk/feature` | [references/feature.md](references/feature.md) |
-| Collection (create a Collection with items; add a new Activity to an existing Collection) | `@hypercerts-org/sdk/collection` | [references/collection.md](references/collection.md) |
-| Project (a Collection of type `project` with its Activities, or one default Activity). Use it to publish work: an Activity on its own may not show up or work in other apps | `@hypercerts-org/sdk/project` | [references/project.md](references/project.md) |
+| Collection (create a Collection with items; add an Activity to an existing Collection) | `@hypercerts-org/sdk/collection` | [references/collection.md](references/collection.md) |
+| Project (a Collection of type `project` with its Activities, or one default Activity; add an Activity to an existing Project). Use it to publish work: an Activity on its own may not show up or work in other apps | `@hypercerts-org/sdk/project` | [references/project.md](references/project.md) |
 | Organization (`app.certified.actor.organization`, with its profile and locations) | `@hypercerts-org/sdk/organization` | [references/organization.md](references/organization.md) |
 | Social (follow accounts and records, like, repost, and undo them) | `@hypercerts-org/sdk/social` | [references/social.md](references/social.md) |
 | Badge (`app.certified.badge.*`: definitions, awards to an account or record, responses) | `@hypercerts-org/sdk/badge` | [references/badge.md](references/badge.md) |
@@ -131,7 +131,7 @@ Uploads happen before the write and are not rolled back, so a call that throws c
 
 Order of work: validate input → read `{ uri }` records → upload blobs → validate against lexicons → one write. The SDK never retries.
 
-The three write errors are exported from `@hypercerts-org/sdk/activity`, `@hypercerts-org/sdk/actor`, `@hypercerts-org/sdk/badge`, `@hypercerts-org/sdk/location`, `@hypercerts-org/sdk/tag`, `@hypercerts-org/sdk/feature`, `@hypercerts-org/sdk/collection`, `@hypercerts-org/sdk/context`, `@hypercerts-org/sdk/organization`, `@hypercerts-org/sdk/project` and `@hypercerts-org/sdk/social` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order (an undo function called without `cid` has an empty `attempted`; its message names the URI): for `createActivity` the Activity is last; for `createActivityInCollection` the Collection is last and the Activity is just before it; for `createCollection` the Collection is last, after the records it points at; for `createProject` the Project is last, after its Activities and their records; for `awardBadge` the award is last, after a new definition; for `createOrganization` the organization is last. `instanceof WriteError` catches all three.
+The three write errors are exported from `@hypercerts-org/sdk/activity`, `@hypercerts-org/sdk/actor`, `@hypercerts-org/sdk/badge`, `@hypercerts-org/sdk/location`, `@hypercerts-org/sdk/tag`, `@hypercerts-org/sdk/feature`, `@hypercerts-org/sdk/collection`, `@hypercerts-org/sdk/context`, `@hypercerts-org/sdk/organization`, `@hypercerts-org/sdk/project` and `@hypercerts-org/sdk/social` and extend `WriteError`. Every `WriteError` has `attempted`: the URI and CID of every record in the request, in request order (an undo function called without `cid` has an empty `attempted`; its message names the URI): for `createActivity` the Activity is last; for `addActivityToCollection` and `addActivityToProject` the Collection or Project is last, after the new Activity and its records (it is the only entry for an existing Activity); for `createCollection` the Collection is last, after the records it points at; for `createProject` the Project is last, after its Activities and their records; for `awardBadge` the award is last, after a new definition; for `createOrganization` the organization is last. `instanceof WriteError` catches all three.
 
 | Error                      | Meaning                                                                                        | What to do                                    |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
@@ -172,7 +172,7 @@ try {
 
 ### Concurrent changes (`InvalidSwap`)
 
-`applyWrites` cannot say "only if this record is absent" or "only if it is unchanged". `createOrganization` and `createActivityInCollection` decide something from what they read, so they read the account's latest commit first, then the records, and send the write conditional on that commit. If **anything** wrote to the account in between (even an unrelated record, such as a post), the PDS refuses the whole request: `WriteRejectedError` with `code === "InvalidSwap"`. Nothing was written and nothing is wrong with the input. The SDK never retries or merges. Calling again reads everything afresh, so it is safe.
+`applyWrites` cannot say "only if this record is absent" or "only if it is unchanged". `createOrganization`, `addActivityToCollection` and `addActivityToProject` decide something from what they read, so they read the account's latest commit first, then the records, and send the write conditional on that commit. If **anything** wrote to the account in between (even an unrelated record, such as a post), the PDS refuses the whole request: `WriteRejectedError` with `code === "InvalidSwap"`. Nothing was written and nothing is wrong with the input. The SDK never retries or merges. Calling again reads everything afresh, so it is safe.
 
 A taken key has the same `code`, but calling again cannot fix it. `RecordAlreadyExistsError` (and its subclasses `OrganizationAlreadyExistsError` and `ProfileAlreadyExistsError`) is a `WriteRejectedError` too, so rule it out first:
 
@@ -197,16 +197,17 @@ try {
 }
 ```
 
-`createActivityInCollection` uses the same check, with `WriteRejectedError` from `@hypercerts-org/sdk/collection`. Calling again does not help when the cause is a taken `key` of a new tag in its `activity`: pass `{ uri }` or choose another key.
+`addActivityToCollection` and `addActivityToProject` use the same check, with `WriteRejectedError` from their own subpaths. Calling again does not help when the cause is a taken `key` of a new tag in the new Activity: pass `{ uri }` or choose another key.
 
 ## Pitfalls
 
 - `createSDKContext({ client: session })` or passing an `@atproto/api` `Agent` throws. Wrap it: `new Client(session)`.
 - `didResolver: oauthClient` throws. Pass `oauthClient.identityResolver`.
 - Passing an `uploadBlob` result as `image` throws. Pass the `Blob`/`File`.
-- Retrying blindly after `WriteOutcomeUnknownError` duplicates every record under new keys. The exception is a call whose records all have a fixed key and are only created if absent: `createProfile` and `createVocabularyTag`. `createOrganization` is also safe to repeat: the organization exists at most once, so a second call creates it or throws `OrganizationAlreadyExistsError`. Undo functions are safe to repeat too. `createFeature`, `createCollection`, `createProject`, `createWorkScopeTag`, `createBadgeDefinition`, `awardBadge`, `respondToBadgeAward`, `followAccount`, `followEntity`, `like` and `repost` are not safe to repeat.
+- Retrying blindly after `WriteOutcomeUnknownError` duplicates every record under new keys. The exception is a call whose records all have a fixed key and are only created if absent: `createProfile` and `createVocabularyTag`. `createOrganization` is also safe to repeat: the organization exists at most once, so a second call creates it or throws `OrganizationAlreadyExistsError`. Undo functions are safe to repeat too. `createFeature`, `createCollection`, `createProject`, `addActivityToCollection`, `addActivityToProject`, `createWorkScopeTag`, `createBadgeDefinition`, `awardBadge`, `respondToBadgeAward`, `followAccount`, `followEntity`, `like` and `repost` are not safe to repeat.
 - An item of `createCollection` is `{ activity }`, `{ feature }`, `{ collection }` or `{ uri }`, never a bare Activity input; `{ uri }` must be an Activity, Feature or Collection.
 - An entry of `createProject`'s `activities` is `{ activity }` or `{ uri }` (an Activity), never a bare Activity input, and a Project takes no `type` or `items`. Without `activities` it creates one default Activity from the Project's own fields, which needs a `shortDescription`; see the [default Activity](references/project.md#the-default-activity) for what is copied and the limits (for example, a banner over 5 MB is not copied).
+- `addActivityToCollection` and `addActivityToProject` take `activity: { activity }` (new) or `activity: { uri }` (existing), never a bare Activity input, and `weight` beside it. The Collection or Project must be your own; `addActivityToProject` needs `type: "project"`.
 - A vocabulary tag's key is `<category>.<key>` exactly as you pass it. A dot in either part throws a `TypeError`; the SDK does not normalise the parts.
 - A work-scope tag URI is not a vocabulary tag URI: each field accepts one collection, and a `{ uri }` of another throws a `TypeError`.
 - One write holds at most 200 records on the reference PDS. A larger call throws a `TypeError` before anything is written; the SDK does not split it. Create some records first and pass their URIs.

@@ -3,10 +3,14 @@ import * as activity from "@hypercerts-org/lexicon/org/hypercerts/claim/activity
 import * as collection from "@hypercerts-org/lexicon/org/hypercerts/collection";
 import * as defs from "@hypercerts-org/lexicon/org/hypercerts/defs";
 import {
-  type ActivityInput,
-  activityTextFields,
-  type CreateActivityResult,
-} from "../activity/build-activity.js";
+  type ActivityEntry,
+  type ActivityEntryResult,
+  activityEntryFields,
+  chooseActivity,
+  entryWeight,
+  existingActivitySlot,
+} from "../activity/activity-entry.js";
+import { type ActivityInput, activityTextFields } from "../activity/build-activity.js";
 import {
   type CollectionInput,
   type CreateCollectionItemResult,
@@ -15,7 +19,7 @@ import {
 } from "../collection/build-collection.js";
 import { type BuildContext, parseInput } from "../internal/build-context.js";
 import { describeError } from "../internal/describe.js";
-import { compact, optionalMedia, strictObject, weightString } from "../internal/input.js";
+import { compact, optionalMedia, strictObject } from "../internal/input.js";
 import type { LeafletDocument } from "../internal/long-description.js";
 import { assertWithinLimits } from "../internal/media.js";
 import type { PreparedRecord } from "../internal/prepare-record.js";
@@ -24,8 +28,6 @@ import {
   isExistingRecord,
   isInputObject,
   prepareSlots,
-  type SupportingRecordRef,
-  toExistingSlot,
 } from "../internal/slots.js";
 
 /**
@@ -36,18 +38,7 @@ import {
 export type ProjectActivityInput = {
   /** A positive decimal as a string, such as `"2"` or `"0.5"`, kept as written. Up to 100 chars. */
   weight?: string | undefined;
-} & (
-  | {
-      /** A new Activity and its supporting records. See {@link ActivityInput}. */
-      activity: ActivityInput;
-      uri?: never;
-    }
-  | {
-      /** An existing Activity: `at://<did>/org.hypercerts.claim.activity/<rkey>`, with a DID. */
-      uri: string;
-      activity?: never;
-    }
-);
+} & ActivityEntry;
 
 /**
  * The data of a new Project: {@link CollectionInput} without `type` and `items`, plus `activities`.
@@ -70,9 +61,7 @@ export interface ProjectInput
  * What {@link createProject} did for one Activity: created it (with its records) or reused it.
  * Narrow on `created`.
  */
-export type ProjectActivityResult =
-  | (CreateActivityResult & { created: true })
-  | (SupportingRecordRef & { created: false });
+export type ProjectActivityResult = ActivityEntryResult;
 
 /**
  * The result of {@link createProject}: {@link CreateCollectionResult} with `activities` in place of
@@ -91,10 +80,9 @@ export interface PreparedProject {
   readonly result: CreateProjectResult;
 }
 
-// The lexicon's limits on `items` and `itemWeight`, checked here so that messages name `activities`
-// and `weight` as the caller wrote them.
+// The lexicon's limit on `items`, checked here so that messages name `activities` as the caller
+// wrote it.
 const MAX_ACTIVITIES = 1000;
-const MAX_WEIGHT_LENGTH = 100;
 
 // `type` and `items` are refused with advice, before the schema's general "unknown field".
 const REFUSED_FIELDS = {
@@ -120,16 +108,7 @@ const projectInput = strictObject({
   activities: l.optional(l.array(l.unknown(), { maxLength: MAX_ACTIVITIES })),
 } satisfies Record<keyof ProjectInput, l.Validator>);
 
-const activityEntry = strictObject({
-  activity: l.optional(l.unknown()),
-  uri: l.optional(l.string()),
-  weight: l.optional(
-    l.refine(weightString, {
-      check: (value: string) => value.length <= MAX_WEIGHT_LENGTH,
-      message: `must be at most ${MAX_WEIGHT_LENGTH} characters`,
-    }),
-  ),
-});
+const activityEntry = strictObject({ ...activityEntryFields, weight: entryWeight });
 
 // What the default Activity copies: the Activity's text fields, and the banner as its image.
 const copiedFields = l.object({ ...activityTextFields, banner: optionalMedia });
@@ -190,16 +169,11 @@ function parseProjectInput(build: BuildContext, value: unknown) {
 
 // An entry of `activities` as the item of a Collection, which is what `planCollection` takes.
 function planEntry(build: BuildContext, field: string, value: unknown) {
-  const { activity: data, uri, weight } = parseInput(build, field, activityEntry, value);
-  if ((data === undefined) === (uri === undefined)) {
-    throw new TypeError(
-      `${build.operation}: ${field} must have exactly one of activity or uri, but has ${data === undefined ? "none" : "both"}. Use { activity } with the data of a new Activity, or { uri } of an existing one, and an optional weight.`,
-    );
-  }
-  if (uri === undefined) return { activity: data, weight };
+  const { weight, ...fields } = parseInput(build, field, activityEntry, value);
+  const choice = chooseActivity(build, field, fields);
   // `planCollection` would accept a Feature or a Collection, so the type is checked here.
-  toExistingSlot(build, `${field}.uri`, { uri }, [activity.main.$type]);
-  return { uri, weight };
+  if ("uri" in choice) existingActivitySlot(build, field, choice.uri);
+  return { ...choice, weight };
 }
 
 // The default Activity copies the Project's text fields and its banner as the image. A value that
