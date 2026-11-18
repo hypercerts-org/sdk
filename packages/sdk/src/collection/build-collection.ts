@@ -179,6 +179,17 @@ export interface CreateCollectionResult {
   items: readonly CreateCollectionItemResult[];
 }
 
+/**
+ * How messages name the items of a Collection when the caller passed them under another name, as a
+ * Project does with `activities`.
+ */
+export interface ItemNames {
+  /** The list of items, for example `input.activities` for `input.activities[0]`. */
+  readonly items: string;
+  /** The `image` of the Activity at an index, when the caller passed it elsewhere. */
+  readonly activityImage?: ((index: number) => string | undefined) | undefined;
+}
+
 /** A Collection and every record it needs, planned: nothing is read, uploaded or written yet. */
 export interface PlannedCollection {
   /** The Collection as a record to create. Everything it points at is a reference of the slot. */
@@ -246,16 +257,19 @@ interface PlannedItem {
  * New child records are planned with their own record families' builders: Activities with
  * `planActivitySlot`, Features with `featureKind`, child Collections with this function.
  *
+ * `names` renames the items in messages. It applies to this Collection only, not to child ones.
+ *
  * Throws TypeError, naming the field, for any problem in the data.
  */
 export function planCollection(
   build: BuildContext,
   field: string,
   value: unknown,
+  names?: ItemNames,
 ): PlannedCollection {
   // Hand-written instead of a `recordKind` with `references`: an item stores a strong reference plus
   // a weight, which a reference field (a plain list of strong references) cannot express.
-  const plan = planFields(build, field, value);
+  const plan = planFields(build, field, value, names);
   const slot: NewSlot = {
     collection: collection.main.$type,
     field,
@@ -291,7 +305,12 @@ interface CollectionPlan {
   readonly items: readonly PlannedItem[] | undefined;
 }
 
-function planFields(build: BuildContext, field: string, value: unknown): CollectionPlan {
+function planFields(
+  build: BuildContext,
+  field: string,
+  value: unknown,
+  names: ItemNames | undefined,
+): CollectionPlan {
   const input = parseInput(build, field, collectionKind.input, value);
   return {
     input,
@@ -303,7 +322,9 @@ function planFields(build: BuildContext, field: string, value: unknown): Collect
     tags: input.tags?.map((tag, i) =>
       toSlot(build, `${field}.tags[${i}]`, tag, vocabularyTagKind, false),
     ),
-    items: input.items?.map((item, i) => planItem(build, `${field}.items[${i}]`, item)),
+    items: input.items?.map((item, i) =>
+      planItem(build, `${names?.items ?? `${field}.items`}[${i}]`, item, names?.activityImage?.(i)),
+    ),
   };
 }
 
@@ -325,7 +346,12 @@ function storedFields(
   };
 }
 
-function planItem(build: BuildContext, field: string, value: unknown): PlannedItem {
+function planItem(
+  build: BuildContext,
+  field: string,
+  value: unknown,
+  activityImage: string | undefined,
+): PlannedItem {
   const item = parseInput(build, field, itemInput, value);
   const given = ITEM_CHOICES.filter((choice) => item[choice] !== undefined);
   if (given.length !== 1) {
@@ -337,7 +363,7 @@ function planItem(build: BuildContext, field: string, value: unknown): PlannedIt
   const target =
     item.uri !== undefined
       ? existingItem(build, `${field}.uri`, item.uri)
-      : planNewItem(build, field, item);
+      : planNewItem(build, field, item, activityImage);
   return { ...target, weight: item.weight };
 }
 
@@ -345,9 +371,10 @@ function planNewItem(
   build: BuildContext,
   field: string,
   item: l.InferOutput<typeof itemInput>,
+  activityImage: string | undefined,
 ): Omit<PlannedItem, "weight"> {
   if (item.activity !== undefined) {
-    const planned = planActivitySlot(build, item.activity, `${field}.activity`);
+    const planned = planActivitySlot(build, item.activity, `${field}.activity`, activityImage);
     return {
       slot: planned.slot,
       result: (created, refOf) => ({
