@@ -1,12 +1,12 @@
 import { l } from "@atproto/lex";
 import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
 import type { SDKContext } from "../context.js";
+import { RecordAlreadyExistsError } from "../errors.js";
 import { createStandalone } from "../internal/create-record.js";
 import { optionalMedia, optionalText } from "../internal/input.js";
 import { mediaTransform } from "../internal/media.js";
 import { type RecordKind, recordKind } from "../internal/record-kind.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
-import { RecordAlreadyExistsError } from "../internal/submit-writes.js";
 
 /** The data of the `app.certified.actor.profile` record of an account. */
 export interface ProfileInput {

@@ -1,17 +1,15 @@
 import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
 import * as rights from "@hypercerts-org/lexicon/org/hypercerts/claim/rights";
 import { describe, expect, it } from "vitest";
-import { CID, DID, json } from "../test-utils/fake-pds.js";
-import { fakeRepo, HEAD, methods } from "../test-utils/fake-repo.js";
-import { prepareRecord, prepareUpdate } from "./prepare-record.js";
 import {
-  submitCreateOnly,
-  submitDelete,
-  submitWrites,
   WriteOutcomeUnknownError,
   WriteRejectedError,
   WriteResultMismatchError,
-} from "./submit-writes.js";
+} from "../errors.js";
+import { CID, DID, json } from "../test-utils/fake-pds.js";
+import { fakeRepo, HEAD, methods } from "../test-utils/fake-repo.js";
+import { prepareRecord, prepareUpdate } from "./prepare-record.js";
+import { submitCreateOnly, submitDelete, submitWrites } from "./submit-writes.js";
 
 async function prepared() {
   return prepareRecord(DID, rights.main, {
