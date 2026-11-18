@@ -6,10 +6,10 @@ import { planNew, prepareSlots, resultOf } from "./slots.js";
 import { submitCreateOnly, submitWrites } from "./submit-writes.js";
 
 /**
- * Creates one record and every new record it points at: validates `input`, reads what the call
- * depends on, builds the records and writes them. Nothing is written unless the whole input is
- * valid, and nothing is uploaded when an existing record cannot be read or a chosen record key is
- * taken.
+ * The public creator of a record kind, named `operation` in error messages: creates one record and
+ * every new record it points at. Validates `input`, reads what the call depends on, builds the
+ * records and writes them. Nothing is written unless the whole input is valid, and nothing is
+ * uploaded when an existing record cannot be read or a chosen record key is taken.
  *
  * Internal. Backs the standalone creators, which therefore share their builders with
  * `createActivity`. Returns the new record's reference with `created: true`, and the result of
@@ -21,46 +21,47 @@ import { submitCreateOnly, submitWrites } from "./submit-writes.js";
  * record is reported instead of overwritten, even when two calls race. Everything else is written
  * with `submitWrites` in one request, after checking that no new record's chosen key is taken.
  *
- * Throws TypeError for invalid input or more records than one write holds, and what the reads and
- * the writes throw.
+ * The creator throws TypeError for invalid input or more records than one write holds, and what
+ * the reads and the writes throw.
  */
-export async function createRecordTree<T extends { createdAt?: string | undefined }, TResult>(
-  context: SDKContext,
+export function creatorOf<T extends { createdAt?: string | undefined }, TResult>(
   operation: string,
   kind: RecordKind<T>,
-  input: unknown,
-): Promise<TResult> {
-  const build = createBuildContext(context, operation);
-  const root = planNew(build, "input", kind, input);
-  const { created, refOf, fresh, createOnly } = await prepareSlots(build, [root], {
-    createOnly: true,
-  });
-  const records = [...created.values()];
-  const [only] = records;
-  if (createOnly && only !== undefined) {
-    await submitCreateOnly(context, build.did, only, operation);
-  } else {
-    // Calling again cannot duplicate records when every one has a key the input decided.
-    const retrySafe = fresh.every((slot) => slot.choice.key !== undefined);
-    await submitWrites(context, build.did, records, operation, { retrySafe });
-  }
+): StandaloneCreator<T, TResult> {
+  return async (context, input) => {
+    const build = createBuildContext(context, operation);
+    const root = planNew(build, "input", kind, input);
+    const { created, refOf, fresh, createOnly } = await prepareSlots(build, [root], {
+      createOnly: true,
+    });
+    const records = [...created.values()];
+    const [only] = records;
+    if (createOnly && only !== undefined) {
+      await submitCreateOnly(build, only);
+    } else {
+      // Calling again cannot duplicate records when every one has a key the input decided.
+      const retrySafe = fresh.every((slot) => slot.choice.key !== undefined);
+      await submitWrites(build, records, { retrySafe });
+    }
 
-  return resultOf(root, created, refOf);
+    return resultOf(root, created, refOf);
+  };
 }
 
 /**
- * Creates one record on its own: see `createRecordTree`. Returns only its URI and CID.
+ * Like `creatorOf` for a record that points at no other record: returns only its URI and CID.
  *
- * Internal. Used by the standalone creators whose record points at no other record.
+ * Internal. Used by the standalone creators.
  */
-export async function createStandalone<T extends { createdAt?: string | undefined }>(
-  context: SDKContext,
+export function standaloneCreatorOf<T extends { createdAt?: string | undefined }>(
   operation: string,
   kind: RecordKind<T>,
-  input: unknown,
-): Promise<StrongRef> {
-  const { uri, cid } = await createRecordTree<T, StrongRef>(context, operation, kind, input);
-  return { uri, cid };
+): StandaloneCreator<T> {
+  const create = creatorOf<T, StrongRef>(operation, kind);
+  return async (context, input) => {
+    const { uri, cid } = await create(context, input);
+    return { uri, cid };
+  };
 }
 
 /**

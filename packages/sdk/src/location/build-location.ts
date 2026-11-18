@@ -1,6 +1,6 @@
 import { l } from "@atproto/lex";
 import * as location from "@hypercerts-org/lexicon/app/certified/location";
-import { createStandalone, type StandaloneCreator } from "../internal/create-record.js";
+import { type StandaloneCreator, standaloneCreatorOf } from "../internal/create-record.js";
 import { blob, optionalText } from "../internal/input.js";
 import { mediaValue } from "../internal/media.js";
 import { type RecordKind, recordKind } from "../internal/record-kind.js";
@@ -194,5 +194,7 @@ function isGeoJsonPoint(value: string): boolean {
  * });
  * ```
  */
-export const createLocation: StandaloneCreator<LocationInput> = (context, input) =>
-  createStandalone(context, "createLocation", locationKind, input);
+export const createLocation: StandaloneCreator<LocationInput> = standaloneCreatorOf(
+  "createLocation",
+  locationKind,
+);

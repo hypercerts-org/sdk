@@ -1,11 +1,11 @@
-import type { CidString, DidString, NsidString, TypedLexMap } from "@atproto/lex";
-import type { SDKContext } from "../context.js";
+import type { CidString, NsidString, TypedLexMap } from "@atproto/lex";
 import {
   RecordAlreadyExistsError,
   WriteOutcomeUnknownError,
   WriteRejectedError,
   WriteResultMismatchError,
 } from "../errors.js";
+import type { BuildContext } from "./build-context.js";
 import { describeError } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import { parseRecordUri, type StrongRef } from "./resolve-record-ref.js";
@@ -88,16 +88,15 @@ export function assertWithinWriteLimit(operation: string, count: number): void {
  *   It covers the whole repo, so any other write to the account since the head was read, not only
  *   one to the updated record, rejects the request: a false alarm the caller accepts.
  *
- * Throws WriteRejectedError, WriteOutcomeUnknownError or WriteResultMismatchError. `operation`
+ * Throws WriteRejectedError, WriteOutcomeUnknownError or WriteResultMismatchError. `build.operation`
  * names the public function for the message.
  */
 export async function submitWrites(
-  context: SDKContext,
-  did: DidString,
+  build: BuildContext,
   records: readonly PreparedRecord[],
-  operation: string,
   options: SubmitOptions = {},
 ): Promise<void> {
+  const { context, did, operation } = build;
   const updates = options.updates ?? [];
   const request: Request = {
     created: records.map((record) => record.ref),
@@ -155,12 +154,8 @@ export async function submitWrites(
  * Throws RecordAlreadyExistsError when the key is taken, and otherwise WriteRejectedError,
  * WriteOutcomeUnknownError or WriteResultMismatchError.
  */
-export async function submitCreateOnly(
-  context: SDKContext,
-  did: DidString,
-  record: PreparedRecord,
-  operation: string,
-): Promise<void> {
+export async function submitCreateOnly(build: BuildContext, record: PreparedRecord): Promise<void> {
+  const { context, did, operation } = build;
   try {
     await submit(
       operation,
@@ -228,12 +223,8 @@ export interface DeleteTarget {
  * so it was not deleted) or WriteOutcomeUnknownError. Throws TypeError when `target.uri` is not a
  * record URI.
  */
-export async function submitDelete(
-  context: SDKContext,
-  did: DidString,
-  target: DeleteTarget,
-  operation: string,
-): Promise<void> {
+export async function submitDelete(build: BuildContext, target: DeleteTarget): Promise<void> {
+  const { context, did, operation } = build;
   const { atUri, collection, rkey } = parseRecordUri(target.uri, operation);
   try {
     await context.client.deleteRecord(collection, rkey, {

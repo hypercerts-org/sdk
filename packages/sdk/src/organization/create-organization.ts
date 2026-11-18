@@ -281,7 +281,7 @@ export async function createOrganization(
   // The organization has a fixed key and was found absent above, so calling again after an unknown
   // outcome creates everything or finds the organization, and never makes a copy.
   try {
-    await submitWrites(context, build.did, [...created.values()], OPERATION, {
+    await submitWrites(build, [...created.values()], {
       swapCommit: start.head,
       retrySafe: true,
       retrySafeReason: RETRY_SAFE_REASON,

@@ -1,7 +1,7 @@
 import { l } from "@atproto/lex";
 import * as feature from "@hypercerts-org/lexicon/org/hypercerts/entity/feature";
 import type { SDKContext } from "../context.js";
-import { createRecordTree } from "../internal/create-record.js";
+import { creatorOf } from "../internal/create-record.js";
 import { optionalText } from "../internal/input.js";
 import {
   type LeafletDocument,
@@ -97,6 +97,8 @@ export type FeatureTree = SupportingRecordRef & {
   tags?: readonly VocabularyTagResult[];
   locations?: readonly SupportingRecordRef[];
 };
+
+const createFeatureTree = creatorOf<FeatureInput, FeatureTree>("createFeature", featureKind);
 
 /**
  * Creates a Feature (`org.hypercerts.entity.feature`), a subject such as a land zone or an
@@ -198,12 +200,10 @@ export async function createFeature(
   context: SDKContext,
   input: FeatureInput,
 ): Promise<CreateFeatureResult> {
-  return featureResult(
-    await createRecordTree<FeatureInput, FeatureTree>(context, "createFeature", featureKind, input),
-  );
+  return featureResult(await createFeatureTree(context, input));
 }
 
-/** The public result of a Feature, from what `createRecordTree` reports for its record. */
+/** The public result of a Feature, from what `creatorOf` reports for its record. */
 export function featureResult({ uri, cid, tags, locations }: FeatureTree): CreateFeatureResult {
   return { uri, cid, tags: tags ?? [], locations: locations ?? [] };
 }

@@ -1,5 +1,5 @@
 import * as contribution from "@hypercerts-org/lexicon/org/hypercerts/claim/contribution";
-import { createStandalone, type StandaloneCreator } from "../internal/create-record.js";
+import { type StandaloneCreator, standaloneCreatorOf } from "../internal/create-record.js";
 import { dateRange, optionalText } from "../internal/input.js";
 import { type RecordKind, recordKind } from "../internal/record-kind.js";
 
@@ -65,5 +65,7 @@ export const contributionKind: RecordKind<ContributionInput> = recordKind(
  * });
  * ```
  */
-export const createContribution: StandaloneCreator<ContributionInput> = (context, input) =>
-  createStandalone(context, "createContribution", contributionKind, input);
+export const createContribution: StandaloneCreator<ContributionInput> = standaloneCreatorOf(
+  "createContribution",
+  contributionKind,
+);
