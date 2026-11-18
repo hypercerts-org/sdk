@@ -7,7 +7,12 @@ import type { SDKContext } from "../context.js";
 import { createBuildContext, parseInput, prepareChecked } from "../internal/build-context.js";
 import { describeError } from "../internal/describe.js";
 import { compact, optionalText, strictObject, weightString } from "../internal/input.js";
-import { parseRecordUri, readRecord, type StrongRef } from "../internal/resolve-record-ref.js";
+import {
+  assertRecordUriOfType,
+  parseRecordUri,
+  readRecord,
+  type StrongRef,
+} from "../internal/resolve-record-ref.js";
 import { submitWrites } from "../internal/submit-writes.js";
 
 const OPERATION = "respondToBadgeAward";
@@ -47,12 +52,14 @@ const inputSchema = l.refine(
 
 // Checked before any request: the URI must name a badge award.
 function assertAwardUri(uri: string): void {
-  const { collection } = parseRecordUri(uri, OPERATION);
-  if (collection !== award.main.$type) {
-    throw new TypeError(
-      `${OPERATION}: awardUri points at a record of type ${collection}, but it must be of type ${award.main.$type}: ${uri}. Expected at://<did>/${award.main.$type}/<rkey>.`,
-    );
-  }
+  parseRecordUri(uri, OPERATION);
+  assertRecordUriOfType(
+    OPERATION,
+    "awardUri",
+    uri,
+    [award.main.$type],
+    `it must be of type ${award.main.$type}`,
+  );
 }
 
 // The account the award is for: the DID of an account subject, or the repository that holds a

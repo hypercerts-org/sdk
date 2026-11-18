@@ -5,6 +5,7 @@ import { describeError, describeValue } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import { buildRecord, type RecordKind, type ReferenceField, recordKeyOf } from "./record-kind.js";
 import {
+  assertRecordUriOfType,
   type PdsClients,
   parseRecordUri,
   recordExists,
@@ -302,13 +303,13 @@ function existing(
     );
   }
   const actual = collectionOf(uri);
-  if (actual === undefined || (allowed !== undefined && !allowed.includes(actual))) {
-    const target =
-      actual === undefined ? "something that is not a record" : `a record of type ${actual}`;
-    throw new TypeError(
-      `${build.operation}: ${field} points at ${target}, but this field holds ${allowed?.join(", ") ?? "a record"}: ${uri}. Expected at://<did>/${allowed?.join("|") ?? "<collection>"}/<rkey>.`,
-    );
-  }
+  assertRecordUriOfType(
+    build.operation,
+    field,
+    uri,
+    allowed,
+    `this field holds ${allowed?.join(", ") ?? "a record"}`,
+  );
   try {
     parseRecordUri(uri, build.operation);
   } catch {
