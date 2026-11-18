@@ -279,9 +279,9 @@ describe("createProject with activities", () => {
       title: "Valley",
       activities: [
         { activity, weight: "2" },
-        { uri: existingA, weight: "0.50" },
+        { activity: { uri: existingA }, weight: "0.50" },
         { activity: { ...activity, title: "Wetlands" } },
-        { uri: existingB, weight: "007" },
+        { activity: { uri: existingB }, weight: "007" },
       ],
     });
 
@@ -317,7 +317,7 @@ describe("createProject with activities", () => {
 
     const result = await createProject(context, {
       title: "Valley",
-      activities: [{ uri: existingA }],
+      activities: [{ activity: { uri: existingA } }],
     });
 
     expect(creates[0]?.map((write) => write.collection)).toEqual([COLLECTION]);
@@ -369,7 +369,7 @@ describe("createProject with activities", () => {
   it("counts every nested record and sends nothing, not even a read, for more than 200", async () => {
     const { context, requests } = fakeRepo({ existing: { [existingA]: ACTIVITY_CID } });
     const activities = [
-      { uri: existingA },
+      { activity: { uri: existingA } },
       ...Array.from({ length: 100 }, () => ({
         activity: { ...activity, locations: [location("site")] },
       })),
@@ -402,50 +402,51 @@ describe("createProject when the input is wrong", () => {
     [
       "a bare Activity as an entry",
       entry(activity),
-      /input\.activities\[0\].*Allowed fields: activity, uri, weight/,
+      /input\.activities\[0\].*Allowed fields: activity, weight/,
+    ],
+    [
+      "a bare { uri } as an entry",
+      entry({ uri: uriOf(ACTIVITY) }),
+      /input\.activities\[0\].*Allowed fields: activity, weight/,
     ],
     [
       "a Feature as an entry",
       entry({ feature: { title: "Zone" } }),
-      /input\.activities\[0\].*Allowed fields: activity, uri, weight/,
+      /input\.activities\[0\].*Allowed fields: activity, weight/,
     ],
+    ["an entry with no activity", entry({ weight: "1" }), /input\.activities\[0\].*activity/],
     [
-      "an entry with no choice",
-      entry({ weight: "1" }),
-      /input\.activities\[0\] must have exactly one of activity or uri, but has none/,
-    ],
-    [
-      "an entry with both choices",
-      entry({ activity, uri: uriOf(ACTIVITY) }),
-      /input\.activities\[0\] must have exactly one of activity or uri, but has both/,
+      "an Activity that is data and { uri } at once",
+      entry({ activity: { ...activity, uri: uriOf(ACTIVITY) } }),
+      /input\.activities\[0\]\.activity\.uri combines `uri` with other fields/,
     ],
     [
       "an invalid weight",
-      entry({ uri: uriOf(ACTIVITY), weight: "0" }),
+      entry({ activity: { uri: uriOf(ACTIVITY) }, weight: "0" }),
       /input\.activities\[0\].*positive decimal number/,
     ],
     [
       "a weight over 100 characters",
-      entry({ uri: uriOf(ACTIVITY), weight: "1".repeat(101) }),
+      entry({ activity: { uri: uriOf(ACTIVITY) }, weight: "1".repeat(101) }),
       /input\.activities\[0\].*must be at most 100 characters at \$\.weight/,
     ],
     [
       "more than 1000 activities, before any of them is read",
       {
         title: "Valley",
-        activities: Array.from({ length: 1001 }, () => ({ uri: uriOf(ACTIVITY) })),
+        activities: Array.from({ length: 1001 }, () => ({ activity: { uri: uriOf(ACTIVITY) } })),
       },
       /input.*array too big \(maximum 1000, got 1001\) at \$\.activities/,
     ],
     [
       "a Feature URI",
-      entry({ uri: uriOf(FEATURE) }),
-      /input\.activities\[0\]\.uri points at a record of type org\.hypercerts\.entity\.feature, but this field holds org\.hypercerts\.claim\.activity/,
+      entry({ activity: { uri: uriOf(FEATURE) } }),
+      /input\.activities\[0\]\.activity\.uri points at a record of type org\.hypercerts\.entity\.feature, but this field holds org\.hypercerts\.claim\.activity/,
     ],
     [
       "a Collection URI",
-      entry({ uri: uriOf(COLLECTION) }),
-      /input\.activities\[0\]\.uri points at a record of type org\.hypercerts\.collection, but this field holds org\.hypercerts\.claim\.activity/,
+      entry({ activity: { uri: uriOf(COLLECTION) } }),
+      /input\.activities\[0\]\.activity\.uri points at a record of type org\.hypercerts\.collection, but this field holds org\.hypercerts\.claim\.activity/,
     ],
     [
       "an Activity without a summary, named as the caller passed it",

@@ -99,7 +99,7 @@ try {
 
 ## Adding an Activity to a Collection or Project
 
-`addActivityToCollection` from `@hypercerts-org/sdk/collection` and `addActivityToProject` from `@hypercerts-org/sdk/project` append an Activity to one of your existing Collections or Projects in one commit. Pass `activity: { activity }` for a new Activity (the same input as `createActivity`, with the same uploads and failures as above) or `activity: { uri }` for an existing one, which is read once for its CID and never changed. They can also fail with `WriteRejectedError` and `code === "InvalidSwap"` when the account was written to while the call ran; nothing was written, and calling again is safe. See their TSDoc for details.
+`addActivityToCollection` from `@hypercerts-org/sdk/collection` and `addActivityToProject` from `@hypercerts-org/sdk/project` append an Activity to one of your existing Collections or Projects in one commit. Pass the Collection or Project as `collection: { uri }` or `project: { uri }`, and `activity` as the data of a new Activity (the same input as `createActivity`, with the same uploads and failures as above) or `{ uri }` for an existing one, which is read once for its CID and never changed. The result is the updated Collection or Project as `uri` and `cid`, plus `activity`. They can also fail with `WriteRejectedError` and `code === "InvalidSwap"` when the account was written to while the call ran; nothing was written, and calling again is safe. See their TSDoc for details.
 
 ## Not covered
 

@@ -67,43 +67,42 @@ Not supported: `signatures`, adding items other than an Activity to a Collection
 
 ## addActivityToCollection
 
-`addActivityToCollection(context, { collectionUri, activity, weight? })` appends an Activity to an **existing** `org.hypercerts.collection` record in your repo, in one `applyWrites` commit. `activity` is **exactly one** of `{ activity }` (the data of a new Activity, the same input as `createActivity`; it and its new supporting records are created) or `{ uri }` (an existing Activity, reused unchanged). All of it exists afterwards, or none of it does.
+`addActivityToCollection(context, { collection: { uri }, activity, weight? })` appends an Activity to an **existing** `org.hypercerts.collection` record in your repo, in one `applyWrites` commit. `collection` is `{ uri }` of the Collection, never a bare string. `activity` is the data of a new Activity (the same input as `createActivity`; it and its new supporting records are created) or `{ uri }` of an existing Activity (reused unchanged). All of it exists afterwards, or none of it does.
 
 ```ts
 import { addActivityToCollection } from "@hypercerts-org/sdk/collection";
 
-const collectionUri = "at://did:plc:abc123/org.hypercerts.collection/3k2a4b5c6d7e8"; // placeholder: one of your own
+const collection = { uri: "at://did:plc:abc123/org.hypercerts.collection/3k2a4b5c6d7e8" }; // placeholder: one of your own
 
 // A new Activity, with its own rights record reused.
 const added = await addActivityToCollection(context, {
-  collectionUri,
+  collection,
   activity: {
-    activity: {
-      title: "Reforestation in the Phobjikha valley",
-      shortDescription: "Planting 5,000 native trees.",
-      rights: { uri: "at://did:plc:abc123/org.hypercerts.claim.rights/3k2a4b5c6d7e8" }, // reused
-    },
+    title: "Reforestation in the Phobjikha valley",
+    shortDescription: "Planting 5,000 native trees.",
+    rights: { uri: "at://did:plc:abc123/org.hypercerts.claim.rights/3k2a4b5c6d7e8" }, // reused
   },
   weight: "2", // optional positive decimal string, like a contributor's weight
 });
 added.activity; // { uri, cid, created: true, locations: [], contributors: [] }
-added.collection; // { uri, cid }: the same URI, the new version's CID
+added.uri; // the Collection's URI, unchanged
+added.cid; // the CID of the Collection's new version
 
 // An existing Activity.
 await addActivityToCollection(context, {
-  collectionUri,
+  collection,
   activity: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
 });
 ```
 
-- `collectionUri` must be `at://<did>/org.hypercerts.collection/<rkey>` with **your** DID. Another type of record, a handle, or another account's Collection throws `TypeError` before anything is sent.
-- `activity` is never a bare Activity input: `activity: { title, shortDescription }` is a `TypeError`, as are both or neither of `activity` and `uri`. `weight` goes next to `activity`, not inside it, and is a positive decimal string of at most 100 characters.
-- `{ uri }` must be an Activity (a Feature or a Collection is a `TypeError`) with a DID. It is read once for its CID, which the item stores (a strong reference), and never changed. It may belong to another account if public; the PDS is found with the context's `didResolver` ([SKILL.md](../SKILL.md#2-create-the-context-once)).
+- `collection.uri` must be `at://<did>/org.hypercerts.collection/<rkey>` with **your** DID. Another type of record, a handle, or another account's Collection throws `TypeError` before anything is sent.
+- `activity` is the Activity's own data or `{ uri }`, not wrapped in another `{ activity }`, and `uri` is never mixed with Activity fields. `weight` goes next to `activity`, not inside it, and is a positive decimal string of at most 100 characters.
+- `activity: { uri }` must be an Activity (a Feature or a Collection is a `TypeError`) with a DID. It is read once for its CID, which the item stores (a strong reference), and never changed. It may belong to another account if public; the PDS is found with the context's `didResolver` ([SKILL.md](../SKILL.md#2-create-the-context-once)).
 - The item is appended last. Everything else in the Collection (`createdAt`, existing items, unknown fields, `signatures`) is kept as it was. `signatures` is not re-signed: after the append, an earlier signature no longer matches the content.
 - A Collection that holds 1000 items is full: `Error`, nothing written. A Collection that does not exist or is not a valid `org.hypercerts.collection` record: `Error`, nothing written.
 - Nothing is deduplicated: a second call creates a second Activity and a second item, and the same `{ uri }` twice gives two items.
 - Not supported: adding a Feature or a child Collection to an existing Collection, and adding to another account's Collection. To create a whole new Collection, use `createCollection`.
-- The result is `{ activity, collection }`: `activity` is `created: true` with the nested results of `createActivity`, or `created: false` for a `{ uri }`; `collection` is the Collection's URI and the CID of its new version.
+- The result is a flat strong reference to the **updated Collection** (`uri` unchanged, `cid` of its new version) plus `activity`, which is `created: true` with the nested results of `createActivity`, or `created: false` for a `{ uri }`. The Collection is the main record because the call changes it; the Activity may only be reused.
 - For a Collection of type `project`, `addActivityToProject` ([project.md](project.md)) also checks the type.
 
 ### Concurrent writes (`InvalidSwap`)
@@ -120,6 +119,6 @@ Any other `WriteRejectedError` (4xx) is not fixed by calling again. After `Write
 
 | Field           | Type                          | Notes                                                                                                         |
 | --------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `collectionUri` | `string`                      | Required. `at://<your did>/org.hypercerts.collection/<rkey>`. Must already exist and hold under 1000 items.   |
-| `activity`      | `{ activity } \| { uri }`     | Required. Exactly one: a new Activity (the input of `createActivity`, see [activity.md](activity.md)) or the URI of an existing one. |
+| `collection`    | `{ uri }`                     | Required. `at://<your did>/org.hypercerts.collection/<rkey>`. Must already exist and hold under 1000 items.  |
+| `activity`      | `ActivityInput \| { uri }`    | Required. A new Activity (the input of `createActivity`, see [activity.md](activity.md)) or `{ uri }` of an existing one. |
 | `weight`        | `string`                      | Optional. Positive decimal string, at most 100 characters. Left out of the item when omitted.                 |

@@ -117,7 +117,7 @@ describe("createProject with activities", () => {
       title: unique("E2E project"),
       activities: [
         { activity: { ...base(), locations: [coordinates] }, weight: "2" },
-        { uri: existing.uri, weight: "0.50" },
+        { activity: { uri: existing.uri }, weight: "0.50" },
       ],
     });
 
@@ -170,8 +170,8 @@ describe("addActivityToProject", () => {
     const counts = await snapshotCounts(user.client);
 
     const result = await addActivityToProject(user.context, {
-      projectUri: project.uri,
-      activity: { activity: { ...base(), locations: [coordinates] } },
+      project: { uri: project.uri },
+      activity: { ...base(), locations: [coordinates] },
       weight: "2",
     });
 
@@ -181,9 +181,9 @@ describe("addActivityToProject", () => {
     expect(await expectReferencesResolve(user.client, activity)).toHaveLength(1);
     // The Project is stored at the CID the SDK reported, with its default Activity first and the new
     // one last, and everything else as it was.
-    expect(result.project.uri).toBe(project.uri);
-    expect(result.project.cid).not.toBe(project.cid);
-    const stored = await expectStored(user.client, result.project);
+    expect(result.uri).toBe(project.uri);
+    expect(result.cid).not.toBe(project.cid);
+    const stored = await expectStored(user.client, result);
     expect(stored).toEqual({
       ...before,
       items: [...itemsOf(before), { itemIdentifier: refOnly(result.activity), itemWeight: "2" }],

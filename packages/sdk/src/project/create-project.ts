@@ -13,7 +13,8 @@ const OPERATION = "createProject";
  * Project that holds its Activities.
  *
  * The input is {@link createCollection}'s without `type` and `items`, plus `activities`: each entry
- * is `{ activity }` (new) or `{ uri }` (existing), with an optional `weight` kept as written.
+ * is `{ activity, weight? }`, where `activity` is the data of a new Activity or `{ uri }` of an
+ * existing one, and `weight` is kept as written.
  *
  * With no `activities`, one Activity is created from the Project. It copies the title,
  * `shortDescription` (and its facets), description and langs, and uses the banner as its image (a
@@ -53,7 +54,10 @@ const OPERATION = "createProject";
  *   title: "Phobjikha valley restoration",
  *   activities: [
  *     { activity: { title: "Reforestation", shortDescription: "Planting trees." }, weight: "2" },
- *     { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8", weight: "0.5" },
+ *     {
+ *       activity: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
+ *       weight: "0.5",
+ *     },
  *   ],
  * });
  * ```

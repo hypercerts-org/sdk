@@ -1,5 +1,5 @@
 // Entry point for @hypercerts-org/sdk/collection.
-export type { ActivityEntry, ActivityEntryResult } from "../activity/activity-entry.js";
+export type { ActivityEntryResult } from "../activity/activity-entry.js";
 export type { ActivityInput, CreateActivityResult } from "../activity/build-activity.js";
 export {
   RecordAlreadyExistsError,

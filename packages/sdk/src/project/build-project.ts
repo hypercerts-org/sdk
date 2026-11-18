@@ -3,10 +3,7 @@ import * as activity from "@hypercerts-org/lexicon/org/hypercerts/claim/activity
 import * as collection from "@hypercerts-org/lexicon/org/hypercerts/collection";
 import * as defs from "@hypercerts-org/lexicon/org/hypercerts/defs";
 import {
-  type ActivityEntry,
   type ActivityEntryResult,
-  activityEntryFields,
-  chooseActivity,
   entryWeight,
   existingActivitySlot,
 } from "../activity/activity-entry.js";
@@ -23,22 +20,29 @@ import { compact, optionalMedia, strictObject } from "../internal/input.js";
 import type { LeafletDocument } from "../internal/long-description.js";
 import { assertWithinLimits } from "../internal/media.js";
 import type { PreparedRecord } from "../internal/prepare-record.js";
+import type { StrongRef } from "../internal/resolve-record-ref.js";
 import {
   type ExistingRecord,
   isExistingRecord,
   isInputObject,
   prepareSlots,
+  type SupportingRecordRef,
 } from "../internal/slots.js";
+import type { CreateVocabularyTagResult } from "../tag/build-tag.js";
 
 /**
- * One Activity of a new Project: exactly one of `{ activity }` (a new Activity) or `{ uri }` (an
- * existing Activity, reused and never changed), with an optional `weight`. A bare Activity is not
- * an entry.
+ * One Activity of a new Project, with an optional `weight`.
+ *
+ * @remarks
+ * `activity` is the data of a new Activity (see {@link ActivityInput}) or `{ uri }` of an existing
+ * one, reused and never changed. The weight sits beside it, not inside.
  */
-export type ProjectActivityInput = {
+export interface ProjectActivityInput {
+  /** The Activity: the data of a new one, or `{ uri }` of an existing one. */
+  activity: ActivityInput | ExistingRecord;
   /** A positive decimal as a string, such as `"2"` or `"0.5"`, kept as written. Up to 100 chars. */
   weight?: string | undefined;
-} & ActivityEntry;
+}
 
 /**
  * The data of a new Project: {@link CollectionInput} without `type` and `items`, plus `activities`.
@@ -64,10 +68,14 @@ export interface ProjectInput
 export type ProjectActivityResult = ActivityEntryResult;
 
 /**
- * The result of {@link createProject}: {@link CreateCollectionResult} with `activities` in place of
- * `items`. Each result has the index of its input entry.
+ * The result of {@link createProject}: the Project's `uri` and `cid`, its `location` and `tags`, and
+ * `activities` in place of the Collection's `items`. Each result has the index of its input entry.
  */
-export interface CreateProjectResult extends Omit<CreateCollectionResult, "items"> {
+export interface CreateProjectResult extends StrongRef {
+  /** The location, when the input had `location`. */
+  location?: SupportingRecordRef;
+  /** The vocabulary tags, in input order. */
+  tags: readonly CreateVocabularyTagResult[];
   /** The Activities, in input order. `created` is `false` for one passed by `uri`. */
   activities: readonly ProjectActivityResult[];
 }
@@ -88,7 +96,7 @@ const MAX_ACTIVITIES = 1000;
 const REFUSED_FIELDS = {
   type: 'a Project always has type "project". To create a Collection of another type, use createCollection from @hypercerts-org/sdk/collection',
   items:
-    "a Project lists its Activities in `activities`: { activity } for a new Activity or { uri } of an existing one. To add Features or child Collections, use createCollection from @hypercerts-org/sdk/collection",
+    "a Project lists its Activities in `activities`, each { activity, weight? } with the data of a new Activity or { uri } of an existing one. To add Features or child Collections, use createCollection from @hypercerts-org/sdk/collection",
 } as const;
 
 // `planCollection` checks the fields. This list reports a misspelled field with the Project's own
@@ -108,7 +116,7 @@ const projectInput = strictObject({
   activities: l.optional(l.array(l.unknown(), { maxLength: MAX_ACTIVITIES })),
 } satisfies Record<keyof ProjectInput, l.Validator>);
 
-const activityEntry = strictObject({ ...activityEntryFields, weight: entryWeight });
+const activityEntry = strictObject({ activity: l.unknown(), weight: entryWeight });
 
 // What the default Activity copies: the Activity's text fields, and the banner as its image.
 const copiedFields = l.object({ ...activityTextFields, banner: optionalMedia });
@@ -135,6 +143,7 @@ export async function prepareProject(
   const { collection, hasDefaultActivity } = readProject(build, value);
   const planned = planCollection(build, "input", collection, {
     items: "input.activities",
+    uri: "activity.uri",
     // The default Activity's image is the Project's banner.
     activityImage: (index) => (hasDefaultActivity && index === 0 ? "input.banner" : undefined),
   });
@@ -169,11 +178,11 @@ function parseProjectInput(build: BuildContext, value: unknown) {
 
 // An entry of `activities` as the item of a Collection, which is what `planCollection` takes.
 function planEntry(build: BuildContext, field: string, value: unknown) {
-  const { weight, ...fields } = parseInput(build, field, activityEntry, value);
-  const choice = chooseActivity(build, field, fields);
+  const { activity, weight } = parseInput(build, field, activityEntry, value);
+  if (!isExistingRecord(activity)) return { activity, weight };
   // `planCollection` would accept a Feature or a Collection, so the type is checked here.
-  if ("uri" in choice) existingActivitySlot(build, field, choice.uri);
-  return { ...choice, weight };
+  existingActivitySlot(build, `${field}.activity`, activity);
+  return { uri: activity.uri, weight };
 }
 
 // The default Activity copies the Project's text fields and its banner as the image. A value that

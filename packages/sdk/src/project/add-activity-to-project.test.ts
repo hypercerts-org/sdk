@@ -18,14 +18,14 @@ const untyped = {
 const project = { ...untyped, type: "project" };
 
 describe("addActivityToProject", () => {
-  it("appends a new Activity to a Project, guarded by the head commit, and reports the Project as `project`", async () => {
+  it("appends a new Activity to a Project, guarded by the head commit, and reports the Project as `uri` and `cid`", async () => {
     const { context, creates, updates, swapCommits } = fakeRepo({
       records: { [projectUri]: project },
     });
 
     const result = await addActivityToProject(context, {
-      projectUri,
-      activity: { activity },
+      project: { uri: projectUri },
+      activity,
       weight: "2",
     });
 
@@ -37,8 +37,9 @@ describe("addActivityToProject", () => {
     });
     expect(swapCommits).toEqual([HEAD]);
     expect(result).toEqual({
+      uri: projectUri,
+      cid: update.cid,
       activity: { ...refTo(created), created: true, locations: [], contributors: [] },
-      project: { uri: projectUri, cid: update.cid },
     });
   });
 
@@ -56,8 +57,8 @@ describe("addActivityToProject", () => {
       const image = new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
 
       const error = await addActivityToProject(context, {
-        projectUri,
-        activity: { activity: { ...activity, image } },
+        project: { uri: projectUri },
+        activity: { ...activity, image },
       }).catch((e) => e);
 
       expect(error).toBeInstanceOf(TypeError);
@@ -83,7 +84,7 @@ describe("addActivityToProject", () => {
     });
 
     await expect(
-      addActivityToProject(context, { projectUri, activity: { activity } }),
+      addActivityToProject(context, { project: { uri: projectUri }, activity }),
     ).rejects.toThrow(/that has type "portfolio"/);
 
     expect(methods(requests)).not.toContain("com.atproto.repo.applyWrites");
@@ -92,21 +93,22 @@ describe("addActivityToProject", () => {
   it.each([
     [
       "a weight over 100 characters",
-      { projectUri, activity: { activity }, weight: "1".repeat(101) },
+      { project: { uri: projectUri }, activity, weight: "1".repeat(101) },
       /invalid input: must be at most 100 characters at \$\.weight/,
     ],
     [
-      "`collectionUri` in place of `projectUri`",
-      { collectionUri: projectUri, activity: { activity } },
-      /Missing required key "projectUri"/,
+      "`collection` in place of `project`",
+      { collection: { uri: projectUri }, activity },
+      /Allowed fields: project, activity, weight/,
     ],
+    ["a bare URI string as `project`", { project: projectUri, activity }, /invalid input\.project/],
     [
       "a Project of another account",
       {
-        projectUri: "at://did:plc:someoneelse/org.hypercerts.collection/3k2a4b5c6d7e8",
-        activity: { activity },
+        project: { uri: "at://did:plc:someoneelse/org.hypercerts.collection/3k2a4b5c6d7e8" },
+        activity,
       },
-      /projectUri is in the repository of did:plc:someoneelse.*own Projects/,
+      /project\.uri is in the repository of did:plc:someoneelse.*own Projects/,
     ],
   ])("sends nothing for %s", async (_, input, message) => {
     const { context, requests } = fakeRepo({ records: { [projectUri]: project } });

@@ -167,11 +167,7 @@ export type CreateCollectionItemResult =
  * `items[i]` and `tags[i]` belong to the input entry at the same index, whether it was created or
  * reused. Filter on `created` for only the records this call wrote.
  */
-export interface CreateCollectionResult {
-  /** The URI of the new Collection. */
-  uri: StrongRef["uri"];
-  /** The CID of the new Collection. */
-  cid: StrongRef["cid"];
+export interface CreateCollectionResult extends StrongRef {
   /** The location, when the input had `location`. */
   location?: SupportingRecordRef;
   /** The vocabulary tags, in input order. */
@@ -187,6 +183,8 @@ export interface CreateCollectionResult {
 export interface ItemNames {
   /** The list of items, for example `input.activities` for `input.activities[0]`. */
   readonly items: string;
+  /** The path of an existing item's URI within an item, when it is not `uri`: `activity.uri`. */
+  readonly uri?: string | undefined;
   /** The `image` of the Activity at an index, when the caller passed it elsewhere. */
   readonly activityImage?: ((index: number) => string | undefined) | undefined;
 }
@@ -311,7 +309,7 @@ function planFields(
       toSlot(build, `${field}.tags[${i}]`, tag, vocabularyTagKind, false),
     ),
     items: input.items?.map((item, i) =>
-      planItem(build, `${itemsField}[${i}]`, item, names?.activityImage?.(i)),
+      planItem(build, `${itemsField}[${i}]`, item, names?.activityImage?.(i), names?.uri ?? "uri"),
     ),
   };
 }
@@ -339,6 +337,7 @@ function planItem(
   field: string,
   value: unknown,
   activityImage: string | undefined,
+  uriPath: string,
 ): PlannedItem {
   const item = parseInput(build, field, itemInput, value);
   const given = ITEM_CHOICES.filter((choice) => item[choice] !== undefined);
@@ -350,7 +349,7 @@ function planItem(
   // `uri` first: it is the only choice the schema types, the rest are planned by their builders.
   const target =
     item.uri !== undefined
-      ? existingItem(build, `${field}.uri`, item.uri)
+      ? existingItem(build, `${field}.${uriPath}`, item.uri)
       : planNewItem(build, field, item, activityImage);
   return { ...target, weight: item.weight };
 }
