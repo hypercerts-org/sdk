@@ -1,14 +1,14 @@
 import { isTidString } from "@atproto/lex";
 import { describe, expect, it } from "vitest";
-import { CID, DID } from "../test-utils/fake-pds.js";
+import { CID } from "../test-utils/fake-pds.js";
 import { fakeRepo, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
+import { uriOf } from "../test-utils/records.js";
 import { createMeasurement, type MeasurementInput } from "./index.js";
 
 const MEASUREMENT = "org.hypercerts.context.measurement";
 const ACTIVITY = "org.hypercerts.claim.activity";
 const LOCATION = "app.certified.location";
 
-const uriOf = (collection: string, rkey = "3k2a4b5c6d7e8") => `at://${DID}/${collection}/${rkey}`;
 const location = {
   lpVersion: "1.0",
   srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",

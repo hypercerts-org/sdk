@@ -9,6 +9,7 @@ import {
   refTo,
   writeOf,
 } from "../test-utils/fake-repo.js";
+import { location, png, uriOf } from "../test-utils/records.js";
 import {
   createProject,
   type LeafletDocument,
@@ -29,16 +30,7 @@ const DESCRIPTION_STRING = "org.hypercerts.defs#descriptionString";
 // a reference that carries another one is noticed.
 const ACTIVITY_CID = "bafkreiagkgddx5ozaitcwf6emipmgqcuj7ybm5jfipmzvewx2iuhfwfeku";
 
-const uriOf = (collection: string, rkey = "3k2a4b5c6d7e8") => `at://${DID}/${collection}/${rkey}`;
-const png = () => new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
 const activity = { title: "Trees", shortDescription: "Planting trees" };
-const location = (name: string) => ({
-  lpVersion: "1.0",
-  srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-  locationType: "coordinate-decimal",
-  location: { string: "90.17,27.47" },
-  name,
-});
 const tag = (key: string) => ({ category: "theme", key, name: key, status: "accepted" });
 
 describe("createProject without activities", () => {

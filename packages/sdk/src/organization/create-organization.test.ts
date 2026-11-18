@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CID, DID, fakePds, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, HEAD, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
+import { uriOf } from "../test-utils/records.js";
 import {
   type CreateOrganizationInput,
   createOrganization,
@@ -27,7 +28,6 @@ const READ = "com.atproto.repo.getRecord";
 const UPLOAD = "com.atproto.repo.uploadBlob";
 const WRITE = "com.atproto.repo.applyWrites";
 
-const uriOf = (collection: string, rkey = "3k2a4b5c6d7e8") => `at://${DID}/${collection}/${rkey}`;
 const png = (size = 3) => new Blob([new Uint8Array(size)], { type: "image/png" });
 const location = (name: string): LocationInput => ({
   lpVersion: "1.0",

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createSDKContext } from "../context.js";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
+import { png, uriOf } from "../test-utils/records.js";
 import {
   type ActivityInput,
   createActivity,
@@ -21,8 +22,6 @@ const WORKSCOPE_TAG = "org.hypercerts.workscope.tag";
 const CEL = "org.hypercerts.workscope.cel";
 const LEAFLET = "pub.leaflet.pages.linearDocument";
 
-const png = () => new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
-const uriOf = (collection: string) => `at://${DID}/${collection}/3k2a4b5c6d7e8`;
 const base = { title: "Trees", shortDescription: "Planting trees" };
 const location = {
   lpVersion: "1.0",

@@ -2,6 +2,7 @@ import { isTidString } from "@atproto/lex";
 import { describe, expect, it } from "vitest";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
+import { uriOf } from "../test-utils/records.js";
 import {
   createEvaluation,
   type EvaluationInput,
@@ -16,7 +17,6 @@ const LOCATION = "app.certified.location";
 const APPLY = "com.atproto.repo.applyWrites";
 const UPLOAD = "com.atproto.repo.uploadBlob";
 
-const uriOf = (collection: string, rkey = "3k2a4b5c6d7e8") => `at://${DID}/${collection}/${rkey}`;
 const location = (name: string) => ({
   lpVersion: "1.0",
   srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",

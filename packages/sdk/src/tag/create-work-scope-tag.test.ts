@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { CID, DID } from "../test-utils/fake-pds.js";
+import { CID } from "../test-utils/fake-pds.js";
 import { fakeRepo, methods, refTo } from "../test-utils/fake-repo.js";
+import { uriOf } from "../test-utils/records.js";
 import { createWorkScopeTag, type WorkScopeTagInput } from "./index.js";
 
 const WORKSCOPE = "org.hypercerts.workscope.tag";
 const VOCAB = "org.hypercerts.vocab.tag";
-const uriOf = (collection: string) => `at://${DID}/${collection}/3k2a4b5c6d7e8`;
 const tag = (key: string) => ({ key, name: key });
 
 describe("createWorkScopeTag", () => {

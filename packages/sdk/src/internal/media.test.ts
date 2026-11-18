@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { CID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, HEAD, methods } from "../test-utils/fake-repo.js";
+import { png } from "../test-utils/records.js";
 import { createBuildContext } from "./build-context.js";
 import { mediaValue } from "./media.js";
-
-const png = () => new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
 
 // Every upload gets a CID of its own, so that a second upload of one file cannot go unnoticed by
 // comparing references.
