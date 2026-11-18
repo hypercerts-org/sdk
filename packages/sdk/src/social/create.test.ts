@@ -22,7 +22,7 @@ const actions = [
     name: "followAccount",
     collection: FOLLOW,
     create: (context: Parameters<typeof like>[0], options: object) =>
-      followAccount(context, { targetDid: ACCOUNT, ...options }),
+      followAccount(context, { target: { did: ACCOUNT }, ...options }),
     subject: ACCOUNT,
     reads: [],
   },
@@ -30,7 +30,7 @@ const actions = [
     name: "followEntity",
     collection: ENTITY_FOLLOW,
     create: (context: Parameters<typeof like>[0], options: object) =>
-      followEntity(context, { targetUri: TARGET, ...options }),
+      followEntity(context, { target: { uri: TARGET }, ...options }),
     // The URI only: no CID, and the target is not read.
     subject: { $type: "app.certified.defs#recordSubject", uri: TARGET },
     reads: [],
@@ -39,7 +39,7 @@ const actions = [
     name: "like",
     collection: LIKE,
     create: (context: Parameters<typeof like>[0], options: object) =>
-      like(context, { targetUri: TARGET, ...options }),
+      like(context, { target: { uri: TARGET }, ...options }),
     subject: { uri: TARGET, cid: TARGET_CID },
     reads: ["com.atproto.repo.getRecord"],
   },
@@ -47,7 +47,7 @@ const actions = [
     name: "repost",
     collection: REPOST,
     create: (context: Parameters<typeof like>[0], options: object) =>
-      repost(context, { targetUri: TARGET, ...options }),
+      repost(context, { target: { uri: TARGET }, ...options }),
     subject: { uri: TARGET, cid: TARGET_CID },
     reads: ["com.atproto.repo.getRecord"],
   },
@@ -77,7 +77,7 @@ describe.each(actions)("$name", ({ collection, create, subject, reads }) => {
   it("pins `via` as a strong reference and keeps `createdAt`", async () => {
     const { context, creates } = fakeRepo({ existing });
 
-    await create(context, { via: VIA, createdAt: "2024-01-01T00:00:00.000Z" });
+    await create(context, { via: { uri: VIA }, createdAt: "2024-01-01T00:00:00.000Z" });
 
     expect(writeOf(creates[0] ?? [], collection).value).toMatchObject({
       createdAt: "2024-01-01T00:00:00.000Z",
@@ -90,9 +90,9 @@ describe("creating", () => {
   it("writes nothing when `via` cannot be read", async () => {
     const { context, requests } = fakeRepo();
 
-    await expect(followAccount(context, { targetDid: ACCOUNT, via: VIA })).rejects.toThrow(
-      /cannot resolve .*the record was not found/,
-    );
+    await expect(
+      followAccount(context, { target: { did: ACCOUNT }, via: { uri: VIA } }),
+    ).rejects.toThrow(/cannot resolve .*the record was not found/);
 
     expect(methods(requests)).toEqual(["com.atproto.repo.getRecord"]);
   });
@@ -100,8 +100,8 @@ describe("creating", () => {
   it("does not look for an existing record: calling again creates another", async () => {
     const { context, requests, creates } = fakeRepo({ existing });
 
-    await like(context, { targetUri: TARGET });
-    await like(context, { targetUri: TARGET });
+    await like(context, { target: { uri: TARGET } });
+    await like(context, { target: { uri: TARGET } });
 
     expect(methods(requests)).not.toContain("com.atproto.repo.listRecords");
     expect(creates.map(([write]) => write?.rkey)).toHaveLength(2);
@@ -112,7 +112,7 @@ describe("creating", () => {
     const { context, requests } = fakeRepo({ existing });
 
     await expect(
-      followEntity(context, { targetUri: TARGET, createdAt: "yesterday" }),
+      followEntity(context, { target: { uri: TARGET }, createdAt: "yesterday" }),
     ).rejects.toThrow(
       `followEntity: input is not a valid ${ENTITY_FOLLOW} record: Invalid datetime (got "yesterday") at $.createdAt.`,
     );
@@ -123,7 +123,7 @@ describe("creating", () => {
   it("writes nothing when a like's target does not exist", async () => {
     const { context, requests } = fakeRepo();
 
-    await expect(like(context, { targetUri: TARGET })).rejects.toThrow(
+    await expect(like(context, { target: { uri: TARGET } })).rejects.toThrow(
       /cannot resolve .*the record was not found/,
     );
 
@@ -135,15 +135,17 @@ describe("read failures name the calling operation", () => {
   it("names the operation when `via` cannot be read", async () => {
     const { context } = fakeRepo();
 
-    await expect(followAccount(context, { targetDid: ACCOUNT, via: VIA })).rejects.toThrow(
-      /^followAccount: cannot resolve /,
-    );
+    await expect(
+      followAccount(context, { target: { did: ACCOUNT }, via: { uri: VIA } }),
+    ).rejects.toThrow(/^followAccount: cannot resolve /);
   });
 
   it("names the operation when a like's target cannot be read", async () => {
     const { context } = fakeRepo();
 
-    await expect(like(context, { targetUri: TARGET })).rejects.toThrow(/^like: cannot resolve /);
+    await expect(like(context, { target: { uri: TARGET } })).rejects.toThrow(
+      /^like: cannot resolve /,
+    );
   });
 });
 
@@ -152,13 +154,25 @@ describe("target validation", () => {
     ["a handle", "alice.bsky.social"],
     ["a record URI", TARGET],
     ["a handle-form URI", "at://alice.bsky.social"],
-    ["an object", { did: ACCOUNT }],
     ["nothing", undefined],
-  ])("followAccount rejects %s as targetDid", async (_, targetDid) => {
+  ])("followAccount rejects %s as target.did", async (_, did) => {
     const { context, requests } = fakeRepo();
 
-    await expect(followAccount(context, { targetDid } as never)).rejects.toThrow(
-      /^followAccount: invalid input: must be an account DID.*\$\.targetDid/,
+    await expect(followAccount(context, { target: { did } } as never)).rejects.toThrow(
+      /^followAccount: invalid input: must be an account DID.*\$\.target\.did/,
+    );
+
+    expect(requests).toHaveLength(0);
+  });
+
+  it("rejects a target that is a bare string instead of { did } or { uri }", async () => {
+    const { context, requests } = fakeRepo({ existing });
+
+    await expect(followAccount(context, { target: ACCOUNT } as never)).rejects.toThrow(
+      /^followAccount: invalid input: .*\$\.target/,
+    );
+    await expect(like(context, { target: TARGET } as never)).rejects.toThrow(
+      /^like: invalid input: .*\$\.target/,
     );
 
     expect(requests).toHaveLength(0);
@@ -176,12 +190,11 @@ describe("target validation", () => {
       `at://${DID}/org.hypercerts.claim.activity`, // no record key
       `at://${DID}`,
       "https://example.org/record",
-      { uri: TARGET },
     ];
 
-    for (const targetUri of invalid) {
-      await expect(run(context, { targetUri } as never)).rejects.toThrow(
-        new RegExp(`^${name}: invalid input: must be a full record URI.*\\$\\.targetUri`),
+    for (const uri of invalid) {
+      await expect(run(context, { target: { uri } } as never)).rejects.toThrow(
+        new RegExp(`^${name}: invalid input: must be a full record URI.*\\$\\.target\\.uri`),
       );
     }
 
@@ -191,11 +204,11 @@ describe("target validation", () => {
   it("rejects a `via` that is not a record URI, and fields the SDK does not know", async () => {
     const { context, requests } = fakeRepo({ existing });
 
-    await expect(like(context, { targetUri: TARGET, via: ACCOUNT })).rejects.toThrow(
-      /must be a record URI.*\$\.via/,
+    await expect(like(context, { target: { uri: TARGET }, via: { uri: ACCOUNT } })).rejects.toThrow(
+      /must be a full record URI.*\$\.via\.uri/,
     );
     await expect(
-      followAccount(context, { targetDid: ACCOUNT, targetUri: TARGET } as never),
+      followAccount(context, { target: { did: ACCOUNT }, targetUri: TARGET } as never),
     ).rejects.toThrow(/field the SDK does not know/);
 
     expect(requests).toHaveLength(0);
@@ -208,7 +221,7 @@ describe("write failures", () => {
       applyWrites: () => json(500, { error: "InternalServerError", message: "boom" }),
     });
 
-    const error = await followAccount(context, { targetDid: ACCOUNT }).catch((e) => e);
+    const error = await followAccount(context, { target: { did: ACCOUNT } }).catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteOutcomeUnknownError);
     expect(error.attempted).toHaveLength(1);

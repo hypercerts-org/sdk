@@ -60,7 +60,7 @@ beforeAll(async () => {
     shortDescription: "Planting native trees",
   });
   target = fixtures.add(other, { uri: activity.uri, cid: activity.cid });
-  const reposted = await repost(other.context, { targetUri: target.uri });
+  const reposted = await repost(other.context, { target: { uri: target.uri } });
   viaRepost = fixtures.add(other, { uri: reposted.uri, cid: reposted.cid });
 });
 afterEach(created.release);
@@ -81,13 +81,19 @@ async function storedOwn(ref: Ref, collection: string) {
 
 describe("following", () => {
   it("followAccount stores the followed DID as the subject", async () => {
-    const follow = created.add(user, await followAccount(user.context, { targetDid: other.did }));
+    const follow = created.add(
+      user,
+      await followAccount(user.context, { target: { did: other.did } }),
+    );
 
     expect(await storedOwn(follow, collections.follow)).toMatchObject({ subject: other.did });
   });
 
   it("followEntity stores the record's URI as a recordSubject, with no CID", async () => {
-    const follow = created.add(user, await followEntity(user.context, { targetUri: target.uri }));
+    const follow = created.add(
+      user,
+      await followEntity(user.context, { target: { uri: target.uri } }),
+    );
 
     const stored = await storedOwn(follow, collections.entityFollow);
     expect(stored.subject).toEqual({ $type: defs.recordSubject.$type, uri: target.uri });
@@ -101,7 +107,10 @@ describe("liking and reposting", () => {
   ];
 
   it.each(reactions)("$name stores the target's URI and its current CID", async (reaction) => {
-    const ref = created.add(user, await reaction.create(user.context, { targetUri: target.uri }));
+    const ref = created.add(
+      user,
+      await reaction.create(user.context, { target: { uri: target.uri } }),
+    );
 
     expect(await storedOwn(ref, reaction.collection)).toMatchObject({ subject: target });
   });
@@ -109,7 +118,7 @@ describe("liking and reposting", () => {
   it("pins the URI and CID of the `via` record", async () => {
     const ref = created.add(
       user,
-      await like(user.context, { targetUri: target.uri, via: viaRepost.uri }),
+      await like(user.context, { target: { uri: target.uri }, via: { uri: viaRepost.uri } }),
     );
 
     expect(await storedOwn(ref, collections.like)).toMatchObject({
@@ -123,75 +132,76 @@ describe("undoing", () => {
   const actions = [
     {
       name: "unfollowAccount",
-      create: () => followAccount(user.context, { targetDid: other.did }),
-      undo: (uri: string) => unfollowAccount(user.context, { followUri: uri }),
+      create: () => followAccount(user.context, { target: { did: other.did } }),
+      undo: (ref: Ref) => unfollowAccount(user.context, { follow: ref }),
     },
     {
       name: "unfollowEntity",
-      create: () => followEntity(user.context, { targetUri: target.uri }),
-      undo: (uri: string) => unfollowEntity(user.context, { followUri: uri }),
+      create: () => followEntity(user.context, { target: { uri: target.uri } }),
+      undo: (ref: Ref) => unfollowEntity(user.context, { follow: ref }),
     },
     {
       name: "unlike",
-      create: () => like(user.context, { targetUri: target.uri }),
-      undo: (uri: string) => unlike(user.context, { likeUri: uri }),
+      create: () => like(user.context, { target: { uri: target.uri } }),
+      undo: (ref: Ref) => unlike(user.context, { like: ref }),
     },
     {
       name: "unrepost",
-      create: () => repost(user.context, { targetUri: target.uri }),
-      undo: (uri: string) => unrepost(user.context, { repostUri: uri }),
+      create: () => repost(user.context, { target: { uri: target.uri } }),
+      undo: (ref: Ref) => unrepost(user.context, { repost: ref }),
     },
   ];
 
-  it.each(actions)("$name deletes the record whose URI create returned", async (action) => {
-    const ref = created.add(user, await action.create());
-    await expectStored(user.client, ref);
+  it.each(actions)(
+    "$name deletes the record that create returned, passed as it is",
+    async (action) => {
+      const ref = created.add(user, await action.create());
+      await expectStored(user.client, ref);
 
-    await action.undo(ref.uri);
+      await action.undo(ref);
 
-    await expectMissing(user.client, ref.uri);
-  });
+      await expectMissing(user.client, ref.uri);
+    },
+  );
 
   // The guard on `cid` and the repeat are the same code for the four functions, so these run
   // through `unlike` only.
   it("deletes the record when the cid it is given is the record's", async () => {
-    const liked = created.add(user, await like(user.context, { targetUri: target.uri }));
+    const liked = created.add(user, await like(user.context, { target: { uri: target.uri } }));
 
-    await unlike(user.context, { likeUri: liked.uri, cid: liked.cid });
+    await unlike(user.context, { like: liked });
 
     await expectMissing(user.client, liked.uri);
   });
 
   it("refuses a stale cid with InvalidSwap and leaves the record", async () => {
-    const liked = created.add(user, await like(user.context, { targetUri: target.uri }));
+    const liked = created.add(user, await like(user.context, { target: { uri: target.uri } }));
 
     // Another record's CID: a valid CID that is not the like's.
     await expect(
-      unlike(user.context, { likeUri: liked.uri, cid: target.cid }),
+      unlike(user.context, { like: { uri: liked.uri, cid: target.cid } }),
     ).rejects.toMatchObject({ name: "WriteRejectedError", code: "InvalidSwap" });
 
     await expectStored(user.client, liked);
   });
 
   it("resolves when the record is already gone, with or without the old cid", async () => {
-    const liked = created.add(user, await like(user.context, { targetUri: target.uri }));
-    await unlike(user.context, { likeUri: liked.uri });
+    const liked = created.add(user, await like(user.context, { target: { uri: target.uri } }));
+    await unlike(user.context, { like: { uri: liked.uri } });
 
-    await expect(unlike(user.context, { likeUri: liked.uri })).resolves.toBeUndefined();
-    await expect(
-      unlike(user.context, { likeUri: liked.uri, cid: liked.cid }),
-    ).resolves.toBeUndefined();
+    await expect(unlike(user.context, { like: { uri: liked.uri } })).resolves.toBeUndefined();
+    await expect(unlike(user.context, { like: liked })).resolves.toBeUndefined();
   });
 
   it("throws TypeError, before sending anything, for another account's record", async () => {
-    const theirs = created.add(other, await like(other.context, { targetUri: target.uri }));
+    const theirs = created.add(other, await like(other.context, { target: { uri: target.uri } }));
     const sent: string[] = [];
     const watched = await loginAs("user1", (path, init) => {
       sent.push(path);
       return init;
     });
 
-    await expect(unlike(watched.context, { likeUri: theirs.uri })).rejects.toBeInstanceOf(
+    await expect(unlike(watched.context, { like: { uri: theirs.uri } })).rejects.toBeInstanceOf(
       TypeError,
     );
 
@@ -207,7 +217,9 @@ describe("targets that do not exist", () => {
   it("like throws and writes nothing when the record cannot be read", async () => {
     const before = await countRecords(user.client, collections.like);
 
-    await expect(like(user.context, { targetUri: missingUri() })).rejects.toThrow(/cannot resolve/);
+    await expect(like(user.context, { target: { uri: missingUri() } })).rejects.toThrow(
+      /cannot resolve/,
+    );
 
     expect(await countRecords(user.client, collections.like)).toBe(before);
   });
@@ -215,7 +227,10 @@ describe("targets that do not exist", () => {
   it("followAccount stores a DID that no account has, as given", async () => {
     const nobody = `did:plc:${"a".repeat(24)}` as const;
 
-    const follow = created.add(user, await followAccount(user.context, { targetDid: nobody }));
+    const follow = created.add(
+      user,
+      await followAccount(user.context, { target: { did: nobody } }),
+    );
 
     expect(await storedOwn(follow, collections.follow)).toMatchObject({ subject: nobody });
   });
@@ -223,7 +238,10 @@ describe("targets that do not exist", () => {
   it("followEntity stores the URI of a record that does not exist, as given", async () => {
     const targetUri = missingUri();
 
-    const follow = created.add(user, await followEntity(user.context, { targetUri }));
+    const follow = created.add(
+      user,
+      await followEntity(user.context, { target: { uri: targetUri } }),
+    );
 
     const stored = await storedOwn(follow, collections.entityFollow);
     expect(stored.subject).toEqual({ $type: defs.recordSubject.$type, uri: targetUri });

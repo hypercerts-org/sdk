@@ -9,35 +9,35 @@ const ACTIVITY_URI = `at://${DID}/org.hypercerts.claim.activity/${RKEY}`;
 
 type Context = Parameters<typeof unlike>[0];
 
-// Each undo function, the record it deletes, and the input field that holds that record's URI.
+// Each undo function, the record it deletes, and the input field that holds that record.
 const actions = [
   {
     name: "unfollowAccount",
     collection: "app.certified.graph.follow",
     undo: (context: Context, input: object) => unfollowAccount(context, input as never),
-    uriField: "followUri",
+    field: "follow",
   },
   {
     name: "unfollowEntity",
     collection: "app.certified.graph.entityFollow",
     undo: (context: Context, input: object) => unfollowEntity(context, input as never),
-    uriField: "followUri",
+    field: "follow",
   },
   {
     name: "unlike",
     collection: "app.certified.feed.like",
     undo: (context: Context, input: object) => unlike(context, input as never),
-    uriField: "likeUri",
+    field: "like",
   },
   {
     name: "unrepost",
     collection: "app.certified.feed.repost",
     undo: (context: Context, input: object) => unrepost(context, input as never),
-    uriField: "repostUri",
+    field: "repost",
   },
 ];
 
-describe.each(actions)("$name", ({ collection, undo, uriField }) => {
+describe.each(actions)("$name", ({ collection, undo, field }) => {
   const uri = `at://${DID}/${collection}/${RKEY}`;
 
   it.each([
@@ -46,7 +46,7 @@ describe.each(actions)("$name", ({ collection, undo, uriField }) => {
   ])("deletes the record at the URI, %s, and sends nothing else", async (_, extra, swapRecord) => {
     const { context, requests } = fakeRepo({ deleteRecord: () => json(200, {}) });
 
-    await expect(undo(context, { [uriField]: uri, ...extra })).resolves.toBeUndefined();
+    await expect(undo(context, { [field]: { uri, ...extra } })).resolves.toBeUndefined();
 
     expect(methods(requests)).toEqual(["com.atproto.repo.deleteRecord"]);
     const sent = JSON.parse(new TextDecoder().decode(requests[0]?.body));
@@ -61,18 +61,30 @@ describe("rejected input", () => {
   const likeUri = `at://${DID}/${collection}/${RKEY}`;
 
   it.each([
-    ["an unknown field", { likeUri, extra: true }, /has a field the SDK does not know/],
-    ["a DID instead of a record URI", { likeUri: DID }, /must be a full record URI/],
-    ["a handle authority", { likeUri: `at://alice.bsky.social/${collection}/${RKEY}` }, /DID/],
-    ["a cid that is not a CID", { likeUri, cid: "not-a-cid" }, /must be a CID string/],
+    [
+      "an unknown field",
+      { like: { uri: likeUri }, extra: true },
+      /has a field the SDK does not know/,
+    ],
+    ["a DID instead of a record URI", { like: { uri: DID } }, /must be a full record URI/],
+    [
+      "a handle authority",
+      { like: { uri: `at://alice.bsky.social/${collection}/${RKEY}` } },
+      /DID/,
+    ],
+    [
+      "a cid that is not a CID",
+      { like: { uri: likeUri, cid: "not-a-cid" } },
+      /must be a CID string/,
+    ],
     [
       "the URI of the liked record, whose collection is another",
-      { likeUri: ACTIVITY_URI },
+      { like: { uri: ACTIVITY_URI } },
       /is a org.hypercerts.claim.activity record, not a app.certified.feed.like record/,
     ],
     [
       "a record in another account's repository",
-      { likeUri: `at://${OTHER_ACCOUNT}/${collection}/${RKEY}` },
+      { like: { uri: `at://${OTHER_ACCOUNT}/${collection}/${RKEY}` } },
       new RegExp(`is in the repository of ${OTHER_ACCOUNT}, not of the signed-in account`),
     ],
   ])("throws TypeError for %s, and sends nothing", async (_, input, message) => {

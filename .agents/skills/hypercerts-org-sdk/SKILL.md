@@ -96,7 +96,7 @@ Things to know before opening a reference:
 - `createProfile` needs an OAuth scope with both `create` and `update` on `app.certified.actor.profile`. With only `create` it fails with `WriteRejectedError` (403).
 - `location: { uri }` inside a location is a link to external data; a whole location given as `{ uri }` in `createActivity` reuses an existing record.
 - `createOrganization` takes the name, avatar, banner and website in `profileIfMissing`, not in `organization`, and an existing location as `{ uri }`, never a bare string.
-- Social create functions take the **target**: `{ targetDid }` for an account, `{ targetUri }` (a full record URI) for a record. Undo functions (`unlike`, `unrepost`, `unfollowAccount`, `unfollowEntity`) take the **URI of your own like, repost or follow record** (`likeUri`, `repostUri`, `followUri`), not the target's, and return `void`. Keep the `uri` the create function returned.
+- Social create functions take the **target**: `target: { did }` for an account, `target: { uri }` (a full record URI) for a record, and `via: { uri }`. Undo functions (`unlike`, `unrepost`, `unfollowAccount`, `unfollowEntity`) take **your own like, repost or follow record** as the create function returned it (`{ like: liked }`, `{ repost }`, `{ follow }`), not the target, and return `void`. Keep what the create function returned.
 - `awardBadge` takes `{ did }` or `{ uri }` as the subject and `{ uri }` or new fields as the definition; never build strong references or DID objects. `respondToBadgeAward` works only as the award's recipient.
 - `createAttachment`, `createMeasurement`, `createEvaluation` and `createAcknowledgement` take a subject as `{ uri }`, never a bare string, and a measured value or score as a decimal string, never a number.
 
@@ -211,7 +211,7 @@ try {
 - A vocabulary tag's key is `<category>.<key>` exactly as you pass it. A dot in either part throws a `TypeError`; the SDK does not normalise the parts.
 - A work-scope tag URI is not a vocabulary tag URI: each field accepts one collection, and a `{ uri }` of another throws a `TypeError`.
 - One write holds at most 200 records on the reference PDS. A larger call throws a `TypeError` before anything is written; the SDK does not split it. Create some records first and pass their URIs.
-- The SDK reads a record you reference only to pin its CID in a strong reference (`{ uri }` inputs, the target of `like` and `repost`, `via`); a record it cannot read stops the call. A plain DID or URI (`followAccount`'s `targetDid`, `followEntity`'s `targetUri`) is stored as given and never looked up, so a mistyped one is stored too. Check it yourself if that matters.
+- The SDK reads a record you reference only to pin its CID in a strong reference (`{ uri }` inputs, the `target` of `like` and `repost`, `via`); a record it cannot read stops the call. A plain DID or URI (`followAccount`'s `target.did`, `followEntity`'s `target.uri`) is stored as given and never looked up, so a mistyped one is stored too. Check it yourself if that matters.
 - Do not call operations a subpath does not export, even if a TSDoc example mentions them.
 
 ## Verify

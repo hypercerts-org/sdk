@@ -1,23 +1,13 @@
 import * as likeRecord from "@hypercerts-org/lexicon/app/certified/feed/like";
 import * as repostRecord from "@hypercerts-org/lexicon/app/certified/feed/repost";
-import {
-  likeUndoInput,
-  recordRefAction,
-  repostUndoInput,
-  type UnlikeInput,
-  type UnrepostInput,
-} from "./action.js";
+import { recordRefAction } from "./action.js";
 import { createAction, undoAction } from "./run-action.js";
 
-const likeAction = recordRefAction<UnlikeInput>(
-  { create: "like", undo: "unlike" },
-  likeRecord.main,
-  { undoInput: likeUndoInput, undoUri: ({ likeUri }) => likeUri },
-);
-const repostAction = recordRefAction<UnrepostInput>(
+const likeAction = recordRefAction({ create: "like", undo: "unlike" }, likeRecord.main, "like");
+const repostAction = recordRefAction(
   { create: "repost", undo: "unrepost" },
   repostRecord.main,
-  { undoInput: repostUndoInput, undoUri: ({ repostUri }) => repostUri },
+  "repost",
 );
 
 /**
@@ -38,7 +28,7 @@ const repostAction = recordRefAction<UnrepostInput>(
  * {@link unlike} deletes only the record whose URI it is given, so each duplicate has to be undone
  * with its own URI.
  *
- * `via` is optional: the URI of the record through which the target was encountered, typically a
+ * `via` is optional: `{ uri }` of the record through which the target was encountered, typically a
  * repost. The SDK reads it the same way. See {@link ActionOptions}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
@@ -46,8 +36,8 @@ const repostAction = recordRefAction<UnrepostInput>(
  * @param input - The record to like and optional `createdAt` and `via`. See
  * {@link RecordActionInput}.
  * @returns The new like's URI and CID (not the target's).
- * @throws {@link TypeError} If `input` has an unknown field, a `targetUri` that is not a full record
- * URI (a bare DID, a handle authority or a partial URI), a `via` that is not a record URI, or a
+ * @throws {@link TypeError} If `input` has an unknown field, a `target.uri` that is not a full record
+ * URI (a bare DID, a handle authority or a partial URI), a `via.uri` that is not a record URI, or a
  * `createdAt` the lexicon rejects. Nothing was written.
  * @throws {@link Error} If the client is not authenticated, or the target or the `via` record cannot
  * be read (missing, or the PDS cannot be reached). Nothing was written.
@@ -63,7 +53,7 @@ const repostAction = recordRefAction<UnrepostInput>(
  *
  * // `context` comes from createSDKContext.
  * const liked = await like(context, {
- *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+ *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
  * console.log(liked.uri); // at://<your DID>/app.certified.feed.like/<tid>
  * ```
@@ -73,15 +63,15 @@ const repostAction = recordRefAction<UnrepostInput>(
  * import { like } from "@hypercerts-org/sdk/social";
  *
  * await like(context, {
- *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
- *   via: "at://did:plc:def456/app.certified.feed.repost/3k2a4b5c6d7e9", // read and pinned for you
+ *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
+ *   via: { uri: "at://did:plc:def456/app.certified.feed.repost/3k2a4b5c6d7e9" }, // read and pinned for you
  * });
  * ```
  */
 export const like = createAction(likeAction);
 
 /**
- * Removes a like: deletes the `app.certified.feed.like` record at `likeUri` from the
+ * Removes a like: deletes the `app.certified.feed.like` record `like.uri` points at, from the
  * authenticated account's repo.
  *
  * @remarks
@@ -90,7 +80,8 @@ export const like = createAction(likeAction);
  * a duplicate (see {@link like}), the other like stays until you delete it with its own URI. The
  * liked record does not have to exist any more.
  *
- * Where the URI comes from: the `uri` that {@link like} returned (keep it), or the Hypercerts
+ * Where the record comes from: what {@link like} returned, `{ uri, cid }`, which can be passed as it is
+ * (keep it), or the Hypercerts
  * API, for example `app.certified.feed.getActorReactions`, which returns the like's `uri` and
  * `cid`. It is the URI of the like record, not the URI of the record that was liked.
  *
@@ -105,9 +96,9 @@ export const like = createAction(likeAction);
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; only that account's own records can be deleted.
- * @param input - The like record's URI and an optional `cid`. See {@link UnlikeInput}.
+ * @param input - The like record, `{ uri, cid? }`, as {@link like} returned it. See {@link UnlikeInput}.
  * @returns Nothing. It resolves when the PDS confirmed the deletion or that the record is absent.
- * @throws {@link TypeError} If `input` has an unknown field, a `likeUri` that is not a full record
+ * @throws {@link TypeError} If `input` has an unknown field, a `like.uri` that is not a full record
  * URI, one whose collection is not `app.certified.feed.like` or that is in another account's
  * repository, or a `cid` that is not a CID string. Nothing was sent.
  * @throws {@link Error} If the client is not authenticated. Nothing was sent.
@@ -122,10 +113,10 @@ export const like = createAction(likeAction);
  *
  * // `context` comes from createSDKContext.
  * const liked = await like(context, {
- *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+ *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
- * // Keep `liked.uri` (and `liked.cid`) to undo it later.
- * await unlike(context, { likeUri: liked.uri, cid: liked.cid });
+ * // Keep `liked` (its `uri` and `cid`) to undo it later.
+ * await unlike(context, { like: liked });
  * ```
  *
  * @example The like's URI, not the URI of the liked record
@@ -134,7 +125,7 @@ export const like = createAction(likeAction);
  *
  * // TypeError: this is the activity, not an app.certified.feed.like record.
  * await unlike(context, {
- *   likeUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+ *   like: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
  * ```
  */
@@ -155,7 +146,7 @@ export const unlike = undoAction(likeAction);
  * {@link unrepost} deletes only the record whose URI it is given, so each duplicate has to be undone
  * with its own URI.
  *
- * `via` is optional: the URI of the record through which the target was encountered, typically
+ * `via` is optional: `{ uri }` of the record through which the target was encountered, typically
  * another repost. The SDK reads it the same way. See {@link ActionOptions}.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
@@ -163,8 +154,8 @@ export const unlike = undoAction(likeAction);
  * @param input - The record to repost and optional `createdAt` and `via`. See
  * {@link RecordActionInput}.
  * @returns The new repost's URI and CID (not the target's).
- * @throws {@link TypeError} If `input` has an unknown field, a `targetUri` that is not a full record
- * URI (a bare DID, a handle authority or a partial URI), a `via` that is not a record URI, or a
+ * @throws {@link TypeError} If `input` has an unknown field, a `target.uri` that is not a full record
+ * URI (a bare DID, a handle authority or a partial URI), a `via.uri` that is not a record URI, or a
  * `createdAt` the lexicon rejects. Nothing was written.
  * @throws {@link Error} If the client is not authenticated, or the target or the `via` record cannot
  * be read (missing, or the PDS cannot be reached). Nothing was written.
@@ -180,7 +171,7 @@ export const unlike = undoAction(likeAction);
  *
  * // `context` comes from createSDKContext.
  * const reposted = await repost(context, {
- *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+ *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
  * console.log(reposted.uri); // at://<your DID>/app.certified.feed.repost/<tid>
  * ```
@@ -190,15 +181,15 @@ export const unlike = undoAction(likeAction);
  * import { repost } from "@hypercerts-org/sdk/social";
  *
  * await repost(context, {
- *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
- *   via: "at://did:plc:def456/app.certified.feed.repost/3k2a4b5c6d7e9", // read and pinned for you
+ *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
+ *   via: { uri: "at://did:plc:def456/app.certified.feed.repost/3k2a4b5c6d7e9" }, // read and pinned for you
  * });
  * ```
  */
 export const repost = createAction(repostAction);
 
 /**
- * Removes a repost: deletes the `app.certified.feed.repost` record at `repostUri` from the
+ * Removes a repost: deletes the `app.certified.feed.repost` record `repost.uri` points at, from the
  * authenticated account's repo.
  *
  * @remarks
@@ -207,7 +198,8 @@ export const repost = createAction(repostAction);
  * after a duplicate (see {@link repost}), the other repost stays until you delete it with its own
  * URI. The reposted record does not have to exist any more.
  *
- * Where the URI comes from: the `uri` that {@link repost} returned (keep it), or the Hypercerts
+ * Where the record comes from: what {@link repost} returned, `{ uri, cid }`, which can be passed as it is
+ * (keep it), or the Hypercerts
  * API, for example `app.certified.feed.getActorReactions`, which returns the repost's `uri` and
  * `cid`. It is the URI of the repost record, not the URI of the record that was reposted.
  *
@@ -222,9 +214,9 @@ export const repost = createAction(repostAction);
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; only that account's own records can be deleted.
- * @param input - The repost record's URI and an optional `cid`. See {@link UnrepostInput}.
+ * @param input - The repost record, `{ uri, cid? }`, as {@link repost} returned it. See {@link UnrepostInput}.
  * @returns Nothing. It resolves when the PDS confirmed the deletion or that the record is absent.
- * @throws {@link TypeError} If `input` has an unknown field, a `repostUri` that is not a full record
+ * @throws {@link TypeError} If `input` has an unknown field, a `repost.uri` that is not a full record
  * URI, one whose collection is not `app.certified.feed.repost` or that is in another account's
  * repository, or a `cid` that is not a CID string. Nothing was sent.
  * @throws {@link Error} If the client is not authenticated. Nothing was sent.
@@ -239,10 +231,10 @@ export const repost = createAction(repostAction);
  *
  * // `context` comes from createSDKContext.
  * const reposted = await repost(context, {
- *   targetUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+ *   target: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
- * // Keep `reposted.uri` (and `reposted.cid`) to undo it later.
- * await unrepost(context, { repostUri: reposted.uri, cid: reposted.cid });
+ * // Keep `reposted` (its `uri` and `cid`) to undo it later.
+ * await unrepost(context, { repost: reposted });
  * ```
  *
  * @example The repost's URI, not the URI of the reposted record
@@ -251,7 +243,7 @@ export const repost = createAction(repostAction);
  *
  * // TypeError: this is the activity, not an app.certified.feed.repost record.
  * await unrepost(context, {
- *   repostUri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8",
+ *   repost: { uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" },
  * });
  * ```
  */

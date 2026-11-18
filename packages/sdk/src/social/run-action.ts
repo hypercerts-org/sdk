@@ -11,7 +11,14 @@ import type { StandaloneCreator } from "../internal/create-record.js";
 import { compact } from "../internal/input.js";
 import { resolveRecordRef } from "../internal/resolve-record-ref.js";
 import { submitDelete, submitWrites } from "../internal/submit-writes.js";
-import type { ActionOptions, SocialAction, UndoFunction, UndoOptions } from "./action.js";
+import {
+  type ActionOptions,
+  type SocialAction,
+  type UndoField,
+  type UndoFunction,
+  type UndoInput,
+  undoInputSchema,
+} from "./action.js";
 
 /**
  * The function that creates one social record (a follow, an entity follow, a like or a repost) in
@@ -27,8 +34,8 @@ import type { ActionOptions, SocialAction, UndoFunction, UndoOptions } from "./a
  *
  * The function throws TypeError for invalid input, and what the reads and `submitWrites` throw.
  */
-export function createAction<TCreate extends ActionOptions, TUndo extends UndoOptions>(
-  action: SocialAction<TCreate, TUndo>,
+export function createAction<TCreate extends ActionOptions, TField extends UndoField>(
+  action: SocialAction<TCreate, TField>,
 ): StandaloneCreator<TCreate> {
   return async (context, input) => {
     const { build, parsed } = start(context, action.names.create, action.createInput, input);
@@ -36,7 +43,7 @@ export function createAction<TCreate extends ActionOptions, TUndo extends UndoOp
       action.subject(context, parsed),
       parsed.via === undefined
         ? undefined
-        : resolveRecordRef(context, parsed.via, action.names.create),
+        : resolveRecordRef(context, parsed.via.uri, action.names.create),
     ]);
     const record = await prepareChecked(
       build,
@@ -65,14 +72,15 @@ export function createAction<TCreate extends ActionOptions, TUndo extends UndoOp
  * The function throws TypeError for invalid input, Error when the client is not authenticated, and
  * what `submitDelete` throws.
  */
-export function undoAction<TCreate extends ActionOptions, TUndo extends UndoOptions>(
-  action: SocialAction<TCreate, TUndo>,
-): UndoFunction<TUndo> {
+export function undoAction<TCreate extends ActionOptions, TField extends UndoField>(
+  action: SocialAction<TCreate, TField>,
+): UndoFunction<UndoInput<TField>> {
+  const schema = undoInputSchema(action.undoField);
   return async (context, input) => {
-    const { build, parsed } = start(context, action.names.undo, action.undoInput, input);
-    const uri = action.undoUri(parsed);
+    const { build, parsed } = start(context, action.names.undo, schema, input);
+    const { uri, cid } = parsed[action.undoField];
     assertOwnRecord(build, uri, action.schema.$type);
-    await submitDelete(build, { uri, cid: parsed.cid });
+    await submitDelete(build, { uri, cid });
   };
 }
 
