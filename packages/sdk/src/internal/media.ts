@@ -74,9 +74,9 @@ async function uploadNamingField(
   try {
     return await uploadBlob(build.context, file);
   } catch (error) {
-    throw new Error(`${build.operation}: could not upload ${field}: ${describeError(error)}`, {
-      cause: error,
-    });
+    // `uploadBlob` prefixes its messages with its own name, which would follow ours.
+    const reason = describeError(error).replace(/^uploadBlob: /, "");
+    throw new Error(`${build.operation}: could not upload ${field}: ${reason}`, { cause: error });
   }
 }
 

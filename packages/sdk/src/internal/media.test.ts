@@ -86,4 +86,14 @@ describe("mediaValue", () => {
     }
     expect(methods(requests).filter((method) => method.endsWith("uploadBlob"))).toHaveLength(1);
   });
+
+  it("does not repeat the uploadBlob prefix in a failed upload's message", async () => {
+    const { context } = fakeRepo({ uploadBlob: () => json(500, { error: "InternalServerError" }) });
+    const build = createBuildContext(context, "createTest");
+
+    const error = await mediaValue(build, "logo", png(), "image").catch((e) => e);
+
+    expect(error.message).toMatch(/^createTest: could not upload logo: the upload failed \(/);
+    expect(error.message).not.toContain("uploadBlob:");
+  });
 });

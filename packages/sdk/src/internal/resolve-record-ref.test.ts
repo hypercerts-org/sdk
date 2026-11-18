@@ -4,6 +4,7 @@ import { createSDKContext, type DidDocumentResolver } from "../context.js";
 import { CID, DID, fakePds, json } from "../test-utils/fake-pds.js";
 import { resolveRecordRef } from "./resolve-record-ref.js";
 
+const OPERATION = "resolveRecordRef";
 const URI = `at://${DID}/org.hypercerts.claim.activity/3k2a4b5c6d7e8`;
 
 const OWNER = "did:plc:ewvi7nxzyoun6zhxrhs64oiz";
@@ -49,7 +50,7 @@ describe("resolveRecordRef", () => {
   it("reads a record in the client's own repo through the client", async () => {
     const { context, requests } = fakePds(() => json(200, { uri: URI, cid: CID, value: {} }));
 
-    const ref = await resolveRecordRef(context, URI);
+    const ref = await resolveRecordRef(context, URI, OPERATION);
 
     expect(ref).toEqual({ uri: URI, cid: CID });
     const url = new URL(requests[0]?.path ?? "", "https://pds.test");
@@ -84,7 +85,7 @@ describe("resolveRecordRef", () => {
     });
     const { context, requests } = fakePds(() => json(500, {}));
 
-    const ref = await resolveRecordRef(context, uri);
+    const ref = await resolveRecordRef(context, uri, OPERATION);
 
     expect(ref).toEqual({ uri, cid: CID });
     expect(requests).toHaveLength(0);
@@ -112,7 +113,9 @@ describe("resolveRecordRef", () => {
     const uris = [ownerUri("3k2a4b5c6d7e8"), ownerUri("3k2a4b5c6d7e9")];
     const pdsClients = new Map();
 
-    const refs = await Promise.all(uris.map((uri) => resolveRecordRef(context, uri, pdsClients)));
+    const refs = await Promise.all(
+      uris.map((uri) => resolveRecordRef(context, uri, OPERATION, pdsClients)),
+    );
 
     expect(refs).toEqual(uris.map((uri) => ({ uri, cid: CID })));
     expect(lookups).toEqual([OWNER]);
@@ -124,8 +127,8 @@ describe("resolveRecordRef", () => {
     const { context } = fakePds(() => json(500, {}));
     const requested = stubOwnerNetwork();
 
-    await resolveRecordRef(context, ownerUri("3k2a4b5c6d7e8"));
-    await resolveRecordRef(context, ownerUri("3k2a4b5c6d7e9"));
+    await resolveRecordRef(context, ownerUri("3k2a4b5c6d7e8"), OPERATION);
+    await resolveRecordRef(context, ownerUri("3k2a4b5c6d7e9"), OPERATION);
 
     expect(didLookups(requested)).toBe(1);
   });
@@ -133,8 +136,16 @@ describe("resolveRecordRef", () => {
   it("does not share looked-up DIDs between contexts", async () => {
     const requested = stubOwnerNetwork();
 
-    await resolveRecordRef(fakePds(() => json(500, {})).context, ownerUri("3k2a4b5c6d7e8"));
-    await resolveRecordRef(fakePds(() => json(500, {})).context, ownerUri("3k2a4b5c6d7e8"));
+    await resolveRecordRef(
+      fakePds(() => json(500, {})).context,
+      ownerUri("3k2a4b5c6d7e8"),
+      OPERATION,
+    );
+    await resolveRecordRef(
+      fakePds(() => json(500, {})).context,
+      ownerUri("3k2a4b5c6d7e8"),
+      OPERATION,
+    );
 
     expect(didLookups(requested)).toBe(2);
   });
@@ -160,7 +171,7 @@ describe("resolveRecordRef", () => {
     });
     const uri = ownerUri("3k2a4b5c6d7e8");
 
-    const ref = await resolveRecordRef(context, uri);
+    const ref = await resolveRecordRef(context, uri, OPERATION);
 
     expect(ref).toEqual({ uri, cid: CID });
     expect(lookups).toEqual([OWNER]);
@@ -172,7 +183,7 @@ describe("resolveRecordRef", () => {
     vi.stubGlobal("fetch", async () => json(404, {}));
     const { context, requests } = fakePds(() => json(200, {}));
 
-    await expect(resolveRecordRef(context, uri)).rejects.toThrow(
+    await expect(resolveRecordRef(context, uri, OPERATION)).rejects.toThrow(
       "cannot resolve the PDS of did:plc:ewvi7nxzyoun6zhxrhs64oiz: did-fetch-error (HTTP 404)",
     );
     expect(requests).toHaveLength(0);
@@ -183,7 +194,7 @@ describe("resolveRecordRef", () => {
       json(400, { error: "RecordNotFound", message: "Could not locate record" }),
     );
 
-    const error = await resolveRecordRef(context, URI).catch((e) => e);
+    const error = await resolveRecordRef(context, URI, OPERATION).catch((e) => e);
 
     expect(error.message).toBe(
       `resolveRecordRef: cannot resolve ${URI}: the record was not found.`,
@@ -196,7 +207,7 @@ describe("resolveRecordRef", () => {
       json(500, { error: "InternalServerError", message: "Database unavailable" }),
     );
 
-    await expect(resolveRecordRef(context, URI)).rejects.toThrow(
+    await expect(resolveRecordRef(context, URI, OPERATION)).rejects.toThrow(
       `resolveRecordRef: cannot resolve ${URI}: the read failed (InternalServerError: Database unavailable).`,
     );
   });
@@ -204,7 +215,7 @@ describe("resolveRecordRef", () => {
   it("fails when the PDS returns the record without a CID", async () => {
     const { context } = fakePds(() => json(200, { uri: URI, value: {} }));
 
-    await expect(resolveRecordRef(context, URI)).rejects.toThrow(
+    await expect(resolveRecordRef(context, URI, OPERATION)).rejects.toThrow(
       /returned the record without a valid URI and CID/,
     );
   });
@@ -221,7 +232,7 @@ describe("resolveRecordRef", () => {
   ])("rejects a response with %s from a client that skips validation", async (_, body, message) => {
     const { context } = fakePds(() => json(200, body), { validateResponse: false });
 
-    await expect(resolveRecordRef(context, URI)).rejects.toThrow(message);
+    await expect(resolveRecordRef(context, URI, OPERATION)).rejects.toThrow(message);
   });
 
   it.each([
@@ -232,8 +243,10 @@ describe("resolveRecordRef", () => {
   ])("rejects a URI with %s before sending anything", async (_, uri) => {
     const { context, requests } = fakePds(() => json(200, {}));
 
-    await expect(resolveRecordRef(context, uri)).rejects.toThrow(TypeError);
-    await expect(resolveRecordRef(context, uri)).rejects.toThrow(/Expected at:\/\/<did>/);
+    await expect(resolveRecordRef(context, uri, OPERATION)).rejects.toThrow(TypeError);
+    await expect(resolveRecordRef(context, uri, OPERATION)).rejects.toThrow(
+      /Expected at:\/\/<did>/,
+    );
     expect(requests).toHaveLength(0);
   });
 });

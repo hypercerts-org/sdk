@@ -341,7 +341,7 @@ describe("createActivity when the PDS refuses the request", () => {
         ],
       }),
     ).rejects.toThrow(
-      /could not upload locations\[0\]\.location: uploadBlob: the upload failed \(PayloadTooLarge/,
+      /could not upload locations\[0\]\.location: the upload failed \(PayloadTooLarge/,
     );
 
     expect(await snapshotCounts(user.client)).toEqual(before);
