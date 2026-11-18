@@ -1,6 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { createActivity } from "../src/activity/index.js";
-import { createProject, RecordAlreadyExistsError } from "../src/project/index.js";
+import {
+  addActivityToProject,
+  createProject,
+  RecordAlreadyExistsError,
+} from "../src/project/index.js";
 import { createVocabularyTag } from "../src/tag/index.js";
 import { coordinates, PNG, png, unique } from "./fixtures.js";
 import {
@@ -153,5 +157,41 @@ describe("createProject with activities", () => {
     ).rejects.toBeInstanceOf(RecordAlreadyExistsError);
 
     expect(await snapshotCounts(user.client)).toEqual(before);
+  });
+});
+
+describe("addActivityToProject", () => {
+  it("stores a new Activity and the new version of the Project together, keeping the rest of it", async () => {
+    const project = await createProject(user.context, {
+      title: unique("E2E project"),
+      shortDescription: "Restoring the valley's forests",
+    });
+    const before = await expectStored(user.client, project);
+    const counts = await snapshotCounts(user.client);
+
+    const result = await addActivityToProject(user.context, {
+      projectUri: project.uri,
+      activity: { activity: { ...base(), locations: [coordinates] } },
+      weight: "2",
+    });
+
+    // The Activity and its location exist and reference each other by the stored CIDs.
+    expect(result.activity.created).toBe(true);
+    const activity = await expectStored(user.client, result.activity);
+    expect(await expectReferencesResolve(user.client, activity)).toHaveLength(1);
+    // The Project is stored at the CID the SDK reported, with its default Activity first and the new
+    // one last, and everything else as it was.
+    expect(result.project.uri).toBe(project.uri);
+    expect(result.project.cid).not.toBe(project.cid);
+    const stored = await expectStored(user.client, result.project);
+    expect(stored).toEqual({
+      ...before,
+      items: [...itemsOf(before), { itemIdentifier: refOnly(result.activity), itemWeight: "2" }],
+    });
+    expect(await snapshotCounts(user.client)).toEqual({
+      ...counts,
+      activity: counts.activity + 1,
+      location: counts.location + 1,
+    });
   });
 });
