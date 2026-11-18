@@ -161,6 +161,7 @@ const attachmentKind: RecordKind<AttachmentInput> = recordKind(
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the records are created in that account's repo.
  * @param input - The attachment and the records it needs. See {@link AttachmentInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new Attachment's URI and CID, and the references of its
  * location and tags. See {@link CreateAttachmentResult}.
  * @throws {@link TypeError} If `input` has an unknown field, a `content` entry that is neither a
@@ -175,6 +176,7 @@ const attachmentKind: RecordKind<AttachmentInput> = recordKind(
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
  * a retry can duplicate records under new keys.
+ * @throws {@link PartialWriteError} With `{ repo }` of an organization, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *

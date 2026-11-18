@@ -130,6 +130,7 @@ const evaluationKind: RecordKind<EvaluationInput> = recordKind(
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the records are created in that account's repo.
  * @param input - The evaluation and the records it needs. See {@link EvaluationInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new Evaluation's URI and CID, and the references of its
  * measurements (with their locations) and location. See {@link CreateEvaluationResult}.
  * @throws {@link TypeError} If `input` has an unknown field, an `evaluators` entry that is not
@@ -143,6 +144,7 @@ const evaluationKind: RecordKind<EvaluationInput> = recordKind(
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
  * a retry can duplicate records under new keys.
+ * @throws {@link PartialWriteError} With `{ repo }` of an organization, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *

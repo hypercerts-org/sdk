@@ -51,6 +51,7 @@ const followEntityAction: SocialAction<RecordActionInput, "follow"> = {
  * authenticated.
  * @param input - The account to follow and optional `createdAt` and `via`. See
  * {@link FollowAccountInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new record's URI and CID.
  * @throws {@link TypeError} If `input` has an unknown field, a `subject.did` that is not a DID (a
  * handle, for example), a `via.uri` that is not a record URI, or a `createdAt` the lexicon rejects.
@@ -117,6 +118,7 @@ export const followAccount = createAction(followAccountAction);
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; only that account's own records can be deleted.
  * @param input - The follow record, `{ uri, cid? }`, as the create function returned it. See {@link UnfollowAccountInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns Nothing. It resolves when the PDS confirmed the deletion or that the record is absent.
  * @throws {@link TypeError} If `input` has an unknown field, a `follow.uri` that is not a full record
  * URI, one whose collection is not `app.certified.graph.follow` or that is in another account's
@@ -171,6 +173,7 @@ export const unfollowAccount = undoAction(followAccountAction);
  * authenticated.
  * @param input - The record to follow and optional `createdAt` and `via`. See
  * {@link RecordActionInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new record's URI and CID.
  * @throws {@link TypeError} If `input` has an unknown field, a `subject.uri` that is not a full record
  * URI (a bare DID, a handle authority or a partial URI), a `via.uri` that is not a record URI, or a
@@ -230,6 +233,7 @@ export const followEntity = createAction(followEntityAction);
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; only that account's own records can be deleted.
  * @param input - The follow record, `{ uri, cid? }`, as the create function returned it. See {@link UnfollowEntityInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns Nothing. It resolves when the PDS confirmed the deletion or that the record is absent.
  * @throws {@link TypeError} If `input` has an unknown field, a `follow.uri` that is not a full record
  * URI, one whose collection is not `app.certified.graph.entityFollow` or that is in another

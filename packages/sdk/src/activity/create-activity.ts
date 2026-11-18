@@ -350,6 +350,7 @@ function supportingSlots(plan: ActivityPlan): Slot[] {
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the records are created in that account's repo.
  * @param input - The Activity and its supporting records. See {@link ActivityInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new Activity's URI and CID, and the references of the supporting records that
  * were created. See {@link CreateActivityResult}.
  * @throws {@link TypeError} If `input` has an unknown field, a mixed or wrongly typed choice (a
@@ -363,6 +364,7 @@ function supportingSlots(plan: ActivityPlan): Slot[] {
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
  * a retry can duplicate records under new keys.
+ * @throws {@link PartialWriteError} With `{ repo }` of an organization, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *

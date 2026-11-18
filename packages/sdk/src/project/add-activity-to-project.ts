@@ -38,13 +38,24 @@ export interface AddActivityToProjectResult extends StrongRef {
  * concurrency check and what is not deduplicated or re-signed. It also checks that the Collection's
  * type is `project`; a Collection of another type is refused with a `TypeError`.
  *
+ * With `{ repo: orgDid }` the Project must be in the organization's repository. A new Activity is
+ * created first, then the Project is replaced with one `putRecord` guarded by the Project's own
+ * version (`swapRecord`), so a concurrent change to it is still refused. The repository-wide
+ * `swapCommit` that guards the account's own repository when a new Activity is created is not
+ * available through the Certified Group Service and is not sent: another write to the organization
+ * that does not touch the Project is not detected. If the update fails after the Activity was created,
+ * {@link PartialWriteError} says so; pass the new Activity as `{ uri }` to try again. Replacing a
+ * Project that another member created needs the admin role.
+ *
  * @param context - The shared context from {@link createSDKContext}, with an authenticated client.
  * @param input - The Project, the Activity and an optional weight.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The Project's new version as `uri` and `cid`, and the Activity as `activity` (`created` is
  * `false` for `{ uri }`).
  * @throws {@link TypeError} If the input is invalid, or the Collection is not your own Project.
  * @throws {@link WriteRejectedError} If the PDS rejected the write, including `"InvalidSwap"`: the
  * Project changed since it was read (`activity: { uri }`), or the repository did (a new Activity).
+ * @throws {@link PartialWriteError} With `{ repo }` of an organization, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
  * a retry can duplicate new records under new keys. For `activity: { uri }` only the Project was written
  * (one `putRecord`): its stored CID is no proof either way. Compare it with the Project entry of `attempted`:

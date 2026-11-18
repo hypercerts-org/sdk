@@ -94,6 +94,7 @@ const createStandaloneProfile = standaloneCreatorOf("createProfile", profileKind
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
  * @param input - The profile's data. See {@link ProfileInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new record's URI and CID.
  * @throws {@link TypeError} If `input` has an unknown field, or a value the lexicon does not
  * allow, for example more than three `langs` or an avatar that is not a JPEG, PNG or WebP image.

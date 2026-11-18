@@ -112,6 +112,7 @@ function recipientOf({ subject }: award.Main, uri: string): DidString {
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated as the recipient.
  * @param input - The award, the answer and an optional weight. See {@link RespondToBadgeAwardInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new response's URI and CID.
  * @throws {@link TypeError} If `award.uri` is not `at://<did>/app.certified.badge.award/<rkey>`, if
  * `response` is not `"accepted"` or `"rejected"`, if `weight` is given with a rejected response or

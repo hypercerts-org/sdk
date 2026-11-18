@@ -29,6 +29,7 @@ import {
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
  * @param input - The tag's data. See {@link VocabularyTagInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new tag's URI and CID with `created: true`, and the results for the tags it points
  * at. See {@link CreateVocabularyTagResult}.
  * @throws {@link TypeError} If `input` has an unknown field, a `category` or `key` that is not a
@@ -48,6 +49,7 @@ import {
  * {@link RecordAlreadyExistsError} from the retry only means one key is taken, and a retry that
  * races the first write can throw {@link WriteOutcomeUnknownError} again. Check each attempted URI
  * before treating the tags as created.
+ * @throws {@link PartialWriteError} With `{ repo }` of an organization, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *

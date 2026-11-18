@@ -146,6 +146,7 @@ function assertValidityRange(build: BuildContext, input: l.InferOutput<typeof aw
  * authenticated; the award, and a new definition, are created in that account's repo.
  * @param input - The badge, the subject and the optional note, link and validity. See
  * {@link AwardBadgeInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The award's URI and CID at the top, and the definition's beside them, with whether this call created it. See
  * {@link AwardBadgeResult}.
  * @throws {@link TypeError} If `input` has an unknown field; `subject` is neither `{ did }` nor
@@ -159,6 +160,7 @@ function assertValidityRange(build: BuildContext, input: l.InferOutput<typeof aw
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
  * a retry can duplicate records under new keys. `attempted` lists a new definition, if any, then the award.
+ * @throws {@link PartialWriteError} With `{ repo }` of an organization, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *

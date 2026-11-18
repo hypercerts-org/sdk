@@ -106,6 +106,7 @@ const acknowledgementKind: RecordKind<AcknowledgementInput> = recordKind(
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the record is created in that account's repo.
  * @param input - The acknowledgement. See {@link AcknowledgementInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new record's URI and CID, and the CIDs its `subject` and
  * `{ uri }` `context` were pinned at. See {@link CreateAcknowledgementResult}.
  * @throws {@link TypeError} If `input` has an unknown field, a `subject` that is not `{ uri }`, an

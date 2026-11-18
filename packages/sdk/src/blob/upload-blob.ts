@@ -39,7 +39,9 @@ export interface UploadBlobOptions {
  * records embed, for example as an image or attachment.
  *
  * @remarks
- * The upload goes through the context's client; the SDK opens no connection of its own.
+ * The upload goes through the context's client; the SDK opens no connection of its own. With `repo`
+ * set to an organization's DID it goes to the Certified Group Service instead, with a service-auth
+ * token the context's client obtains from the account's PDS.
  *
  * Uploads are not part of the atomic write. A blob is stored as soon as it is uploaded, before any
  * record refers to it, and a record write that fails afterwards does not undo it. The `create*`
@@ -62,7 +64,8 @@ export interface UploadBlobOptions {
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
  * @param data - The content to upload. See {@link BlobData}.
- * @param options - The content's MIME type. See {@link UploadBlobOptions}.
+ * @param options - The content's MIME type, and optionally `repo`, the DID of an organization to upload
+ * to through the Certified Group Service. See {@link UploadBlobOptions}.
  * @returns The {@link TypedBlobRef} for the uploaded content: its CID (`ref`), `mimeType` and `size`.
  * @throws {@link TypeError} If `data` is not a `Blob`, `Uint8Array` or `ArrayBuffer`, or if no MIME
  * type is given or derivable, or it is not of the form `type/subtype`.

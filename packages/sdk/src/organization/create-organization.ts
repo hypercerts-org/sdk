@@ -141,9 +141,18 @@ const inputSchema = strictObject({
  * This creates records in the repository the client is signed in to. It does not create accounts,
  * and has no connection to a group service.
  *
+ * With `{ repo: orgDid }` the profile and the organization are created in the organization's
+ * repository, one request each, the profile first. The `swapCommit` that guards the account's own
+ * repository against a concurrent write is not available through the Certified Group Service and is
+ * not sent. A concurrent creation of the organization is still caught, because both records have a
+ * fixed key: the loser gets {@link OrganizationAlreadyExistsError}, or {@link PartialWriteError} with
+ * a {@link RecordAlreadyExistsError} as its `failure` when the profile had already been written. The
+ * profile is then reused by a second call.
+ *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the records are created in that account's repo.
  * @param input - The organization and the fallback profile. See {@link CreateOrganizationInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The organization's URI and CID, the profile's with whether it was created or reused,
  * and the locations. See {@link CreateOrganizationResult}.
  * @throws {@link TypeError} If `input` has an unknown field or a value the lexicons do not allow, a
@@ -166,6 +175,7 @@ const inputSchema = strictObject({
  * so it either creates everything or throws {@link OrganizationAlreadyExistsError}, which then
  * means the first attempt succeeded and no second set of locations or profile is created. The new
  * records are the ones in `attempted` of the first error.
+ * @throws {@link PartialWriteError} With `{ repo }` of an organization, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *
