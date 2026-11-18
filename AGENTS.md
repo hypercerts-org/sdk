@@ -22,6 +22,7 @@ Put detailed guides, design notes and decision records in dedicated documentatio
 - Packages are ESM-only. Every public entry point must be listed in the package's `exports` field.
 - Keep packages free of import-time side effects so unused operations can be tree-shaken (`sideEffects: false`).
 - Helpers shared by several operations usually live in `packages/sdk/src/internal/` and are not exported. Check there, and search the package, before writing a private helper (see below for where shared code goes). `pnpm check:duplicates` (also run in CI) reports copied code, including renamed copies and functions with the same structure. When `check:duplicates` finds a clone, share the code rather than loosening the check.
+- Name a file after the public `create*`/`add*`/`award*` operation it holds (`create-x.ts`, `add-x.ts`, `award-x.ts`); a file holding several operations is split. `build-*.ts` holds planning helpers, input types and record kinds only.
 - Put code where a reader would look for it. Code shared by several domains usually belongs in `internal/`, but use judgement: if it is really one domain's logic that another domain builds on (for example `addActivityToProject` reusing the collection domain's `addActivity`), keep it in its domain and import it from there. Move code when its home stops making sense, not by rule. Avoid circular imports between domains. When `internal/` grows too large to scan, group it into subfolders by concern (for example `internal/records/`, `internal/writes/`) rather than by domain.
 
 ## Tooling

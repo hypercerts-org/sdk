@@ -8,5 +8,5 @@ export {
   WriteResultMismatchError,
 } from "../errors.js";
 export type { StrongRef } from "../internal/resolve-record-ref.js";
-export type { ProfileInput } from "./build-profile.js";
-export { createProfile, ProfileAlreadyExistsError } from "./build-profile.js";
+export type { ProfileInput } from "./create-profile.js";
+export { createProfile, ProfileAlreadyExistsError } from "./create-profile.js";

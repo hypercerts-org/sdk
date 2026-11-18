@@ -7,7 +7,7 @@ import {
   entryWeight,
   existingActivitySlot,
 } from "../activity/activity-entry.js";
-import { type ActivityInput, activityTextFields } from "../activity/build-activity.js";
+import { type ActivityInput, activityTextFields } from "../activity/create-activity.js";
 import {
   type CollectionInput,
   type CreateCollectionItemResult,
@@ -81,7 +81,7 @@ export interface CreateProjectResult extends StrongRef {
 }
 
 /** A Project and its new records, validated and ready to submit. Nothing is written. */
-export interface PreparedProject {
+interface PreparedProject {
   /** The records to create, in the order to submit them: the Project is last. */
   readonly writes: readonly PreparedRecord[];
   /** What the caller gets back once the writes are committed. */

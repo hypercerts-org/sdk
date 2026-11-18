@@ -3,7 +3,7 @@ import * as measurement from "@hypercerts-org/lexicon/org/hypercerts/context/mea
 import { dateRange, optionalText } from "../internal/input.js";
 import { type RecordKind, recordKind } from "../internal/record-kind.js";
 import type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
-import type { LocationInput } from "../location/build-location.js";
+import type { LocationInput } from "../location/create-location.js";
 import {
   creatorOf,
   decimalString,

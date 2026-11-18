@@ -9,11 +9,11 @@ import type { PreparedRecord } from "../internal/prepare-record.js";
 import { buildRecord } from "../internal/record-kind.js";
 import { parseRecordUri, readRecord, type StrongRef } from "../internal/resolve-record-ref.js";
 import { isInputObject, toSlot } from "../internal/slots.js";
-import { type BadgeDefinitionInput, badgeDefinitionKind } from "./build-definition.js";
+import { type BadgeDefinitionInput, badgeDefinitionKind } from "./create-badge-definition.js";
 
 // What an award points at: the subject it is for and the badge definition it uses.
 
-export type DefinitionPlan =
+type DefinitionPlan =
   | { kind: "existing"; uri: string }
   | { kind: "new"; input: BadgeDefinitionInput };
 
@@ -48,7 +48,7 @@ function assertIssuerAllowed(
   );
 }
 
-export interface ResolvedDefinition {
+interface ResolvedDefinition {
   readonly ref: StrongRef;
   /** The record to write with the award, when the definition is new. */
   readonly created: PreparedRecord | undefined;

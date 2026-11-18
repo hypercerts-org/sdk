@@ -8,7 +8,7 @@ import { describeError } from "./describe.js";
  * Which blob wrapper a lexicon field uses: `smallImage` (images only, 5 MB), `largeImage` (images
  * only, 10 MB) or `smallBlob` (any file, 10 MB).
  */
-export type BlobKind = "image" | "largeImage" | "blob";
+type BlobKind = "image" | "largeImage" | "blob";
 
 /**
  * Turns a field that accepts a URL or a file into the lexicon value for it: a string becomes

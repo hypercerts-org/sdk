@@ -33,7 +33,7 @@ const collectionRef = strictObject({ uri: l.string() });
  * Internal. `addActivityToCollection` and `addActivityToProject` do the same work; they differ in
  * the words of their messages and in the Project's check of the Collection's `type`.
  */
-export interface AddActivityTarget {
+interface AddActivityTarget {
   /** The input field that holds the `{ uri }`, as the caller wrote it: "collection" or "project". */
   readonly field: string;
   /** What the record is called in messages: "Collection" or "Project". */

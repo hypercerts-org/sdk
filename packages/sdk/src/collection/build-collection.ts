@@ -6,14 +6,14 @@ import {
   type ActivityInput,
   type CreateActivityResult,
   planActivitySlot,
-} from "../activity/build-activity.js";
+} from "../activity/create-activity.js";
 import {
   type CreateFeatureResult,
   type FeatureInput,
   type FeatureTree,
   featureKind,
   featureResult,
-} from "../feature/build-feature.js";
+} from "../feature/create-feature.js";
 import { type BuildContext, parseInput } from "../internal/build-context.js";
 import {
   compact,
@@ -41,7 +41,7 @@ import {
   toExistingSlot,
   toSlot,
 } from "../internal/slots.js";
-import { type LocationInput, locationKind } from "../location/build-location.js";
+import { type LocationInput, locationKind } from "../location/create-location.js";
 import {
   type CreateVocabularyTagResult,
   type VocabularyTagInput,
@@ -180,7 +180,7 @@ export interface CreateCollectionResult extends StrongRef {
  * How messages name the items of a Collection when the caller passed them under another name, as a
  * Project does with `activities`.
  */
-export interface ItemNames {
+interface ItemNames {
   /** The list of items, for example `input.activities` for `input.activities[0]`. */
   readonly items: string;
   /** The path of an existing item's URI within an item, when it is not `uri`: `activity.uri`. */

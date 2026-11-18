@@ -47,7 +47,7 @@ export type ReferenceOf = (slot: Slot) => StrongRef;
  * What a call reports for one planned record, built once the records it writes are prepared:
  * `created` holds those, and `refOf` gives the reference of any slot.
  */
-export type ResultOf<TResult> = (
+type ResultOf<TResult> = (
   created: ReadonlyMap<Slot, PreparedRecord>,
   refOf: ReferenceOf,
 ) => TResult;
@@ -65,7 +65,7 @@ export interface Planned<TResult> {
  * A new record to create, with its input already validated and the slots of the records it points
  * at planned.
  */
-export interface NewChoice {
+interface NewChoice {
   readonly kind: "new";
   /**
    * The record key the input decided (a vocabulary tag's `<category>.<key>`, a profile's `self`),
@@ -84,7 +84,7 @@ export interface NewChoice {
  * - `inline`: a value the Activity's lexicon stores directly instead of a record.
  * - `new`: a record to create. See {@link NewChoice}.
  */
-export type SlotChoice =
+type SlotChoice =
   | { readonly kind: "existing"; readonly uri: string }
   | { readonly kind: "inline"; readonly value: string }
   | NewChoice;
@@ -345,7 +345,7 @@ const referencedSlots = ({ references }: NewChoice): Slot[] =>
   Object.values(references).flatMap((target) => (isSlotList(target) ? [...target] : [target]));
 
 /** The slots of `slots` whose record this call creates. */
-export const newSlots = (slots: readonly Slot[]): NewSlot[] => slots.filter(isNew);
+const newSlots = (slots: readonly Slot[]): NewSlot[] => slots.filter(isNew);
 
 /**
  * Fails when two records the call creates would have the same URI, because they chose the same
@@ -353,7 +353,7 @@ export const newSlots = (slots: readonly Slot[]): NewSlot[] => slots.filter(isNe
  *
  * Throws TypeError, naming both fields.
  */
-export function assertDistinctKeys(build: BuildContext, slots: readonly NewSlot[]): void {
+function assertDistinctKeys(build: BuildContext, slots: readonly NewSlot[]): void {
   const seen = new Map<string, NewSlot>();
   for (const slot of slots) {
     if (slot.choice.key === undefined) continue;
@@ -375,7 +375,7 @@ export function assertDistinctKeys(build: BuildContext, slots: readonly NewSlot[
  *
  * Throws what `resolveRecordRef` throws, and RecordAlreadyExistsError when a chosen key is taken.
  */
-export async function readBeforeWriting(
+async function readBeforeWriting(
   build: BuildContext,
   slots: readonly Slot[],
   { checkKeys }: { checkKeys: boolean },
@@ -476,7 +476,7 @@ export async function prepareNew(
  * The reference every slot has once the reads and the builds are done: the resolved CID of an
  * existing record, or the CID computed for a new one.
  */
-export function referenceLookup(
+function referenceLookup(
   existingRefs: ReadonlyMap<Slot, StrongRef>,
   created: ReadonlyMap<Slot, PreparedRecord>,
 ): ReferenceOf {
@@ -488,7 +488,7 @@ export function referenceLookup(
 }
 
 /** What `prepareSlots` returns: the reads, the records to write, and every slot's reference. */
-export interface PreparedSlots {
+interface PreparedSlots {
   existing: Map<Slot, StrongRef>;
   created: Map<Slot, PreparedRecord>;
   refOf: ReferenceOf;

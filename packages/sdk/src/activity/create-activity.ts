@@ -42,18 +42,18 @@ import {
   toSlot,
 } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
-import { type LocationInput, locationKind } from "../location/build-location.js";
+import { type LocationInput, locationKind } from "../location/create-location.js";
 import {
   type CreateWorkScopeTagResult,
   type WorkScopeTagInput,
   workScopeTagKind,
 } from "../tag/build-tag.js";
-import { type ContributionInput, contributionKind } from "./build-contribution.js";
+import { type ContributionInput, contributionKind } from "./create-contribution.js";
 import {
   type ContributorInformationInput,
   contributorInformationKind,
-} from "./build-contributor-information.js";
-import { type RightsInput, rightsKind } from "./build-rights.js";
+} from "./create-contributor-information.js";
+import { type RightsInput, rightsKind } from "./create-rights.js";
 
 /**
  * A value the Activity stores directly, without a supporting record: a contributor's identity
@@ -458,7 +458,7 @@ export async function createActivity(
 }
 
 /** An Activity and its new supporting records, validated and ready to submit. Nothing is written. */
-export interface PreparedActivity {
+interface PreparedActivity {
   /** The records to create, in the order to submit them: the new supporting records, then the Activity. */
   readonly writes: readonly PreparedRecord[];
   /** What the caller gets back once the writes are committed. */
@@ -528,10 +528,7 @@ export function planActivitySlot(
  * Throws what `createActivity` throws before its write: TypeError for invalid input and Error for
  * a failed read or upload.
  */
-export async function prepareActivity(
-  build: BuildContext,
-  input: unknown,
-): Promise<PreparedActivity> {
+async function prepareActivity(build: BuildContext, input: unknown): Promise<PreparedActivity> {
   const planned = planActivitySlot(build, input);
   // Reads first, then uploads: a URI that cannot be resolved fails before anything is uploaded.
   const { created, refOf } = await prepareSlots(build, [planned.slot], { checkKeys: true });

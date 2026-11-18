@@ -11,7 +11,7 @@ import type { PreparedRecord } from "./prepare-record.js";
 import { parseRecordUri, type StrongRef } from "./resolve-record-ref.js";
 
 /** What a request writes besides the records it creates. */
-export interface SubmitOptions {
+interface SubmitOptions {
   /**
    * Existing records to replace with a new full value, written after the creates in the same
    * commit. Each is prepared with the record key it already has (see `prepareRecord`).
@@ -50,7 +50,7 @@ interface Request {
  * 0.5.34 and 0.5.44) rejects a request with more with HTTP 400 "Too many writes. Max: 200"; the
  * lexicon states no limit.
  */
-export const MAX_WRITES_PER_REQUEST = 200;
+const MAX_WRITES_PER_REQUEST = 200;
 
 /**
  * Fails before anything is uploaded or written when a call would write more records than one
@@ -196,7 +196,7 @@ function toAlreadyExists(
 }
 
 /** The record `submitDelete` removes, and the version it must still have, if the caller knows it. */
-export interface DeleteTarget {
+interface DeleteTarget {
   /** The record's URI, `at://<did>/<collection>/<rkey>`. */
   readonly uri: string;
   /** Delete only if the record still has this CID. Absent: delete whatever version it has. */

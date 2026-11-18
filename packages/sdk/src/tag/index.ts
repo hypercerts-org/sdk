@@ -16,4 +16,5 @@ export type {
   VocabularyTagInput,
   WorkScopeTagInput,
 } from "./build-tag.js";
-export { createVocabularyTag, createWorkScopeTag } from "./build-tag.js";
+export { createVocabularyTag } from "./create-vocabulary-tag.js";
+export { createWorkScopeTag } from "./create-work-scope-tag.js";

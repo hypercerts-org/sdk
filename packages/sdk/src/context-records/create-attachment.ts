@@ -10,7 +10,7 @@ import {
 import { type RecordKind, recordKind, references } from "../internal/record-kind.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
-import type { LocationInput } from "../location/build-location.js";
+import type { LocationInput } from "../location/create-location.js";
 import {
   type CreateVocabularyTagResult,
   type VocabularyTagInput,

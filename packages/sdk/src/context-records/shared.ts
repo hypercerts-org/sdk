@@ -10,7 +10,7 @@ import {
 } from "../internal/record-kind.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import { type ExistingRecord, isExistingRecord } from "../internal/slots.js";
-import { locationKind } from "../location/build-location.js";
+import { locationKind } from "../location/create-location.js";
 
 // What more than one of the context records have in common: `content`, DID lists, decimal strings,
 // and links to other records.
