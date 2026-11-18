@@ -2,7 +2,7 @@
 
 Read [../SKILL.md](../SKILL.md) first for setup, blob uploads and error handling. Every example assumes `context` from `createSDKContext`.
 
-`createOrganization(context, { organization, profileIfMissing? })` creates the signed-in account's organization record (`app.certified.actor.organization`, key `self`) and, if the account has no profile yet, its profile (`app.certified.actor.profile`, see [profile.md](profile.md)), together with any new locations (see [location.md](location.md)), in one `applyWrites` commit. It creates records in the account you are signed in as; it does not create accounts.
+`createOrganization(context, { organization, profileIfMissing? })` creates the signed-in account's organization record (`app.certified.actor.organization`, key `self`) and, if the account has no profile yet, its profile (`app.certified.actor.profile`, see [profile.md](profile.md)), together with any new locations (see [location.md](location.md)), in one `applyWrites` commit (with `{ repo }`, see [org-writes.md](org-writes.md): one request per record instead). It creates records in the account you are signed in as, or `{ repo }`; it does not create accounts or register groups.
 
 ```ts
 import { createOrganization } from "@hypercerts-org/sdk/organization";

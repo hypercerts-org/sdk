@@ -2,7 +2,7 @@
 
 Read [../SKILL.md](../SKILL.md) first for setup and error handling. Every example assumes `context` from `createSDKContext`.
 
-The subpath covers `app.certified.graph.*` (follows) and `app.certified.feed.*` (likes, reposts). Each action has a create function and an undo function; all of them act on the signed-in account's own repo. Create functions take the **subject** (what to follow, like or repost); undo functions take **your own record** that the create function made, exactly as it returned it.
+The subpath covers `app.certified.graph.*` (follows) and `app.certified.feed.*` (likes, reposts). Each action has a create function and an undo function; all of them act on the signed-in account's own repo (or `{ repo }`, see [org-writes.md](org-writes.md)). Create functions take the **subject** (what to follow, like or repost); undo functions take **your own record** that the create function made, exactly as it returned it.
 
 A record is always `{ uri }` and an account is always `{ did }`, never a bare string.
 

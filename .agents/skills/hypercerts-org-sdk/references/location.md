@@ -1,6 +1,6 @@
 # Location domain (`@hypercerts-org/sdk/location`)
 
-`createLocation(context, input)` creates one `app.certified.location` record in the signed-in account's repo and returns `{ uri, cid }`. The record key is a new TID.
+`createLocation(context, input)` creates one `app.certified.location` record in the signed-in account's repo (or `{ repo }`, see [org-writes.md](org-writes.md)) and returns `{ uri, cid }`. The record key is a new TID.
 
 Create a location on its own when several activities share it. For a location used by one activity, pass it inline in `createActivity`'s `locations` instead (see [activity.md](activity.md)).
 

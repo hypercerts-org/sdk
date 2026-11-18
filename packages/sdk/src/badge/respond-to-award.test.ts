@@ -117,12 +117,12 @@ describe("respondToBadgeAward", () => {
     [
       "an account",
       forDid(OTHER),
-      /is for did:plc:other222 and the client is signed in as did:plc:testowner123/,
+      /is for did:plc:other222 and the response would be written to the signed-in account \(did:plc:testowner123\)/,
     ],
     [
       "a record in another account's repository",
       forRecord(`at://${OTHER}/${ACTIVITY}/3k2a4b5c6d7e8`),
-      /is for did:plc:other222 and the client is signed in as/,
+      /is for did:plc:other222 and the response would be written to the signed-in account/,
     ],
   ])(
     "refuses to respond to an award for %s that is not the signed-in account's",

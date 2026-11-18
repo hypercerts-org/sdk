@@ -2,6 +2,7 @@ import type { DidString, LexMap } from "@atproto/lex";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createActivity, createRights } from "./activity/index.js";
 import { createProfile } from "./actor/index.js";
+import { awardBadge, respondToBadgeAward } from "./badge/index.js";
 import { uploadBlob } from "./blob/index.js";
 import { addActivityToCollection, createCollection } from "./collection/index.js";
 import { PartialWriteError, RecordAlreadyExistsError } from "./errors.js";
@@ -126,6 +127,8 @@ describe("writes with { repo: orgDid }", () => {
 
     expect(error).toBeInstanceOf(TypeError);
     expect(error.message).toContain("repository of");
+    expect(error.message).toContain(`the organization repo ${ORG} (written via { repo })`);
+    expect(error.message).not.toContain(`(${DID})`);
     expect(cgs.requests).toEqual([]);
   });
 
@@ -284,6 +287,122 @@ describe("writes with { repo: orgDid }", () => {
     ).catch((e) => e);
 
     expect(error).toBeInstanceOf(TypeError);
+    expect(error.message).toContain(`the organization repo ${ORG} (written via { repo })`);
+    expect(cgs.requests).toEqual([]);
+  });
+
+  it("awardBadge checks allowedIssuers against the org, not the member, and names the org", async () => {
+    const definition = `at://${ORG}/app.certified.badge.definition/3k2a4b5c6d7e8`;
+    const cgs = fakeCgs({
+      records: {
+        [definition]: {
+          $type: "app.certified.badge.definition",
+          title: "T",
+          badgeType: "verification",
+          allowedIssuers: [{ did: DID }],
+          createdAt: "2024-01-01T00:00:00.000Z",
+        },
+      },
+    });
+
+    const error = await awardBadge(
+      cgs.context,
+      { definition: { uri: definition }, subject: { did: "did:plc:other222" } },
+      { repo },
+    ).catch((e) => e);
+
+    expect(error.message).toContain(`the award would be written to the organization repo ${ORG}`);
+    expect(error.message).toContain(`lets only ${DID} award it`);
+    expect(cgs.requests).toEqual([]);
+  });
+
+  it("awardBadge writes the award to the org when the org is an allowed issuer", async () => {
+    const definition = `at://${ORG}/app.certified.badge.definition/3k2a4b5c6d7e8`;
+    const cgs = fakeCgs({
+      records: {
+        [definition]: {
+          $type: "app.certified.badge.definition",
+          title: "T",
+          badgeType: "verification",
+          allowedIssuers: [{ did: ORG }],
+          createdAt: "2024-01-01T00:00:00.000Z",
+        },
+      },
+    });
+
+    const result = await awardBadge(
+      cgs.context,
+      { definition: { uri: definition }, subject: { did: "did:plc:other222" } },
+      { repo },
+    );
+
+    expect(result.uri.startsWith(`at://${ORG}/app.certified.badge.award/`)).toBe(true);
+    expect(cgs.requests.map((request) => request.method)).toEqual([CREATE]);
+  });
+
+  it("respondToBadgeAward requires the org to be the recipient and names the org", async () => {
+    const award = `at://${ORG}/app.certified.badge.award/3k2a4b5c6d7e8`;
+    const cgs = fakeCgs({
+      records: {
+        [award]: {
+          $type: "app.certified.badge.award",
+          badge: {
+            uri: `at://${ORG}/app.certified.badge.definition/3k2a4b5c6d7e8`,
+            cid: "bafyreigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+          },
+          subject: { $type: "app.certified.defs#did", did: DID },
+          createdAt: "2024-01-01T00:00:00.000Z",
+        },
+      },
+    });
+
+    const error = await respondToBadgeAward(
+      cgs.context,
+      { award: { uri: award }, response: "accepted" },
+      { repo },
+    ).catch((e) => e);
+
+    expect(error.message).toContain(`is for ${DID}`);
+    expect(error.message).toContain(
+      `the response would be written to the organization repo ${ORG}`,
+    );
+    expect(cgs.requests).toEqual([]);
+  });
+
+  it("respondToBadgeAward writes the response to the org when the award is for the org", async () => {
+    const award = `at://${ORG}/app.certified.badge.award/3k2a4b5c6d7e8`;
+    const cgs = fakeCgs({
+      records: {
+        [award]: {
+          $type: "app.certified.badge.award",
+          badge: {
+            uri: `at://${ORG}/app.certified.badge.definition/3k2a4b5c6d7e8`,
+            cid: "bafyreigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+          },
+          subject: { $type: "app.certified.defs#did", did: ORG },
+          createdAt: "2024-01-01T00:00:00.000Z",
+        },
+      },
+    });
+
+    const result = await respondToBadgeAward(
+      cgs.context,
+      { award: { uri: award }, response: "accepted" },
+      { repo },
+    );
+
+    expect(result.uri.startsWith(`at://${ORG}/app.certified.badge.response/`)).toBe(true);
+  });
+
+  it("a handle as repo throws a TypeError before any request", async () => {
+    const cgs = fakeCgs();
+
+    const error = await createRights(cgs.context, rightsInput, {
+      repo: "acme.test" as DidString,
+    }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(TypeError);
+    expect(error.message).toContain("Handles are not accepted");
     expect(cgs.requests).toEqual([]);
   });
 

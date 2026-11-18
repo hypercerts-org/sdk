@@ -6,7 +6,12 @@ import {
   planActivityEntry,
 } from "../activity/activity-entry.js";
 import type { SDKContext } from "../context.js";
-import { type BuildContext, createBuildContext, parseInput } from "../internal/build-context.js";
+import {
+  type BuildContext,
+  createBuildContext,
+  describeWrittenRepo,
+  parseInput,
+} from "../internal/build-context.js";
 import { describeError } from "../internal/describe.js";
 import { compact, strictObject } from "../internal/input.js";
 import { type PreparedRecord, prepareUpdate } from "../internal/prepare-record.js";
@@ -128,7 +133,7 @@ function parseCollectionUri(
   );
   if (parsed.did !== build.did) {
     throw new TypeError(
-      `${build.operation}: ${field}.uri is in the repository of ${parsed.did}, but the client is signed in as ${build.context.client.did} and this operation changes only the signed-in account's own ${noun}s: ${uri}.`,
+      `${build.operation}: ${field}.uri is in the repository of ${parsed.did}, but this operation writes to ${describeWrittenRepo(build)} and changes only that repository's own ${noun}s: ${uri}.`,
     );
   }
   return parsed.rkey;

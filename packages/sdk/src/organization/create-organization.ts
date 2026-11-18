@@ -138,8 +138,8 @@ const inputSchema = strictObject({
  * `app.certified.actor.profile` and `app.certified.location` when this call creates them. Unlike
  * {@link createProfile}, no `update` permission is needed.
  *
- * This creates records in the repository the client is signed in to. It does not create accounts,
- * and has no connection to a group service.
+ * This creates records in the repository the client is signed in to, or with `{ repo }` in an
+ * organization's. It does not create accounts and does not register or create groups.
  *
  * With `{ repo: orgDid }` the profile and the organization are created in the organization's
  * repository, one request each, the profile first. The `swapCommit` that guards the account's own

@@ -323,7 +323,7 @@ describe("addActivityToCollection when the input is wrong", () => {
     [
       "a Collection of another account",
       { collection: { uri: "at://did:plc:someoneelse/org.hypercerts.collection/3k2a4b5c6d7e8" } },
-      /in the repository of did:plc:someoneelse, but the client is signed in as did:plc:testowner123.*own Collections/,
+      /in the repository of did:plc:someoneelse, but this operation writes to the signed-in account \(did:plc:testowner123\).*own Collections/,
     ],
     [
       "a handle authority",

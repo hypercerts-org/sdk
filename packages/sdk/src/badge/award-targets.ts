@@ -2,7 +2,7 @@ import { type DidString, l } from "@atproto/lex";
 import * as definition from "@hypercerts-org/lexicon/app/certified/badge/definition";
 import * as certifiedDefs from "@hypercerts-org/lexicon/app/certified/defs";
 import * as strongRef from "@hypercerts-org/lexicon/com/atproto/repo/strongRef";
-import { type BuildContext, parseInput } from "../internal/build-context.js";
+import { type BuildContext, describeWrittenRepo, parseInput } from "../internal/build-context.js";
 import { describeError, describeValue } from "../internal/describe.js";
 import { strictObject } from "../internal/input.js";
 import type { PreparedRecord } from "../internal/prepare-record.js";
@@ -44,7 +44,7 @@ function assertIssuerAllowed(
       ? "lists no allowed issuers, so no one can award it"
       : `lets only ${allowedIssuers.join(", ")} award it`;
   throw new Error(
-    `${build.operation}: ${which} ${reason}, but the client is signed in as ${build.context.client.did}. No record was written. Award a badge whose definition allows this account, or leave allowedIssuers out of the definition to let anyone award it.`,
+    `${build.operation}: ${which} ${reason}, but the award would be written to ${describeWrittenRepo(build)}. No record was written. Award a badge whose definition allows that repository, or leave allowedIssuers out of the definition to let anyone award it.`,
   );
 }
 

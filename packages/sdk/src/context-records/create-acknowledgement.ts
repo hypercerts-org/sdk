@@ -86,8 +86,8 @@ const acknowledgementKind: RecordKind<AcknowledgementInput> = recordKind(
  * of a link between two records, in the authenticated account's repo.
  *
  * @remarks
- * The acknowledgement is always written to the signed-in account's repo. There is no way to write
- * one on behalf of another account, and the SDK does not check that the account has any
+ * The acknowledgement is written to the signed-in account's repo, or with `{ repo }` to an
+ * organization's through the Certified Group Service. The SDK does not check that the account has any
  * relationship to the subject: that is for whoever reads the acknowledgement to judge. The
  * acknowledged record is not modified and does not learn about it.
  *

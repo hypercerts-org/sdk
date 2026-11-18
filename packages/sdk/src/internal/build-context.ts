@@ -120,6 +120,16 @@ export function parseInput<T>(
 }
 
 /**
+ * Names the repository a call writes to, for error messages that print `build.did`: "the
+ * signed-in account" for the client's own repo, the organization repo when `{ repo }` chose it.
+ */
+export function describeWrittenRepo(build: BuildContext): string {
+  return build.did === build.context.client.did
+    ? `the signed-in account (${build.did})`
+    : `the organization repo ${build.did} (written via { repo })`;
+}
+
+/**
  * Splits `uri` into its parts (see `parseRecordUri`) and checks that it names a record of
  * `collection` in the signed-in account's own repo, before any request is sent.
  *

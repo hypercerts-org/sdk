@@ -4,7 +4,7 @@ import * as response from "@hypercerts-org/lexicon/app/certified/badge/response"
 import * as certifiedDefs from "@hypercerts-org/lexicon/app/certified/defs";
 import * as strongRef from "@hypercerts-org/lexicon/com/atproto/repo/strongRef";
 import type { SDKContext } from "../context.js";
-import { prepareChecked, startCall } from "../internal/build-context.js";
+import { describeWrittenRepo, prepareChecked, startCall } from "../internal/build-context.js";
 import { describeError } from "../internal/describe.js";
 import { compact, optionalText, strictObject, weightString } from "../internal/input.js";
 import {
@@ -169,7 +169,7 @@ export async function respondToBadgeAward(
   const recipient = recipientOf(checked.value, parsed.award.uri);
   if (recipient !== build.did) {
     throw new Error(
-      `${OPERATION}: only the recipient can respond to a badge award, but ${parsed.award.uri} is for ${recipient} and the client is signed in as ${build.context.client.did}. No record was written. For an award to a record, the recipient is the account whose repository holds that record.`,
+      `${OPERATION}: only the recipient can respond to a badge award, but ${parsed.award.uri} is for ${recipient} and the response would be written to ${describeWrittenRepo(build)}. No record was written. For an award to a record, the recipient is the account whose repository holds that record.`,
     );
   }
 
