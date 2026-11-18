@@ -8,7 +8,7 @@ import {
   WriteRejectedError,
   WriteResultMismatchError,
 } from "../errors.js";
-import { CGS_DID, type CgsRequest, fakeCgs, ORG } from "../test-utils/fake-cgs.js";
+import { CGS_AUD, type CgsRequest, fakeCgs, ORG } from "../test-utils/fake-cgs.js";
 import { DID, json } from "../test-utils/fake-pds.js";
 import { HEAD } from "../test-utils/fake-repo.js";
 import { createBuildContext } from "./build-context.js";
@@ -95,9 +95,9 @@ describe("cgsTarget.submit", () => {
     expect(cgs.requests.every((r) => r.body?.swapCommit === undefined)).toBe(true);
     // One token per request, for the CGS audience and that request's own method, none reused.
     expect(cgs.tokens.map(({ aud, lxm }) => [aud, lxm])).toEqual([
-      [CGS_DID, CREATE],
-      [CGS_DID, CREATE],
-      [CGS_DID, PUT],
+      [CGS_AUD, CREATE],
+      [CGS_AUD, CREATE],
+      [CGS_AUD, PUT],
     ]);
     expect(new Set(cgs.tokens.map((t) => t.jti)).size).toBe(3);
     expect(cgs.store.get(updated.ref.uri)?.cid).toBe(updated.ref.cid);
@@ -191,7 +191,7 @@ describe("cgsTarget.submit", () => {
 
     expect(error).not.toBeInstanceOf(WriteRejectedError);
     expect(error.message).toContain("cannot get a service-auth token");
-    expect(error.message).toContain(`rpc:${CREATE}?aud=${CGS_DID}`);
+    expect(error.message).toContain(`rpc:${CREATE}?aud=did:web:cgs.test%23certified_group_service`);
     expect(cgs.requests).toEqual([]);
   });
 
@@ -227,6 +227,34 @@ describe("cgsTarget.submit", () => {
       .catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteResultMismatchError);
+  });
+});
+
+describe("cgsTarget error wording", () => {
+  it("names the Certified Group Service, not the PDS, when CGS rejects or does not answer", async () => {
+    const rejecting = fakeCgs({ answer: () => json(403, { error: "Forbidden", message: "no" }) });
+    const rejected = await target(rejecting)
+      .submit({ creates: [await rec()], updates: [], createOnly: false })
+      .catch((e) => e);
+    expect(rejected).toBeInstanceOf(WriteRejectedError);
+    expect(rejected.message).toContain("the Certified Group Service rejected the request");
+    expect(rejected.message).not.toContain("the PDS");
+
+    const silent = fakeCgs({ answer: () => json(500, { error: "InternalServerError" }) });
+    const unknown = await target(silent)
+      .submit({ creates: [await rec()], updates: [], createOnly: false })
+      .catch((e) => e);
+    expect(unknown).toBeInstanceOf(WriteOutcomeUnknownError);
+    expect(unknown.message).toContain("no usable answer from the Certified Group Service");
+    expect(unknown.message).not.toContain("the PDS");
+  });
+
+  it("names the Certified Group Service when a delete is rejected", async () => {
+    const cgs = fakeCgs({ answer: () => json(400, { error: "InvalidRequest", message: "no" }) });
+    const error = await target(cgs)
+      .delete({ uri: `at://${ORG}/org.hypercerts.claim.rights/3k` as never, cid: undefined })
+      .catch((e) => e);
+    expect(error.message).toContain("the Certified Group Service rejected the request");
   });
 });
 

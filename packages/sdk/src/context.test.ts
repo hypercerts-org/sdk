@@ -40,6 +40,12 @@ describe("createSDKContext", () => {
     ["a URL that does not parse", { url: "cgs.test", did: "did:web:cgs.test" }, "cgs.url"],
     ["a handle as the DID", { url: "https://cgs.test", did: "cgs.test" }, "cgs.did"],
     ["a missing DID", { url: "https://cgs.test" }, "cgs.did"],
+    [
+      "a DID with a service fragment",
+      { url: "https://cgs.test", did: "did:web:cgs.test#certified_group_service" },
+      "cgs.did",
+    ],
+    ["no URL", { did: "did:web:cgs.test" }, "cgs.url"],
   ])("throws a TypeError for cgs with %s", (_name, cgs, field) => {
     // @ts-expect-error The point is to reject what the types already forbid.
     expect(() => createSDKContext({ client, cgs })).toThrow(new RegExp(`\\\`${field}\\\``));

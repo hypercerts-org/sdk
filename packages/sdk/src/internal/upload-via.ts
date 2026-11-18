@@ -7,12 +7,13 @@ import { isBlob } from "./input.js";
  * Validates `data` and its MIME type, sends it with `send`, and checks the blob reference `send`
  * returns. Shared by the targets, which differ only in where `send` posts the bytes.
  *
- * `send` resolves to the `blob` member of the server's answer. Throws what `uploadBlob` documents.
+ * `send` resolves to the `blob` member of the server's answer. `service` names who answers in error messages. Throws what `uploadBlob` documents.
  */
 export async function uploadVia(
   send: (body: BlobData, encoding: `${string}/${string}`) => Promise<unknown>,
   data: BlobData,
   mimeType: string | undefined,
+  service = "the PDS",
 ): Promise<TypedBlobRef> {
   const encoding = resolveMimeType(data, mimeType);
   let blob: unknown;
@@ -27,7 +28,7 @@ export async function uploadVia(
   // CID, as such clients do) treats `size: -1` as "unknown", so that is rejected explicitly.
   if (!isTypedBlobRef(blob, { strict: false }) || blob.size < 0) {
     throw new Error(
-      'uploadBlob: the PDS did not return a current blob reference (`$type: "blob"` with a size).',
+      `uploadBlob: ${service} did not return a current blob reference (\`$type: "blob"\` with a size).`,
     );
   }
   return blob;

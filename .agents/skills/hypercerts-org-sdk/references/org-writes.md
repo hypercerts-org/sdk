@@ -16,7 +16,16 @@ export const context = createSDKContext({
 });
 ```
 
-With OAuth the session needs the scope `rpc:app.certified.group.repo.*?aud=<cgs did>` (`aud` is the `cgs.did` you configured, as given). The SDK asks the account's PDS for a service-auth token before every CGS request, so a missing scope fails with a plain `Error` that names the scope.
+With OAuth the session needs one scope per CGS method. `lxm` must be a full method name (`rpc:...repo.*` is invalid) and `aud` needs the `#certified_group_service` fragment, written `%23`:
+
+```
+rpc:app.certified.group.repo.createRecord?aud=did:web:cgs.example.com%23certified_group_service
+rpc:app.certified.group.repo.putRecord?aud=did:web:cgs.example.com%23certified_group_service
+rpc:app.certified.group.repo.deleteRecord?aud=did:web:cgs.example.com%23certified_group_service
+rpc:app.certified.group.repo.uploadBlob?aud=did:web:cgs.example.com%23certified_group_service
+```
+
+`cgs.did` stays the bare DID; the SDK appends the fragment. The SDK asks the account's PDS for a service-auth token before every CGS request, so a missing scope fails with a plain `Error` that names the scope.
 
 ## Calls
 

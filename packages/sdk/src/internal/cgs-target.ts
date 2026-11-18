@@ -46,6 +46,17 @@ import {
   type WriteTarget,
 } from "./write-target.js";
 
+const CGS_SERVICE = "the Certified Group Service";
+
+/**
+ * The service id of CGS's DID document entry. The scope `aud` of an `rpc:` permission must be a
+ * DID with a fragment, and the PDS matches a requested token's `aud` against the scope as given.
+ */
+const SERVICE_ID = "certified_group_service";
+
+/** The scope an OAuth session needs for one CGS method (`#` is written `%23` in a scope string). */
+const scopeFor = (cgsDid: string, lxm: string) => `rpc:${lxm}?aud=${cgsDid}%23${SERVICE_ID}`;
+
 const repoDid = l.string({ format: "did" });
 const collection = l.string({ format: "nsid" });
 const rkey = l.string({ format: "record-key" });
@@ -92,10 +103,12 @@ const uploadBlob = l.procedure(
   l.jsonPayload({ blob: l.blob() }),
 );
 
-// `com.atproto.server.getServiceAuth` is not among the lexicons bundled with `Client`.
+// `com.atproto.server.getServiceAuth` is not among the lexicons bundled with `Client`. `aud` is a
+// plain string here, not format "did": the PDS accepts a `did:web:host#service` reference (and a
+// scope can only name that form), which the `did` format would refuse before the request is sent.
 const getServiceAuth = l.query(
   "com.atproto.server.getServiceAuth",
-  l.params({ aud: l.string({ format: "did" }), lxm: l.string({ format: "nsid" }) }),
+  l.params({ aud: l.string(), lxm: l.string({ format: "nsid" }) }),
   l.jsonPayload({ token: l.string() }),
 );
 
@@ -154,6 +167,7 @@ export function cgsTarget(
           (await call(uploadBlob, { params: { repo }, body: data, encoding })).blob,
         body,
         mimeType,
+        CGS_SERVICE,
       ),
     submit: (plan) => submitSteps(plan),
     delete: (deleteTarget) => deleteOne(deleteTarget),
@@ -180,14 +194,14 @@ export function cgsTarget(
   async function serviceAuth(lxm: NsidString): Promise<string> {
     try {
       const { body } = await context.client.xrpc(getServiceAuth, {
-        params: { aud: cgs.did, lxm },
+        params: { aud: `${cgs.did}#${SERVICE_ID}`, lxm },
         service: null,
         labelers: null,
       });
       return body.token;
     } catch (error) {
       throw new Error(
-        `${operation}: cannot get a service-auth token for ${lxm} from the account's PDS (${describeError(error)}), so nothing was sent to the Certified Group Service. With OAuth, the session needs the scope rpc:${lxm}?aud=${cgs.did}.`,
+        `${operation}: cannot get a service-auth token for ${lxm} from the account's PDS (${describeError(error)}), so nothing was sent to the Certified Group Service. With OAuth, the session needs the scope ${scopeFor(cgs.did, lxm)} (one such scope per CGS method: createRecord, putRecord, deleteRecord and uploadBlob).`,
         { cause: error },
       );
     }
@@ -227,6 +241,7 @@ export function cgsTarget(
       created: step.kind === "create" ? [record.ref] : [],
       updated: step.kind === "update" ? [record.ref] : [],
       swapCommit: undefined,
+      service: CGS_SERVICE,
       staleRecord:
         step.swapRecord === undefined
           ? undefined
@@ -298,7 +313,7 @@ export function cgsTarget(
         },
       });
     } catch (error) {
-      const failure = classifyDeleteFailure(operation, error, parsed.atUri, cid);
+      const failure = classifyDeleteFailure(operation, error, parsed.atUri, cid, CGS_SERVICE);
       if (failure instanceof WriteRejectedError && failure.status === 403) {
         if (await isGone(parsed.collection, parsed.rkey)) return;
       }

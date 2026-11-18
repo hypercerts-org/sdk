@@ -42,8 +42,9 @@ export interface CgsConfig {
   /** The service's base URL, for example `https://cgs.example.com`. Requests go to `<url>/xrpc/<method>`. */
   readonly url: string;
   /**
-   * The service's DID: the `aud` of the service-auth token the SDK asks the account's PDS for
-   * before each request, for example `did:web:cgs.example.com`.
+   * The service's DID without a fragment, for example `did:web:cgs.example.com`. The SDK appends
+   * `#certified_group_service` itself: the token it asks the account's PDS for has that
+   * `did#service` reference as its `aud`, which is what an OAuth `rpc:` scope must name.
    */
   readonly did: DidString;
 }
@@ -97,10 +98,15 @@ export interface CreateSDKContextOptions {
    *
    * @remarks
    * Each write request to the service carries a service-auth token that the SDK asks the signed-in
-   * account's PDS for (`com.atproto.server.getServiceAuth`, with `aud` set to `cgs.did` and `lxm`
-   * set to the method). With OAuth, the session needs the scope
-   * `rpc:app.certified.group.repo.*?aud=<cgs.did>` for that. API keys (`cgsk_...`) are not
-   * supported: the SDK always acts as the signed-in account.
+   * account's PDS for (`com.atproto.server.getServiceAuth`, with `aud` set to
+   * `<cgs.did>#certified_group_service` and `lxm` set to the method). With OAuth, the session needs
+   * one `rpc:` scope per method, because `lxm` must be a full NSID (no `prefix.*`) and `aud` must
+   * carry the `#` fragment, written `%23`:
+   * `rpc:app.certified.group.repo.createRecord?aud=did:web:cgs.example.com%23certified_group_service`,
+   * and the same for `putRecord`, `deleteRecord` and `uploadBlob`. Repeating `lxm` in one scope
+   * (`rpc?lxm=...&lxm=...&aud=...`) is equivalent. CGS accepts the token with or without the
+   * fragment in `aud`. API keys (`cgsk_...`) are not supported: the SDK always acts as the
+   * signed-in account.
    */
   cgs?: CgsConfig;
 }

@@ -356,7 +356,14 @@ export interface WriteRequest {
   readonly swapCommit: CidString | undefined;
   /** Set when the request is conditional on one record's CID (`putRecord` with `swapRecord`). */
   readonly staleRecord?: { readonly uri: string; readonly noun: string } | undefined;
+  /** Who answers the request, as it reads in a message. Defaults to {@link PDS_SERVICE}. */
+  readonly service?: string | undefined;
 }
+
+/** How errors name the account's PDS; the CGS target names the Certified Group Service instead. */
+export const PDS_SERVICE = "the PDS";
+
+const serviceOf = (request: WriteRequest) => request.service ?? PDS_SERVICE;
 
 export function toAlreadyExists(
   operation: string,
@@ -377,13 +384,14 @@ export function classifyDeleteFailure(
   error: unknown,
   uri: StrongRef["uri"],
   cid: CidString | undefined,
+  service: string = PDS_SERVICE,
 ) {
   const reason = describeError(error);
   const attempted = cid === undefined ? [] : [{ uri, cid }];
   const rejection = definiteRejection(error);
   if (rejection === undefined) {
     return new WriteOutcomeUnknownError(
-      `${operation}: no usable answer from the PDS (${reason}), so it is not known whether ${uri} was deleted. ` +
+      `${operation}: no usable answer from ${service} (${reason}), so it is not known whether ${uri} was deleted. ` +
         `The SDK does not retry, but calling ${operation} again is safe: deleting a record that is already gone succeeds. To check first, use com.atproto.repo.getRecord.`,
       attempted,
       { cause: error },
@@ -392,8 +400,8 @@ export function classifyDeleteFailure(
   const { status, code } = rejection;
   const message =
     code === "InvalidSwap" && cid !== undefined
-      ? `${operation}: ${uri} no longer has the version (CID ${cid}) that was given, so the PDS refused to delete it (HTTP ${status}: ${reason}). It was not deleted: something changed or replaced it in between. The SDK neither retries nor deletes without that check. Read the record for its current CID, or call ${operation} without \`cid\` to delete it whatever its version.`
-      : `${operation}: the PDS rejected the request (HTTP ${status}: ${reason}), so ${uri} was not deleted. Fix the cause (for example the session's permissions or a rate limit) and call again.`;
+      ? `${operation}: ${uri} no longer has the version (CID ${cid}) that was given, so ${service} refused to delete it (HTTP ${status}: ${reason}). It was not deleted: something changed or replaced it in between. The SDK neither retries nor deletes without that check. Read the record for its current CID, or call ${operation} without \`cid\` to delete it whatever its version.`
+      : `${operation}: ${service} rejected the request (HTTP ${status}: ${reason}), so ${uri} was not deleted. Fix the cause (for example the session's permissions or a rate limit) and call again.`;
   return new WriteRejectedError(message, attempted, rejection, { cause: error });
 }
 
@@ -475,7 +483,7 @@ function classifyFailure(
     return new WriteRejectedError(message, attempted, details, { cause: error });
   }
   return new WriteOutcomeUnknownError(
-    `${operation}: no usable answer from the PDS (${reason}), so it is not known whether ${describeEffects(request, MAYBE_WRITTEN)}: ${attempted.map((ref) => ref.uri).join(", ")}. ` +
+    `${operation}: no usable answer from ${serviceOf(request)} (${reason}), so it is not known whether ${describeEffects(request, MAYBE_WRITTEN)}: ${attempted.map((ref) => ref.uri).join(", ")}. ` +
       retryAdvice(operation, request, retrySafe, retrySafeReason),
     attempted,
     { cause: error },
@@ -490,13 +498,13 @@ function rejectionMessage(
   request: Request,
 ): string {
   if (code === "InvalidSwap" && request.staleRecord !== undefined) {
-    return recordChanged(operation, reason, request.staleRecord);
+    return recordChanged(operation, reason, request.staleRecord, serviceOf(request));
   }
   if (code === "InvalidSwap" && request.swapCommit !== undefined) {
     return repositoryChanged(operation, reason, request);
   }
   return (
-    `${operation}: the PDS rejected the request (HTTP ${status}: ${reason}), so ${describeEffects(request, NOT_WRITTEN)}. ` +
+    `${operation}: ${serviceOf(request)} rejected the request (HTTP ${status}: ${reason}), so ${describeEffects(request, NOT_WRITTEN)}. ` +
     "Nothing needs cleaning up. Fix the cause (for example the input, the session's permissions or a rate limit) and call again."
   );
 }
@@ -530,9 +538,10 @@ function recordChanged(
   operation: string,
   reason: string,
   { uri, noun }: { uri: string; noun: string },
+  service: string,
 ): string {
   return (
-    `${operation}: the ${noun} changed since it was read (HTTP 400: ${reason}), so the PDS refused to replace ${uri}. ` +
+    `${operation}: the ${noun} changed since it was read (HTTP 400: ${reason}), so ${service} refused to replace ${uri}. ` +
     `Nothing was written: ${uri} was not changed. Other writes to the account do not cause this. The SDK neither retries nor merges. Nothing needs cleaning up. Call again to read the ${noun} afresh and try once more.`
   );
 }
@@ -573,7 +582,7 @@ function assertReportedRefs(
       ? ["created the records", "the new records"]
       : ["applied the writes", "the records"];
   throw new WriteResultMismatchError(
-    `${operation}: the PDS ${applied} but reported different URIs or CIDs than the SDK computed, so references between ${references} may not match what is stored. ` +
+    `${operation}: ${serviceOf(request)} ${applied} but reported different URIs or CIDs than the SDK computed, so references between ${references} may not match what is stored. ` +
       `Computed: ${JSON.stringify(attempted)}. Reported: ${JSON.stringify(reported)}.`,
     attempted,
     reported.filter((ref) => ref !== undefined),

@@ -73,6 +73,6 @@ await createProject(context, input, { repo: orgDid });
 
 CGS takes one record per request, so a call that writes several records is not atomic: if it fails part-way it throws `PartialWriteError`, which lists what landed. Writes to an organization also lose the repository-wide `swapCommit` guard. The signed-in account must be a member of the group; CGS checks the role.
 
-The SDK asks your PDS for a service-auth token before each CGS request. With OAuth, add the scope `rpc:app.certified.group.repo.*?aud=<cgs did>` to the session.
+The SDK asks your PDS for a service-auth token before each CGS request. With OAuth, add one scope per method to the session (a scope's `lxm` must be a full method name, and its `aud` needs the `#certified_group_service` fragment, written `%23`): `rpc:app.certified.group.repo.createRecord?aud=did:web:cgs.example.com%23certified_group_service`, and the same for `putRecord`, `deleteRecord` and `uploadBlob`. Set `cgs.did` to the DID without the fragment; the SDK adds it.
 
 See the TSDoc on `createSDKContext` (shown in your editor) for the full contract.

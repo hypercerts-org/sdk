@@ -94,6 +94,6 @@ function assertOwnRecord(build: BuildContext, uri: string, collection: string) {
     collection: (actual) =>
       `${build.operation}: ${uri} is a ${actual} record, not a ${collection} record. Pass the URI of the ${collection} record the account created (for example the \`uri\` its create function returned), not the URI of its subject. Nothing was sent.`,
     repository: (did) =>
-      `${build.operation}: ${uri} is in the repository of ${did}, not of the signed-in account (${build.did}). Only the account's own records can be deleted. Nothing was sent.`,
+      `${build.operation}: ${uri} is in the repository of ${did}, not of the signed-in account (${build.context.client.did}). Only the account's own records can be deleted. Nothing was sent.`,
   });
 }

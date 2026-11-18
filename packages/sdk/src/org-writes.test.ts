@@ -4,7 +4,7 @@ import { createActivity, createRights } from "./activity/index.js";
 import { createProfile } from "./actor/index.js";
 import { uploadBlob } from "./blob/index.js";
 import { addActivityToCollection, createCollection } from "./collection/index.js";
-import { PartialWriteError } from "./errors.js";
+import { PartialWriteError, RecordAlreadyExistsError } from "./errors.js";
 import { createOrganization, OrganizationAlreadyExistsError } from "./organization/index.js";
 import { like, unlike } from "./social/index.js";
 import { fakeCgs, ORG } from "./test-utils/fake-cgs.js";
@@ -184,6 +184,61 @@ describe("writes with { repo: orgDid }", () => {
 
     expect(error).toBeInstanceOf(OrganizationAlreadyExistsError);
     expect(cgs.requests).toEqual([]);
+  });
+
+  describe("createOrganization when another writer creates the organization after it was read", () => {
+    const organizationUri = `at://${ORG}/${ORGANIZATION}/self`;
+    // Plants another writer's organization the moment the SDK sends its own.
+    const racing = (records?: Record<string, LexMap>) => {
+      const cgs: ReturnType<typeof fakeCgs> = fakeCgs({
+        records: records ?? {},
+        answer: (request) => {
+          if (request.body?.collection === ORGANIZATION) {
+            cgs.store.set(organizationUri, {
+              cid: "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq",
+              value: { $type: ORGANIZATION, legalName: "Someone else" },
+            });
+          }
+          return undefined;
+        },
+      });
+      return cgs;
+    };
+
+    it("reports OrganizationAlreadyExistsError when the profile was reused", async () => {
+      const cgs = racing({
+        [`at://${ORG}/${PROFILE}/self`]: { $type: PROFILE, displayName: "Old" },
+      });
+
+      const error = await createOrganization(
+        cgs.context,
+        { organization: { legalName: "Acme" } },
+        { repo },
+      ).catch((e) => e);
+
+      expect(error).toBeInstanceOf(OrganizationAlreadyExistsError);
+      expect(error.uri).toBe(organizationUri);
+      expect(cgs.of("createRecord").map((request) => request.body?.collection)).toEqual([
+        ORGANIZATION,
+      ]);
+    });
+
+    it("reports PartialWriteError with the profile that landed and RecordAlreadyExistsError as the failure", async () => {
+      const cgs = racing();
+
+      const error = await createOrganization(
+        cgs.context,
+        { organization: { legalName: "Acme" }, profileIfMissing: { displayName: "Acme" } },
+        { repo },
+      ).catch((e) => e);
+
+      expect(error).toBeInstanceOf(PartialWriteError);
+      expect(error.written.map((ref: { uri: string }) => ref.uri)).toEqual([
+        `at://${ORG}/${PROFILE}/self`,
+      ]);
+      expect(error.failure).toBeInstanceOf(RecordAlreadyExistsError);
+      expect(error.failure.uri).toBe(organizationUri);
+    });
   });
 
   it("createProfile of the org: a taken `self` key is reported through the read-back", async () => {

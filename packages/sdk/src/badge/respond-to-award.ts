@@ -169,7 +169,7 @@ export async function respondToBadgeAward(
   const recipient = recipientOf(checked.value, parsed.award.uri);
   if (recipient !== build.did) {
     throw new Error(
-      `${OPERATION}: only the recipient can respond to a badge award, but ${parsed.award.uri} is for ${recipient} and the client is signed in as ${build.did}. No record was written. For an award to a record, the recipient is the account whose repository holds that record.`,
+      `${OPERATION}: only the recipient can respond to a badge award, but ${parsed.award.uri} is for ${recipient} and the client is signed in as ${build.context.client.did}. No record was written. For an award to a record, the recipient is the account whose repository holds that record.`,
     );
   }
 

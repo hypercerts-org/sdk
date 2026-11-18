@@ -128,7 +128,7 @@ function parseCollectionUri(
   );
   if (parsed.did !== build.did) {
     throw new TypeError(
-      `${build.operation}: ${field}.uri is in the repository of ${parsed.did}, but the client is signed in as ${build.did} and this operation changes only the signed-in account's own ${noun}s: ${uri}.`,
+      `${build.operation}: ${field}.uri is in the repository of ${parsed.did}, but the client is signed in as ${build.context.client.did} and this operation changes only the signed-in account's own ${noun}s: ${uri}.`,
     );
   }
   return parsed.rkey;

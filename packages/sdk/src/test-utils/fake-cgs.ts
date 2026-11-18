@@ -7,6 +7,8 @@ import { HEAD } from "./fake-repo.js";
 
 export const CGS_URL = "https://cgs.test";
 export const CGS_DID = "did:web:cgs.test";
+/** The `aud` of the tokens the SDK asks for: CGS's DID with its service id, as an OAuth `rpc:` scope names it. */
+export const CGS_AUD = `${CGS_DID}#certified_group_service`;
 /** The organization (group) repo, and the PDS that hosts it. */
 export const ORG = "did:plc:ewvi7nxzyoun6zhxrhs64oiz";
 export const ORG_PDS = "https://org-pds.test";
@@ -138,7 +140,7 @@ export function fakeCgs(options: FakeCgsOptions = {}) {
   function checkToken({ method, headers }: CgsRequest): Response | undefined {
     const bearer = headers.get("authorization")?.replace(/^Bearer /, "");
     const token = bearer === undefined ? undefined : (JSON.parse(atob(bearer)) as IssuedToken);
-    if (token === undefined || token.aud !== CGS_DID || token.lxm !== method) {
+    if (token === undefined || token.aud !== CGS_AUD || token.lxm !== method) {
       return json(401, { error: "AuthRequired", message: "token not for this method" });
     }
     if (used.has(token.jti)) return json(401, { error: "AuthRequired", message: "jti reused" });
