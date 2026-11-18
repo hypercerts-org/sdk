@@ -260,7 +260,9 @@ export function cgsTarget(
         operation,
         request,
         async () => [await send(token, method, step)],
-        plan.retrySafe ?? false,
+        // Create-only writes use a fixed key and createRecord never overwrites, so repeating is
+        // safe, the same as pdsTarget's create-only path.
+        plan.retrySafe ?? plan.createOnly,
         plan.retrySafeReason,
       );
       return undefined;

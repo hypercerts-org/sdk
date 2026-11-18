@@ -308,6 +308,18 @@ describe("cgsTarget create read-back", () => {
     expect(error).toBeInstanceOf(WriteOutcomeUnknownError);
   });
 
+  it("says a create-only write is safe to repeat when its outcome stays unknown", async () => {
+    const cgs = fakeCgs({ answer: bad });
+
+    const error = await target(cgs)
+      .submit({ creates: [await rec()], updates: [], createOnly: true })
+      .catch((e) => e);
+
+    expect(error).toBeInstanceOf(WriteOutcomeUnknownError);
+    expect(error.message).toContain("is safe");
+    expect(error.message).not.toContain("duplicates");
+  });
+
   it("keeps the unknown outcome when the read-back itself fails", async () => {
     const cgs = fakeCgs({ answer: bad });
     const unreachable = {
