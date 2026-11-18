@@ -277,7 +277,8 @@ function definiteRejection(
   error: unknown,
 ): { status: number; code: string | undefined } | undefined {
   const status = property(error, "status");
-  if (typeof status !== "number" || status < 400 || status >= 500 || status === 408) {
+  // Positive range check, so a NaN status stays an unknown outcome.
+  if (!(typeof status === "number" && status >= 400 && status < 500 && status !== 408)) {
     return undefined;
   }
   const code = property(error, "error");
