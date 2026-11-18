@@ -4,12 +4,14 @@
 // and likes and reposts (`app.certified.feed.*`), with the operations that undo them.
 
 export {
+  PartialWriteError,
   WriteError,
   WriteOutcomeUnknownError,
   WriteRejectedError,
   WriteResultMismatchError,
 } from "../errors.js";
 export type { StrongRef } from "../internal/resolve-record-ref.js";
+export type { WriteOptions } from "../write-options.js";
 export type {
   ActionOptions,
   FollowAccountInput,

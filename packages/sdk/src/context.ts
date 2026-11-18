@@ -1,4 +1,4 @@
-import type { Client } from "@atproto/lex";
+import { type Client, type DidString, isDidString } from "@atproto/lex";
 import type { AtprotoDid, AtprotoDidDocument } from "@atproto-labs/did-resolver";
 import { describeValue } from "./internal/describe.js";
 import { createDefaultDidResolver } from "./internal/resolve-pds.js";
@@ -27,6 +27,25 @@ export interface SDKContext {
    * resolver passed to {@link createSDKContext}, or the SDK's cached default.
    */
   readonly didResolver: DidDocumentResolver;
+  /**
+   * The Certified Group Service that organization writes go through, when the context was created
+   * with one. See {@link CgsConfig}.
+   */
+  readonly cgs?: CgsConfig | undefined;
+}
+
+/**
+ * Where the Certified Group Service (CGS) is, for writes to an organization's repository (see
+ * {@link WriteOptions}). The same for every organization the service hosts.
+ */
+export interface CgsConfig {
+  /** The service's base URL, for example `https://cgs.example.com`. Requests go to `<url>/xrpc/<method>`. */
+  readonly url: string;
+  /**
+   * The service's DID: the `aud` of the service-auth token the SDK asks the account's PDS for
+   * before each request, for example `did:web:cgs.example.com`.
+   */
+  readonly did: DidString;
 }
 
 /**
@@ -72,6 +91,18 @@ export interface CreateSDKContextOptions {
    * PLC directory; pass a resolver for that.
    */
   didResolver?: DidDocumentResolver;
+  /**
+   * The Certified Group Service, needed only to write to an organization's repository with
+   * `{ repo: orgDid }`. Without it such a call throws a TypeError before any request.
+   *
+   * @remarks
+   * Each write request to the service carries a service-auth token that the SDK asks the signed-in
+   * account's PDS for (`com.atproto.server.getServiceAuth`, with `aud` set to `cgs.did` and `lxm`
+   * set to the method). With OAuth, the session needs the scope
+   * `rpc:app.certified.group.repo.*?aud=<cgs.did>` for that. API keys (`cgsk_...`) are not
+   * supported: the SDK always acts as the signed-in account.
+   */
+  cgs?: CgsConfig;
 }
 
 /**
@@ -90,11 +121,13 @@ export interface CreateSDKContextOptions {
  * `ERR_PNPM_IGNORED_BUILDS` for `core-js` until `core-js: false` is added to `allowBuilds` in
  * `pnpm-workspace.yaml`.
  *
- * @param options - The application's client and, optionally, a DID resolver.
+ * @param options - The application's client and, optionally, a DID resolver and the Certified
+ * Group Service for organization writes.
  * @returns A frozen {@link SDKContext} holding `options.client` and the DID resolver.
  * @throws {@link TypeError} If `client` is missing or has no `xrpc()` method, for example a raw
  * OAuth session or an `@atproto/api` agent, or if `didResolver` is given without a `resolve()`
- * method, for example the OAuth client itself instead of `oauthClient.identityResolver`.
+ * method, for example the OAuth client itself instead of `oauthClient.identityResolver`, or if
+ * `cgs` is given without an http(s) `url` and a DID in `did`.
  *
  * @example
  * ```ts
@@ -124,7 +157,8 @@ export function createSDKContext(options: CreateSDKContextOptions): SDKContext {
   assertClient(client);
   const didResolver = options.didResolver ?? createDefaultDidResolver();
   if (!hasMethod(didResolver, "resolve")) throw notADidResolver(didResolver);
-  return Object.freeze({ client, didResolver });
+  const cgs = options.cgs === undefined ? undefined : checkedCgs(options.cgs);
+  return Object.freeze({ client, didResolver, ...(cgs === undefined ? {} : { cgs }) });
 }
 
 // Duck-typed instead of `instanceof Client`: an application can end up with more than one
@@ -139,6 +173,35 @@ function assertClient(value: unknown): asserts value is Client {
       "The SDK does not accept sessions or agents because authentication stays in your application. " +
       "Authenticate first, then pass `new Client(session)` (imported from @atproto/lex) as `client`.",
   );
+}
+
+// A bad CGS URL or DID would only show up as a failed request after the first records were written,
+// so it is refused here.
+function checkedCgs(value: unknown): CgsConfig {
+  const { url, did } = (typeof value === "object" && value !== null ? value : {}) as Record<
+    string,
+    unknown
+  >;
+  const parsed = typeof url === "string" ? tryParseUrl(url) : undefined;
+  if (parsed === undefined || (parsed.protocol !== "https:" && parsed.protocol !== "http:")) {
+    throw new TypeError(
+      `createSDKContext: \`cgs.url\` must be the http(s) base URL of the Certified Group Service, for example "https://cgs.example.com", but received ${describeValue(url)}.`,
+    );
+  }
+  if (typeof did !== "string" || !isDidString(did)) {
+    throw new TypeError(
+      `createSDKContext: \`cgs.did\` must be the service's DID, for example "did:web:cgs.example.com", but received ${describeValue(did)}.`,
+    );
+  }
+  return Object.freeze({ url: parsed.href.replace(/\/$/, ""), did });
+}
+
+function tryParseUrl(value: string): URL | undefined {
+  try {
+    return new URL(value);
+  } catch {
+    return undefined;
+  }
 }
 
 // Duck-typed for the same reason as `assertClient`. The common mistake is passing the OAuth client

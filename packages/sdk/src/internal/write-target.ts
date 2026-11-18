@@ -6,8 +6,8 @@ import type {
   TypedBlobRef,
   TypedLexMap,
 } from "@atproto/lex";
-import { l } from "@atproto/lex";
-import { type BlobData, uploadBlob } from "../blob/upload-blob.js";
+import { type Client, l } from "@atproto/lex";
+import type { BlobData } from "../blob/upload-blob.js";
 import type { SDKContext } from "../context.js";
 import {
   RecordAlreadyExistsError,
@@ -18,6 +18,7 @@ import {
 import { describeError, isRecordNotFound } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import { parseRecordUri, type StrongRef } from "./resolve-record-ref.js";
+import { uploadVia } from "./upload-via.js";
 
 /** An existing record to replace with a new full value. */
 export interface PlannedUpdate {
@@ -93,7 +94,7 @@ export interface WriteTarget {
 }
 
 // `com.atproto.sync.getLatestCommit` is not among the lexicons bundled with `Client`.
-const getLatestCommit = l.query(
+export const getLatestCommit = l.query(
   "com.atproto.sync.getLatestCommit",
   l.params({ did: l.string({ format: "did" }) }),
   l.jsonPayload({ cid: l.string({ format: "cid" }), rev: l.string() }),
@@ -149,9 +150,14 @@ export function pdsTarget(context: SDKContext, did: DidString, operation: string
   return {
     did,
     atomic: true,
-    readHead: () => readHead(context, did, operation),
-    recordExists: (collection, rkey) => recordExists(context, did, collection, rkey),
-    uploadBlob: (body, mimeType) => uploadBlob(context, body, { mimeType }),
+    readHead: () => readHead(context.client, did, operation),
+    recordExists: (collection, rkey) => recordExists(context.client, did, collection, rkey),
+    uploadBlob: (body, mimeType) =>
+      uploadVia(
+        async (data, encoding) => (await context.client.uploadBlob(data, { encoding })).body.blob,
+        body,
+        mimeType,
+      ),
     submit: (plan) => {
       if (plan.createOnly) return submitCreateOnly(context, did, operation, plan);
       return isGuardedSingleUpdate(plan)
@@ -172,11 +178,16 @@ function isGuardedSingleUpdate(plan: WritePlan): boolean {
   );
 }
 
-async function readHead(context: SDKContext, did: DidString, operation: string) {
+/**
+ * The head commit of `did`'s repo as `client` reports it. `client` must talk to the account's own
+ * PDS: that is the client's own PDS for the signed-in account, and a client for the PDS in the DID
+ * document for any other.
+ */
+export async function readHead(client: Client, did: DidString, operation: string) {
   try {
     // `service: null` and `labelers: null`: the head must come from the account's own PDS, not from
     // an AppView the client may proxy to by default (the typed record methods do the same).
-    const { body } = await context.client.xrpc(getLatestCommit, {
+    const { body } = await client.xrpc(getLatestCommit, {
       params: { did },
       service: null,
       labelers: null,
@@ -190,14 +201,15 @@ async function readHead(context: SDKContext, did: DidString, operation: string) 
   }
 }
 
-async function recordExists(
-  context: SDKContext,
+/** The record at `collection`/`rkey` in `did`'s repo, read through `client` (see {@link readHead}). */
+export async function recordExists(
+  client: Client,
   did: DidString,
   collection: NsidString,
   rkey: RecordKeyString,
 ): Promise<StrongRef | undefined> {
   try {
-    const { body } = await context.client.getRecord(collection, rkey, { repo: did });
+    const { body } = await client.getRecord(collection, rkey, { repo: did });
     // The lexicon types `cid` as optional; a PDS always sends it, and callers only test for presence.
     return { uri: body.uri, cid: body.cid } as StrongRef;
   } catch (error) {
@@ -214,12 +226,12 @@ async function submitApplyWrites(
 ): Promise<void> {
   const { creates } = plan;
   const updates = plan.updates.map(({ record }) => record);
-  const request: Request = {
+  const request: WriteRequest = {
     created: creates.map((record) => record.ref),
     updated: updates.map((record) => record.ref),
     swapCommit: plan.swapCommit,
   };
-  return submit(
+  return submitRequest(
     operation,
     request,
     async () => {
@@ -257,7 +269,7 @@ async function submitGuardedUpdate(
   plan: WritePlan,
 ): Promise<void> {
   const [{ record, swapRecord, noun }] = plan.updates as [PlannedUpdate, ...PlannedUpdate[]];
-  await submit(
+  await submitRequest(
     operation,
     {
       created: [],
@@ -296,7 +308,7 @@ async function submitCreateOnly(
     );
   }
   try {
-    await submit(
+    await submitRequest(
       operation,
       { created: [record.ref], updated: [], swapCommit: undefined, staleRecord: undefined },
       async () => {
@@ -338,7 +350,7 @@ async function deleteRecord(
 }
 
 /** What one request tried to write, for messages and for the errors' `attempted`. */
-interface Request {
+export interface WriteRequest {
   readonly created: readonly StrongRef[];
   readonly updated: readonly StrongRef[];
   readonly swapCommit: CidString | undefined;
@@ -346,10 +358,10 @@ interface Request {
   readonly staleRecord?: { readonly uri: string; readonly noun: string } | undefined;
 }
 
-function toAlreadyExists(
+export function toAlreadyExists(
   operation: string,
   uri: string,
-  rejected: WriteRejectedError,
+  rejected: Pick<WriteRejectedError, "attempted" | "status" | "code" | "cause">,
 ): RecordAlreadyExistsError {
   return new RecordAlreadyExistsError(
     `${operation}: a record already exists at ${uri}, so nothing was written and the existing record is unchanged. ${operation} only creates records; it never overwrites one.`,
@@ -360,7 +372,7 @@ function toAlreadyExists(
   );
 }
 
-function classifyDeleteFailure(
+export function classifyDeleteFailure(
   operation: string,
   error: unknown,
   uri: StrongRef["uri"],
@@ -404,9 +416,9 @@ function definiteRejection(
 // per record in request order, or `undefined` if the PDS reported none. `retrySafe` says whether
 // calling again after an unknown outcome cannot duplicate records; it only changes the advice in
 // the error message.
-async function submit(
+export async function submitRequest(
   operation: string,
-  request: Request,
+  request: WriteRequest,
   send: () => Promise<readonly unknown[] | undefined>,
   retrySafe: boolean,
   retrySafeReason?: string,
@@ -420,7 +432,7 @@ async function submit(
   assertReportedRefs(operation, request, results);
 }
 
-const attemptedOf = ({ created, updated }: Request) => [...created, ...updated];
+const attemptedOf = ({ created, updated }: WriteRequest) => [...created, ...updated];
 
 const recordsOf = (refs: readonly StrongRef[]) =>
   refs.length === 1 ? "the record" : `the ${refs.length} records`;
@@ -428,7 +440,7 @@ const recordsOf = (refs: readonly StrongRef[]) =>
 // What a request did or did not do to each record, worded for `effect`. A request that only creates
 // keeps the plain wording, so a caller never reads "created" about an update.
 function describeEffects(
-  { created, updated }: Request,
+  { created, updated }: WriteRequest,
   effect: { created: string; changed: string },
 ): string {
   if (updated.length === 0) {
@@ -450,7 +462,7 @@ const MAYBE_WRITTEN = { created: "created", changed: "changed" };
 function classifyFailure(
   operation: string,
   error: unknown,
-  request: Request,
+  request: WriteRequest,
   retrySafe: boolean,
   retrySafeReason?: string,
 ) {
@@ -491,7 +503,7 @@ function rejectionMessage(
 
 function retryAdvice(
   operation: string,
-  request: Request,
+  request: WriteRequest,
   retrySafe: boolean,
   retrySafeReason?: string,
 ): string {
@@ -527,7 +539,7 @@ function recordChanged(
 
 // `InvalidSwap` is what the PDS answers when the repo head is no longer the one the caller read:
 // the one rejection that is not a mistake in the input and that calling again is expected to fix.
-function repositoryChanged(operation: string, reason: string, request: Request): string {
+function repositoryChanged(operation: string, reason: string, request: WriteRequest): string {
   return (
     `${operation}: the repository changed since it was read (HTTP 400: ${reason}), most likely because another write to this account landed in between. ` +
     `Nothing was written: ${describeEffects(request, NOT_WRITTEN)}. The SDK neither retries nor merges. Nothing needs cleaning up. Call again to read the repository afresh and try once more.`
@@ -546,7 +558,7 @@ function property(error: unknown, name: "status" | "error"): unknown {
 // it must agree with the computed references.
 function assertReportedRefs(
   operation: string,
-  request: Request,
+  request: WriteRequest,
   results: readonly unknown[] | undefined,
 ): void {
   if (results === undefined) return;
