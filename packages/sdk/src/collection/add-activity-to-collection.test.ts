@@ -219,7 +219,7 @@ describe("addActivityToCollection when the input is wrong", () => {
       /invalid input: must be at most 100 characters at \$\.weight/,
     ],
     [
-      "the old `{ activity }` wrapper as `activity`",
+      "`activity` wrapped in another `{ activity }`",
       { activity: { activity } },
       /invalid input\.activity: Missing required key "title"/,
     ],

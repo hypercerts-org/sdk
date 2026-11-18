@@ -96,7 +96,7 @@ await addActivityToCollection(context, {
 ```
 
 - `collection.uri` must be `at://<did>/org.hypercerts.collection/<rkey>` with **your** DID. Another type of record, a handle, or another account's Collection throws `TypeError` before anything is sent.
-- `activity` is the Activity's own data or `{ uri }`, not wrapped: the old `activity: { activity: {...} }` is a `TypeError`, as is `uri` mixed with Activity fields. `weight` goes next to `activity`, not inside it, and is a positive decimal string of at most 100 characters.
+- `activity` is the Activity's own data or `{ uri }`, not wrapped in another `{ activity }`. `uri` mixed with Activity fields. `weight` goes next to `activity`, not inside it, and is a positive decimal string of at most 100 characters.
 - `activity: { uri }` must be an Activity (a Feature or a Collection is a `TypeError`) with a DID. It is read once for its CID, which the item stores (a strong reference), and never changed. It may belong to another account if public; the PDS is found with the context's `didResolver` ([SKILL.md](../SKILL.md#2-create-the-context-once)).
 - The item is appended last. Everything else in the Collection (`createdAt`, existing items, unknown fields, `signatures`) is kept as it was. `signatures` is not re-signed: after the append, an earlier signature no longer matches the content.
 - A Collection that holds 1000 items is full: `Error`, nothing written. A Collection that does not exist or is not a valid `org.hypercerts.collection` record: `Error`, nothing written.
