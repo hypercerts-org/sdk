@@ -3,18 +3,22 @@ import { describe, expect, it } from "vitest";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
 import { fakeRepo, HEAD, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
 import {
-  type CreateActivityInCollectionInput,
-  createActivityInCollection,
+  type AddActivityToCollectionInput,
+  addActivityToCollection,
   WriteOutcomeUnknownError,
   WriteRejectedError,
 } from "./index.js";
 
 const ACTIVITY = "org.hypercerts.claim.activity";
 const COLLECTION = "org.hypercerts.collection";
+const FEATURE = "org.hypercerts.entity.feature";
 const LOCATION = "app.certified.location";
 const RIGHTS = "org.hypercerts.claim.rights";
 // CIDv1 (raw, sha-256) of the bytes "other": a head the repo moved to after it was read.
 const OTHER_HEAD = "bafkreigzfgfbbunqonmdpxcl3bo2yza3b46o6j5epzovhjkpf47vwl6p7i";
+// CIDv1 (raw, sha-256) of the word "activity": the CID the PDS reports for an existing Activity, so
+// a reference that carries another one is noticed.
+const ACTIVITY_CID = "bafkreiagkgddx5ozaitcwf6emipmgqcuj7ybm5jfipmzvewx2iuhfwfeku";
 
 const collectionUri = `at://${DID}/${COLLECTION}/3k2a4b5c6d7e8`;
 const activity = { title: "Trees", shortDescription: "Planting trees" };
@@ -27,19 +31,19 @@ const itemAt = (rkey: string) => ({
   itemIdentifier: { uri: `at://${DID}/${ACTIVITY}/${rkey}`, cid: CID },
 });
 
-const call = (input: Partial<CreateActivityInCollectionInput> = {}) => ({
+const call = (input: Partial<AddActivityToCollectionInput> = {}) => ({
   collectionUri,
-  activity,
+  activity: { activity },
   ...input,
 });
 
-describe("createActivityInCollection", () => {
+describe("addActivityToCollection with a new Activity", () => {
   it("creates the Activity and adds it to an empty Collection in one request, reading the head first", async () => {
     const { context, requests, creates, updates, swapCommits } = fakeRepo({
       records: { [collectionUri]: stored },
     });
 
-    const result = await createActivityInCollection(context, call());
+    const result = await addActivityToCollection(context, call());
 
     expect(methods(requests)).toEqual([
       "com.atproto.repo.getRecord", // the Collection, checked before anything else
@@ -57,7 +61,7 @@ describe("createActivityInCollection", () => {
     expect(update.value).toEqual({ ...stored, items: [{ itemIdentifier: refTo(created) }] });
     expect(swapCommits).toEqual([HEAD]);
     expect(result).toEqual({
-      activity: { ...refTo(created), locations: [], contributors: [] },
+      activity: { ...refTo(created), created: true, locations: [], contributors: [] },
       collection: { uri: collectionUri, cid: update.cid },
     });
   });
@@ -88,7 +92,7 @@ describe("createActivityInCollection", () => {
     };
     const { context, updates } = fakeRepo({ records: { [collectionUri]: populated } });
 
-    const result = await createActivityInCollection(context, call({ itemWeight: "0.25" }));
+    const result = await addActivityToCollection(context, call({ weight: "0.25" }));
 
     const update = writeOf(updates[0] ?? [], COLLECTION);
     const newItem = {
@@ -110,21 +114,23 @@ describe("createActivityInCollection", () => {
     });
     const png = new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
 
-    const result = await createActivityInCollection(
+    const result = await addActivityToCollection(
       context,
       call({
         activity: {
-          ...activity,
-          image: png,
-          rights: { uri: rightsUri },
-          locations: [
-            {
-              lpVersion: "1.0",
-              srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-              locationType: "coordinate-decimal",
-              location: { string: "27.47,90.17" },
-            },
-          ],
+          activity: {
+            ...activity,
+            image: png,
+            rights: { uri: rightsUri },
+            locations: [
+              {
+                lpVersion: "1.0",
+                srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                locationType: "coordinate-decimal",
+                location: { string: "27.47,90.17" },
+              },
+            ],
+          },
         },
       }),
     );
@@ -139,6 +145,7 @@ describe("createActivityInCollection", () => {
     ]);
     expect((creates[0] ?? []).map((write) => write.collection)).toEqual([LOCATION, ACTIVITY]);
     expect(result.activity).toMatchObject({
+      created: true,
       rights: { uri: rightsUri, created: false },
       locations: [{ ...refTo(writeOf(creates[0] ?? [], LOCATION)), created: true }],
     });
@@ -146,81 +153,142 @@ describe("createActivityInCollection", () => {
       { itemIdentifier: { uri: result.activity.uri, cid: result.activity.cid } },
     ]);
   });
+});
 
-  it("names the Activity's fields under `activity` in input errors", async () => {
+describe("addActivityToCollection with an existing Activity", () => {
+  const existing = `at://${DID}/${ACTIVITY}/3jzfcijpj2z2a`;
+
+  it("reads it once and lists it at that CID, creating no record but changing the Collection", async () => {
+    const { context, requests, creates, updates, swapCommits } = fakeRepo({
+      existing: { [existing]: ACTIVITY_CID },
+      records: { [collectionUri]: stored },
+    });
+
+    const result = await addActivityToCollection(
+      context,
+      call({ activity: { uri: existing }, weight: "3" }),
+    );
+
+    expect(methods(requests)).toEqual([
+      "com.atproto.repo.getRecord", // the Collection, checked before anything else
+      "com.atproto.repo.getRecord", // the Activity
+      "com.atproto.sync.getLatestCommit",
+      "com.atproto.repo.getRecord", // the Collection again, after the head
+      "com.atproto.repo.applyWrites",
+    ]);
+    expect(creates[0]).toEqual([]);
+    const update = writeOf(updates[0] ?? [], COLLECTION);
+    expect(update.value.items).toEqual([
+      { itemIdentifier: { uri: existing, cid: ACTIVITY_CID }, itemWeight: "3" },
+    ]);
+    expect(swapCommits).toEqual([HEAD]);
+    expect(result).toEqual({
+      activity: { uri: existing, cid: ACTIVITY_CID, created: false },
+      collection: { uri: collectionUri, cid: update.cid },
+    });
+  });
+
+  it("lists the same Activity again when it is already an item: nothing is deduplicated", async () => {
+    const listed = { itemIdentifier: { uri: existing, cid: ACTIVITY_CID } };
+    const { context, updates } = fakeRepo({
+      existing: { [existing]: ACTIVITY_CID },
+      records: { [collectionUri]: { ...stored, items: [listed] } },
+    });
+
+    await addActivityToCollection(context, call({ activity: { uri: existing } }));
+
+    expect(writeOf(updates[0] ?? [], COLLECTION).value.items).toEqual([listed, listed]);
+  });
+
+  it("does not write when the Activity cannot be read", async () => {
     const { context, requests } = fakeRepo({ records: { [collectionUri]: stored } });
 
     await expect(
-      createActivityInCollection(
-        context,
-        call({ activity: { ...activity, rights: { inline: "ARR" } as never } }),
-      ),
-    ).rejects.toThrow(/activity\.rights does not accept \{ inline \}/);
+      addActivityToCollection(context, call({ activity: { uri: existing } })),
+    ).rejects.toThrow(/cannot resolve .*the record was not found/);
 
-    expect(methods(requests)).toEqual(["com.atproto.repo.getRecord"]);
-  });
-
-  it.each([
-    ["zero", "0"],
-    ["not a number", "heavy"],
-    ["negative", "-1"],
-  ])("sends nothing for a weight that is %s", async (_, itemWeight) => {
-    const { context, requests } = fakeRepo({ records: { [collectionUri]: stored } });
-
-    await expect(createActivityInCollection(context, call({ itemWeight }))).rejects.toThrow(
-      /createActivityInCollection: invalid input: .*positive decimal number.* at \$\.itemWeight/,
-    );
-
-    expect(requests).toHaveLength(0);
-  });
-
-  it("rejects a weight longer than the lexicon allows without writing", async () => {
-    const { context, requests } = fakeRepo({ records: { [collectionUri]: stored } });
-
-    const error = await createActivityInCollection(
-      context,
-      call({ itemWeight: "1".repeat(101) }),
-    ).catch((e) => e);
-
-    expect(error).toBeInstanceOf(TypeError);
-    expect(error.message).toMatch(
-      /the updated Collection is not a valid org\.hypercerts\.collection/,
-    );
     expect(methods(requests)).not.toContain("com.atproto.repo.applyWrites");
   });
+});
 
-  it.each([
+describe("addActivityToCollection when the input is wrong", () => {
+  it.each<[string, Partial<AddActivityToCollectionInput> | object, RegExp]>([
+    [
+      "a bare Activity as `activity`",
+      { activity },
+      /invalid input\.activity: .*Allowed fields: activity, uri/,
+    ],
+    [
+      "an `activity` with neither choice",
+      { activity: {} },
+      /input\.activity must have exactly one of activity or uri, but has none/,
+    ],
+    [
+      "an `activity` with both choices",
+      { activity: { activity, uri: `at://${DID}/${ACTIVITY}/3k2a4b5c6d7e8` } },
+      /input\.activity must have exactly one of activity or uri, but has both/,
+    ],
+    [
+      "a Feature URI",
+      { activity: { uri: `at://${DID}/${FEATURE}/3k2a4b5c6d7e8` } },
+      /input\.activity\.uri points at a record of type org\.hypercerts\.entity\.feature, but this field holds org\.hypercerts\.claim\.activity/,
+    ],
+    [
+      "a Collection URI",
+      { activity: { uri: collectionUri } },
+      /input\.activity\.uri points at a record of type org\.hypercerts\.collection, but this field holds org\.hypercerts\.claim\.activity/,
+    ],
+    [
+      "an Activity URI with a handle",
+      { activity: { uri: `at://alice.test/${ACTIVITY}/3k2a4b5c6d7e8` } },
+      /input\.activity\.uri must use a DID as the authority, not a handle/,
+    ],
+    [
+      "an invalid field of the new Activity, named as the caller wrote it",
+      { activity: { activity: { ...activity, rights: { inline: "ARR" } } } },
+      /input\.activity\.activity\.rights does not accept \{ inline \}/,
+    ],
+    [
+      "a weight that is not a number",
+      { weight: "heavy" },
+      /positive decimal number.* at \$\.weight/,
+    ],
+    [
+      "a weight over 100 characters",
+      { weight: "1".repeat(101) },
+      /must be at most 100 characters at \$\.weight/,
+    ],
     [
       "a record of another type",
-      `at://${DID}/${ACTIVITY}/3k2a4b5c6d7e8`,
-      /points at a record of type org\.hypercerts\.claim\.activity, but it must be of type org\.hypercerts\.collection/,
+      { collectionUri: `at://${DID}/${ACTIVITY}/3k2a4b5c6d7e8` },
+      /collectionUri points at a record of type org\.hypercerts\.claim\.activity, but it must be of type org\.hypercerts\.collection/,
     ],
     [
       "a Collection of another account",
-      "at://did:plc:someoneelse/org.hypercerts.collection/3k2a4b5c6d7e8",
-      /in the repository of did:plc:someoneelse, but the client is signed in as did:plc:testowner123/,
+      { collectionUri: "at://did:plc:someoneelse/org.hypercerts.collection/3k2a4b5c6d7e8" },
+      /in the repository of did:plc:someoneelse, but the client is signed in as did:plc:testowner123.*own Collections/,
     ],
     [
       "a handle authority",
-      "at://alice.test/org.hypercerts.collection/3k2a4b5c6d7e8",
+      { collectionUri: "at://alice.test/org.hypercerts.collection/3k2a4b5c6d7e8" },
       /not a record URI/,
     ],
-  ])("sends nothing for %s", async (_, uri, message) => {
+  ])("sends nothing, not even a read, for %s", async (_, input, message) => {
     const { context, requests } = fakeRepo({ records: { [collectionUri]: stored } });
+    const image = new Blob(["x"], { type: "image/png" });
 
-    const error = await createActivityInCollection(
+    const error = await addActivityToCollection(
       context,
-      call({
-        collectionUri: uri,
-        activity: { ...activity, image: new Blob(["x"], { type: "image/png" }) },
-      }),
+      call({ activity: { activity: { ...activity, image } }, ...input }),
     ).catch((e) => e);
 
     expect(error).toBeInstanceOf(TypeError);
     expect(error.message).toMatch(message);
     expect(requests).toHaveLength(0);
   });
+});
 
+describe("addActivityToCollection when the Collection cannot take the item", () => {
   it.each<[string, Parameters<typeof fakeRepo>[0], RegExp, boolean]>([
     ["a Collection that does not exist", {}, /cannot resolve .*the record was not found/, false],
     [
@@ -256,7 +324,7 @@ describe("createActivityInCollection", () => {
     const image = new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
 
     await expect(
-      createActivityInCollection(context, call({ activity: { ...activity, image } })),
+      addActivityToCollection(context, call({ activity: { activity: { ...activity, image } } })),
     ).rejects.toThrow(message);
 
     expect(methods(requests)).not.toContain("com.atproto.repo.applyWrites");
@@ -268,7 +336,7 @@ describe("createActivityInCollection", () => {
     const items = Array.from({ length: 999 }, (_, i) => itemAt(`3jzfcijpj${i}`));
     const { context, updates } = fakeRepo({ records: { [collectionUri]: { ...stored, items } } });
 
-    await createActivityInCollection(context, call());
+    await addActivityToCollection(context, call());
 
     expect(writeOf(updates[0] ?? [], COLLECTION).value.items).toHaveLength(1000);
   });
@@ -281,27 +349,38 @@ describe("createActivityInCollection", () => {
       location: { string: '{"type":"Point","coordinates":[90.13,27.47]}' },
     };
     const withLocations = (count: number) =>
-      call({ activity: { ...activity, locations: Array.from({ length: count }, () => location) } });
+      call({
+        activity: {
+          activity: { ...activity, locations: Array.from({ length: count }, () => location) },
+        },
+      });
     const { context, requests, creates, updates } = fakeRepo({
       records: { [collectionUri]: stored },
     });
 
-    await createActivityInCollection(context, withLocations(198));
+    await addActivityToCollection(context, withLocations(198));
     expect((creates[0] ?? []).length + (updates[0] ?? []).length).toBe(200);
 
     const before = requests.length;
-    await expect(createActivityInCollection(context, withLocations(199))).rejects.toThrow(
+    await expect(addActivityToCollection(context, withLocations(199))).rejects.toThrow(
       /would write 201 records, but one write holds at most 200\. Nothing was written/,
     );
-    expect(methods(requests.slice(before))).not.toContain("com.atproto.repo.applyWrites");
+    // The Collection is read before the records are counted, and nothing after it.
+    expect(methods(requests.slice(before))).toEqual(["com.atproto.repo.getRecord"]);
   });
 });
 
-describe("createActivityInCollection when the write fails", () => {
+describe("addActivityToCollection when the write fails", () => {
   const withRights = call({
     activity: {
-      ...activity,
-      rights: { rightsName: "CC BY", rightsType: "CC-BY", rightsDescription: "Share with credit" },
+      activity: {
+        ...activity,
+        rights: {
+          rightsName: "CC BY",
+          rightsType: "CC-BY",
+          rightsDescription: "Share with credit",
+        },
+      },
     },
   });
 
@@ -317,7 +396,7 @@ describe("createActivityInCollection when the write fails", () => {
       },
     });
 
-    const error = await createActivityInCollection(context, withRights).catch((e) => e);
+    const error = await addActivityToCollection(context, withRights).catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteRejectedError);
     expect(error).toMatchObject({ status: 400, code: "InvalidSwap" });
@@ -337,7 +416,7 @@ describe("createActivityInCollection when the write fails", () => {
       applyWrites: () => json(500, {}),
     });
 
-    const error = await createActivityInCollection(context, withRights).catch((e) => e);
+    const error = await addActivityToCollection(context, withRights).catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteOutcomeUnknownError);
     const [rights, created, collection] = error.attempted.map((ref: { uri: string }) => ref.uri);
