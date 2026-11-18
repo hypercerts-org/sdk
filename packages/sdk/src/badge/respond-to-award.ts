@@ -36,11 +36,14 @@ export interface RespondToBadgeAwardInput {
   createdAt?: string | undefined;
 }
 
+/** The `maxLength` of `weight` in the lexicon of `app.certified.badge.response`. */
+const BADGE_RESPONSE_WEIGHT_MAX_LENGTH = 50;
+
 const inputSchema = l.refine(
   strictObject({
     awardUri: l.string(),
     response: l.enum(["accepted", "rejected"]),
-    weight: l.optional(weightString),
+    weight: l.optional(weightString(BADGE_RESPONSE_WEIGHT_MAX_LENGTH)),
     createdAt: optionalText,
   }),
   {
@@ -109,8 +112,8 @@ function recipientOf({ subject }: award.Main, uri: string): DidString {
  * @returns The new response's URI and CID.
  * @throws {@link TypeError} If `awardUri` is not `at://<did>/app.certified.badge.award/<rkey>`, if
  * `response` is not `"accepted"` or `"rejected"`, if `weight` is given with a rejected response or
- * is not a positive decimal number, if `input` has an unknown field, or if a value is not allowed
- * by the lexicon (for example a `weight` over 50 characters). Nothing was written.
+ * is not a positive decimal number of at most 50 characters, if `input` has an unknown field, or if
+ * a value is not allowed by the lexicon. Nothing was written.
  * @throws {@link Error} If the client is not authenticated; the award cannot be read or is not a
  * valid `app.certified.badge.award`; its recipient cannot be determined; or the signed-in account is
  * not the recipient. Nothing was written.

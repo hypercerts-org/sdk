@@ -11,7 +11,14 @@ import {
   prepareChecked,
 } from "../internal/build-context.js";
 import { describeValue } from "../internal/describe.js";
-import { blobOrUrl, compact, dateRange, strictObject, weightString } from "../internal/input.js";
+import {
+  blobOrUrl,
+  compact,
+  dateRange,
+  strictObject,
+  WEIGHT_MAX_LENGTH,
+  weightString,
+} from "../internal/input.js";
 import {
   type LeafletDocument,
   longDescription,
@@ -176,7 +183,7 @@ export interface CreateActivityResult {
 const contributorShape = strictObject({
   identity: l.unknown(),
   details: l.optional(l.unknown()),
-  weight: l.optional(weightString),
+  weight: l.optional(weightString(WEIGHT_MAX_LENGTH)),
 });
 
 const celWorkScope = strictObject({

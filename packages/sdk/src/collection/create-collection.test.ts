@@ -319,6 +319,11 @@ describe("createCollection when the input is wrong", () => {
     ],
     ["an invalid weight", item({ uri: uriOf(ACTIVITY), weight: "0" }), /positive decimal number/],
     [
+      "a weight over 100 characters",
+      item({ uri: uriOf(ACTIVITY), weight: "1".repeat(101) }),
+      /input\.items\[0\].*must be at most 100 characters at \$\.weight/,
+    ],
+    [
       "a work-scope tag where a vocabulary tag is needed",
       { title: "Portfolio", tags: [{ uri: uriOf(WORKSCOPE) }] },
       /input\.tags\[0\] points at a record of type org\.hypercerts\.workscope\.tag, but this field holds org\.hypercerts\.vocab\.tag/,

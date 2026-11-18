@@ -1,7 +1,7 @@
 import { l } from "@atproto/lex";
 import * as activity from "@hypercerts-org/lexicon/org/hypercerts/claim/activity";
 import { type BuildContext, parseInput } from "../internal/build-context.js";
-import { strictObject, weightString } from "../internal/input.js";
+import { strictObject, WEIGHT_MAX_LENGTH, weightString } from "../internal/input.js";
 import {
   type Planned,
   type Slot,
@@ -38,20 +38,12 @@ export type ActivityEntryResult =
   | (CreateActivityResult & { created: true })
   | (SupportingRecordRef & { created: false });
 
-const MAX_WEIGHT_LENGTH = 100;
-
 /**
- * The schema of the optional weight of an entry: a positive decimal string of at most the 100
- * characters the lexicon allows, checked here so the message names `weight` as the caller wrote it.
+ * The schema of the optional weight of an entry (a collection item or project activity).
  *
  * Internal.
  */
-export const entryWeight = l.optional(
-  l.refine(weightString, {
-    check: (value: string) => value.length <= MAX_WEIGHT_LENGTH,
-    message: `must be at most ${MAX_WEIGHT_LENGTH} characters`,
-  }),
-);
+export const entryWeight = l.optional(weightString(WEIGHT_MAX_LENGTH));
 
 /**
  * The schemas of an entry's two choices, for an input that adds more fields (a weight) around them.

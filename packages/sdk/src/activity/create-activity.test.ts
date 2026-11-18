@@ -308,6 +308,11 @@ describe("createActivity", () => {
       /positive decimal number/,
     ],
     [
+      "a contributor weight over 100 characters",
+      { ...base, contributors: [{ identity: { inline: "x" }, weight: "1".repeat(101) }] },
+      /must be at most 100 characters at \$\.contributors\[0\]\.weight/,
+    ],
+    [
       "an end date before the start date",
       { ...base, startDate: "2024-02-01T00:00:00Z", endDate: "2024-01-01T00:00:00Z" },
       /endDate before its startDate/,

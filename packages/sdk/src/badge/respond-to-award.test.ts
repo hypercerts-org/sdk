@@ -178,8 +178,8 @@ describe("respondToBadgeAward", () => {
     expect([requests.length, reads.length]).toEqual([0, 0]);
   });
 
-  it("rejects a weight the lexicon does not allow without writing", async () => {
-    stubIssuerPds({ [awardUri]: storedAward(forDid(DID)) });
+  it("rejects a weight over 50 characters before any request", async () => {
+    const reads = stubIssuerPds({ [awardUri]: storedAward(forDid(DID)) });
     const { context, requests } = fakeRepo();
 
     const error = await respondToBadgeAward(context, respond({ weight: "1".repeat(51) })).catch(
@@ -187,8 +187,8 @@ describe("respondToBadgeAward", () => {
     );
 
     expect(error).toBeInstanceOf(TypeError);
-    expect(error.message).toMatch(/the response is not a valid app.certified.badge.response/);
-    expect(requests).toHaveLength(0);
+    expect(error.message).toMatch(/must be at most 50 characters at \$\.weight/);
+    expect([requests.length, reads.length]).toEqual([0, 0]);
   });
 
   it.each<[string, Record<string, LexMap>, RegExp]>([

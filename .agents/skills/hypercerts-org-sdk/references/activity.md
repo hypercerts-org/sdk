@@ -170,7 +170,7 @@ Each `usedTags` entry is a new work-scope tag or `{ uri }` of an existing one; s
 ## Activity pitfalls
 
 - A `{ uri }` must use a DID authority, not a handle, and point at the right collection (`org.hypercerts.claim.rights` for `rights`, `app.certified.location` for locations, `org.hypercerts.claim.contributorInformation` for `identity`, `org.hypercerts.claim.contribution` for `details`). Do not mix `uri` with other fields.
-- `weight` is a positive decimal **string** (`"0.5"`), not a number. Weights don't have to add up to anything.
+- `weight` is a positive decimal **string** (`"0.5"`), not a number. At most 100 characters. Weights don't have to add up to anything.
 - A location's `location: { uri }` is a link to external data (e.g. a GeoJSON file). That is different from a whole location given as `{ uri }`, which reuses an existing location record.
 - Dates are ISO 8601 date-times (`"2024-03-01T00:00:00Z"`), not bare dates. `endDate` must not be before `startDate`.
 - A `description` is a string, a Leaflet document (it needs its `$type`, `"pub.leaflet.pages.linearDocument"`) or `{ uri }` of an existing record of any type. A `{ uri }` is read once and stored as a strong reference; the SDK never creates the document record, and a handle instead of a DID throws a `TypeError`.

@@ -91,6 +91,11 @@ describe("addActivityToProject", () => {
 
   it.each([
     [
+      "a weight over 100 characters",
+      { projectUri, activity: { activity }, weight: "1".repeat(101) },
+      /invalid input: must be at most 100 characters at \$\.weight/,
+    ],
+    [
       "`collectionUri` in place of `projectUri`",
       { collectionUri: projectUri, activity: { activity } },
       /Missing required key "projectUri"/,

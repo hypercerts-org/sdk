@@ -20,6 +20,7 @@ import {
   optionalMedia,
   optionalText,
   strictObject,
+  WEIGHT_MAX_LENGTH,
   weightString,
 } from "../internal/input.js";
 import type { LeafletDocument } from "../internal/long-description.js";
@@ -216,7 +217,7 @@ const itemInput = strictObject({
   feature: l.optional(l.unknown()),
   collection: l.optional(l.unknown()),
   uri: l.optional(l.string()),
-  weight: l.optional(weightString),
+  weight: l.optional(weightString(WEIGHT_MAX_LENGTH)),
 });
 
 const ITEM_CHOICES = ["activity", "feature", "collection", "uri"] as const;
