@@ -134,7 +134,7 @@ describe("createMeasurement", () => {
       unit: "hectares",
       value: "1234.56",
       subjects: [{ uri: target.uri }],
-      measurers: [other.did],
+      measurers: [{ did: other.did }],
     });
 
     const stored = await storedOwn(result, contexts.measurement);

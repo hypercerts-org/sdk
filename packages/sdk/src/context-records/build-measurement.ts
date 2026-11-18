@@ -50,10 +50,10 @@ export interface MeasurementInput {
   /** URIs to evidence or the underlying data, at most 50. Stored as written, never fetched. */
   evidenceURI?: readonly string[] | undefined;
   /**
-   * DIDs of the entities that performed the measurement, at most 100. Declared data: it is not
+   * The accounts (`{ did }`) that performed the measurement, at most 100. Declared data: it is not
    * proof that those accounts took part or agree, and nothing is sent to them.
    */
-  measurers?: readonly string[] | undefined;
+  measurers?: readonly { did: string }[] | undefined;
   /** A short comment, suitable for previews. At most 3000 characters and 300 graphemes. */
   comment?: string | undefined;
   /** An ISO 8601 date-time. Defaults to the time of the call. */
@@ -119,7 +119,7 @@ export const measurementKind: RecordKind<MeasurementInput> = recordKind(
  * Each `locations` entry is either a new location's fields or `{ uri }` of an existing location,
  * which is reused as it is. Each `subjects` entry is `{ uri }` of an existing record of any type;
  * it is pinned by its current CID and never modified, and the subject does not learn about the
- * measurement. Nothing is deduplicated, and order is kept. `measurers` are DIDs stored as given:
+ * measurement. Nothing is deduplicated, and order is kept. `measurers` are `{ did }` accounts stored as given:
  * they are not proof that those accounts took part, and nobody is notified.
  *
  * To measure and evaluate in one call, pass the measurement's fields in `measurements` of
@@ -141,7 +141,7 @@ export const measurementKind: RecordKind<MeasurementInput> = recordKind(
  * locations in input order. See {@link CreateMeasurementResult}.
  * @throws {@link TypeError} If `input` has an unknown field, a `value` that is not a decimal
  * string (a number, `"1,234"`, `"1e3"`), an `endDate` before its `startDate`, a `measurers` entry
- * that is not a DID, a mixed or wrongly typed entry (a `locations` URI that points at another
+ * that is not `{ did }` with a DID, a mixed or wrongly typed entry (a `locations` URI that points at another
  * record type, `{ uri }` combined with record fields), more new records than one write holds, or
  * any value the lexicon does not allow. The message names the field. Nothing was written. Blobs
  * may already have been uploaded when a lexicon rule rejects a record.
@@ -165,7 +165,7 @@ export const measurementKind: RecordKind<MeasurementInput> = recordKind(
  *   subjects: [{ uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" }],
  *   startDate: "2026-01-01T00:00:00.000Z",
  *   endDate: "2026-06-30T00:00:00.000Z",
- *   measurers: ["did:plc:abc123"],
+ *   measurers: [{ did: "did:plc:abc123" }],
  *   locations: [
  *     {
  *       lpVersion: "1.0",

@@ -44,7 +44,7 @@ describe("createEvaluation", () => {
         {
           ...measurement,
           value: "0.10",
-          measurers: ["did:plc:abc123"],
+          measurers: [{ did: "did:plc:abc123" }],
           locations: [location("plot")],
         },
         { uri: existingMeasurement },

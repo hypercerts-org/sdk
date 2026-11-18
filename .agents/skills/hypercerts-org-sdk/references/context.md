@@ -61,14 +61,14 @@ const measurement = await createMeasurement(context, {
   subjects: [{ uri: "at://did:plc:abc123/org.hypercerts.claim.activity/3k2a4b5c6d7e8" }],
   startDate: "2026-01-01T00:00:00.000Z",
   endDate: "2026-06-30T00:00:00.000Z",
-  measurers: ["did:plc:abc123"],
+  measurers: [{ did: "did:plc:abc123" }],
   locations: [{ uri: "at://did:plc:abc123/app.certified.location/3k2a4b5c6d7e8" }], // or new location data
 });
 measurement.locations?.[0]; // { uri, cid, created: false }
 ```
 
 - `value` must be a decimal string: `"1234.56"`, `"-3"`, `"0.10"`. A JavaScript number, `"1,234"` and `"1e3"` throw `TypeError`. The string is stored exactly as written.
-- `measurers` (DID strings) and an evaluation's `evaluators` (`{ did }` objects) are accounts stored as declared data: no proof the account took part or consents, nobody is notified.
+- `measurers` and an evaluation's `evaluators` are accounts (`{ did }` objects, never bare strings) stored as declared data: no proof the account took part or consents, nobody is notified.
 - `endDate` before `startDate` throws. `methodURI` and `evidenceURI` entries are URIs, stored and never fetched.
 
 ## createEvaluation
@@ -125,7 +125,7 @@ await createAcknowledgement(context, {
 | `metric`, `unit`, `value` | measurement | `string` | All required; `value` is a decimal string. |
 | `startDate`, `endDate` | measurement | ISO 8601 | `endDate` not before `startDate`. |
 | `locations` | measurement | new locations or `{ uri }`, ≤ 100 | |
-| `methodType`, `methodURI`, `evidenceURI`, `measurers`, `comment` | measurement | `string`, `string`, `string[]`, DID `string[]`, `string` | |
+| `methodType`, `methodURI`, `evidenceURI`, `measurers`, `comment` | measurement | `string`, `string`, `string[]`, `{ did }[]`, `string` | |
 | `evaluators` | evaluation | `{ did }[]` | Required, ≤ 1000. |
 | `summary` | evaluation | `string` | Required, ≤ 5000. |
 | `subject` | evaluation, acknowledgement | `{ uri }` | Required for an acknowledgement. |

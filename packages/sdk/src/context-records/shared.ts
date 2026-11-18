@@ -1,6 +1,6 @@
 import { l } from "@atproto/lex";
 import { creatorOf, type StandaloneCreator } from "../internal/create-record.js";
-import { blobOrUrl } from "../internal/input.js";
+import { blobOrUrl, strictObject } from "../internal/input.js";
 import { mediaValue } from "../internal/media.js";
 import {
   type FieldTransform,
@@ -25,15 +25,18 @@ export const contentInput = l.optional(l.array(blobOrUrl));
 export const contentTransform: FieldTransform = (build, field, value: readonly (Blob | string)[]) =>
   Promise.all(value.map((item, i) => mediaValue(build, `${field}[${i}]`, item, "blob")));
 
-/** A list of DIDs, for example `["did:plc:abc123"]`. */
-export const didListInput = l.array(l.string({ format: "did" }));
+/** A list of accounts, for example `[{ did: "did:plc:abc123" }]`. */
+export const didListInput = l.array(strictObject({ did: l.string({ format: "did" }) }));
 
 /**
  * The `recordKind` transform of a DID list: the lexicon stores each DID as an
  * `app.certified.defs#did` object.
  */
-export const didListTransform: FieldTransform = (_build, _field, dids: readonly string[]) =>
-  Promise.resolve(dids.map((did) => ({ did })));
+export const didListTransform: FieldTransform = (
+  _build,
+  _field,
+  accounts: readonly { did: string }[],
+) => Promise.resolve(accounts.map(({ did }) => ({ did })));
 
 const DECIMAL = /^-?\d+(\.\d+)?$/;
 

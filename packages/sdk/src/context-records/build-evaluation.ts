@@ -1,6 +1,5 @@
 import { l } from "@atproto/lex";
 import * as evaluation from "@hypercerts-org/lexicon/org/hypercerts/context/evaluation";
-import { strictObject } from "../internal/input.js";
 import { type RecordKind, recordKind, references } from "../internal/record-kind.js";
 import type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 import type { LocationInput } from "../location/build-location.js";
@@ -14,6 +13,8 @@ import {
   contentInput,
   contentTransform,
   creatorWithoutCreatedOf,
+  didListInput,
+  didListTransform,
   existingRecordReference,
   locationReference,
   type StrongRef,
@@ -77,16 +78,12 @@ export interface CreateEvaluationResult extends StrongRef {
 const evaluationKind: RecordKind<EvaluationInput> = recordKind(
   evaluation.main,
   {
-    evaluators: l.array(strictObject({ did: l.string({ format: "did" }) })),
+    evaluators: didListInput,
     summary: l.string(),
     content: contentInput,
     score: l.optional(scoreInput),
   },
-  {
-    evaluators: (_build, _field, evaluators: readonly { did: string }[]) =>
-      Promise.resolve(evaluators.map(({ did }) => ({ did }))),
-    content: contentTransform,
-  },
+  { evaluators: didListTransform, content: contentTransform },
   {
     references: {
       subject: existingRecordReference,
