@@ -65,7 +65,9 @@ export interface AddActivityToCollectionResult extends StrongRef {
  * @throws {@link WriteRejectedError} If the PDS rejected the write, including `"InvalidSwap"` (the
  * Collection, or for a new Activity the repository, changed since it was read). Nothing was changed.
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
- * a retry can duplicate records under new keys.
+ * a retry can duplicate new records under new keys. For `activity: { uri }` only the Collection was written
+ * (one `putRecord`): read the Collection first to check whether its CID changed, or a retry re-reads it and
+ * can add the item twice.
  *
  * @example
  * ```ts

@@ -45,7 +45,9 @@ export interface AddActivityToProjectResult extends StrongRef {
  * @throws {@link WriteRejectedError} If the PDS rejected the write, including `"InvalidSwap"`: the
  * Project changed since it was read (`activity: { uri }`), or the repository did (a new Activity).
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
- * a retry can duplicate records under new keys.
+ * a retry can duplicate new records under new keys. For `activity: { uri }` only the Project was written
+ * (one `putRecord`): read the Project first to check whether its CID changed, or a retry re-reads it and
+ * can add the item twice.
  *
  * @example
  * ```ts
