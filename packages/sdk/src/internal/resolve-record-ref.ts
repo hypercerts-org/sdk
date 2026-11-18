@@ -175,7 +175,8 @@ export const collectionOf = (uri: string): string | undefined => uri.split("/")[
 /**
  * Throws TypeError, naming `operation` and `label` (the input field), unless the record URI `uri`
  * is of one of the `allowed` types (any type when `allowed` is undefined). `expectation` completes
- * "..., but " in the message, for example `it must be of type <nsid>`.
+ * "..., but " in the message, for example `it must be of type <nsid>`. A function instead gives the
+ * whole message for a record of another type, for callers that word the refusal themselves.
  *
  * Internal. Checks the collection segment only and does not validate the URI's authority or
  * shape: callers do that with `parseRecordUri`, before or after this check as suits their error
@@ -186,14 +187,17 @@ export function assertRecordUriOfType(
   label: string,
   uri: string,
   allowed: readonly string[] | undefined,
-  expectation: string,
+  expectation: string | ((actual: string) => string),
 ): void {
   const actual = collectionOf(uri);
   if (actual !== undefined && (allowed === undefined || allowed.includes(actual))) return;
+  if (actual !== undefined && typeof expectation === "function") {
+    throw new TypeError(expectation(actual));
+  }
   const target =
     actual === undefined ? "something that is not a record" : `a record of type ${actual}`;
   throw new TypeError(
-    `${operation}: ${label} points at ${target}, but ${expectation}: ${uri}. Expected at://<did>/${allowed?.join("|") ?? "<collection>"}/<rkey>.`,
+    `${operation}: ${label} points at ${target}, but ${typeof expectation === "string" ? expectation : "it must be a record"}: ${uri}. Expected at://<did>/${allowed?.join("|") ?? "<collection>"}/<rkey>.`,
   );
 }
 
