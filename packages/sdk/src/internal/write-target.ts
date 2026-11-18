@@ -19,16 +19,31 @@ import { describeError, isRecordNotFound } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import { parseRecordUri, type StrongRef } from "./resolve-record-ref.js";
 
+/** An existing record to replace with a new full value. */
+export interface PlannedUpdate {
+  /** The new full value, prepared with the record key the record already has. */
+  readonly record: PreparedRecord;
+  /**
+   * The CID the record had when the caller read it and built `record` from it. Replace only if the
+   * record still has it. A target that cannot check one record alone (the PDS's `applyWrites` cannot)
+   * must apply it through `WritePlan.swapCommit` or say so in its documentation.
+   */
+  readonly swapRecord?: CidString | undefined;
+  /** What the record is called in the message when `swapRecord` no longer matches, for example "Collection". Default: "record". */
+  readonly noun?: string | undefined;
+}
+
 /** What one call writes to a repo, in the order it must be written. */
 export interface WritePlan {
   /** New records, in dependency order: records that others reference come first. */
   readonly creates: readonly PreparedRecord[];
   /** Existing records to replace with a new full value, written after the creates. */
-  readonly updates: readonly PreparedRecord[];
+  readonly updates: readonly PlannedUpdate[];
   /** Every create must fail if its record key is already taken. */
   readonly createOnly: boolean;
   /**
-   * The CID of the repo's head commit as the caller read it (see {@link WriteTarget.readHead}). A
+   * The CID of the repo's head commit as the caller read it (see {@link WriteTarget.readHead}). Set
+   * it for a plan with several writes, where a per-record `swapRecord` cannot cover them all. A
    * target that cannot enforce it must say so in its documentation.
    */
   readonly swapCommit?: CidString | undefined;
@@ -106,6 +121,13 @@ const getLatestCommit = l.query(
  * rejects the request: a false alarm the caller accepts. Throws WriteRejectedError,
  * WriteOutcomeUnknownError or WriteResultMismatchError.
  *
+ * `submit` with one update, no creates and an `updates[0].swapRecord` uses `putRecord` with that
+ * `swapRecord`, so only a change to that record itself, not any other write to the account,
+ * rejects the request (WriteRejectedError, `code` `InvalidSwap`, "the <noun> changed since it was
+ * read"). It never reads the head. A plan with more writes keeps `applyWrites` and `swapCommit`.
+ * Calling again after an unknown outcome is not safe in general: the caller built the new value
+ * from what it read, and a first attempt that succeeded changed the record.
+ *
  * `submit` with `createOnly: true` uses `putRecord` with `swapRecord: null`, the lexicon's own "only
  * if absent". `applyWrites` cannot tell the caller a key is taken: the reference PDS answers a
  * `create` at a taken key with a generic HTTP 500, indistinguishable from a server fault.
@@ -130,12 +152,24 @@ export function pdsTarget(context: SDKContext, did: DidString, operation: string
     readHead: () => readHead(context, did, operation),
     recordExists: (collection, rkey) => recordExists(context, did, collection, rkey),
     uploadBlob: (body, mimeType) => uploadBlob(context, body, { mimeType }),
-    submit: (plan) =>
-      plan.createOnly
-        ? submitCreateOnly(context, did, operation, plan)
-        : submitApplyWrites(context, did, operation, plan),
+    submit: (plan) => {
+      if (plan.createOnly) return submitCreateOnly(context, did, operation, plan);
+      return isGuardedSingleUpdate(plan)
+        ? submitGuardedUpdate(context, did, operation, plan)
+        : submitApplyWrites(context, did, operation, plan);
+    },
     delete: (target) => deleteRecord(context, did, operation, target),
   };
+}
+
+// One update to a record the caller read, and nothing else: the one plan `putRecord` can carry
+// with a check on that record alone.
+function isGuardedSingleUpdate(plan: WritePlan): boolean {
+  return (
+    plan.creates.length === 0 &&
+    plan.updates.length === 1 &&
+    plan.updates[0]?.swapRecord !== undefined
+  );
 }
 
 async function readHead(context: SDKContext, did: DidString, operation: string) {
@@ -178,7 +212,8 @@ async function submitApplyWrites(
   operation: string,
   plan: WritePlan,
 ): Promise<void> {
-  const { creates, updates } = plan;
+  const { creates } = plan;
+  const updates = plan.updates.map(({ record }) => record);
   const request: Request = {
     created: creates.map((record) => record.ref),
     updated: updates.map((record) => record.ref),
@@ -215,6 +250,34 @@ async function submitApplyWrites(
   );
 }
 
+async function submitGuardedUpdate(
+  context: SDKContext,
+  did: DidString,
+  operation: string,
+  plan: WritePlan,
+): Promise<void> {
+  const [{ record, swapRecord, noun }] = plan.updates as [PlannedUpdate, ...PlannedUpdate[]];
+  await submit(
+    operation,
+    {
+      created: [],
+      updated: [record.ref],
+      swapCommit: undefined,
+      staleRecord: { uri: record.ref.uri, noun: noun ?? "record" },
+    },
+    async () => {
+      const response = await context.client.putRecord(
+        record.value as TypedLexMap<NsidString>,
+        record.rkey,
+        { repo: did, ...(swapRecord === undefined ? {} : { swapRecord }) },
+      );
+      return [response.body];
+    },
+    plan.retrySafe ?? false,
+    plan.retrySafeReason,
+  );
+}
+
 async function submitCreateOnly(
   context: SDKContext,
   did: DidString,
@@ -235,7 +298,7 @@ async function submitCreateOnly(
   try {
     await submit(
       operation,
-      { created: [record.ref], updated: [], swapCommit: undefined },
+      { created: [record.ref], updated: [], swapCommit: undefined, staleRecord: undefined },
       async () => {
         const response = await context.client.putRecord(
           record.value as TypedLexMap<NsidString>,
@@ -279,6 +342,8 @@ interface Request {
   readonly created: readonly StrongRef[];
   readonly updated: readonly StrongRef[];
   readonly swapCommit: CidString | undefined;
+  /** Set when the request is conditional on one record's CID (`putRecord` with `swapRecord`). */
+  readonly staleRecord?: { readonly uri: string; readonly noun: string } | undefined;
 }
 
 function toAlreadyExists(
@@ -395,10 +460,12 @@ function classifyFailure(
   if (details !== undefined) {
     const { status, code } = details;
     const message =
-      code === "InvalidSwap" && request.swapCommit !== undefined
-        ? repositoryChanged(operation, reason, request)
-        : `${operation}: the PDS rejected the request (HTTP ${status}: ${reason}), so ${describeEffects(request, NOT_WRITTEN)}. ` +
-          "Nothing needs cleaning up. Fix the cause (for example the input, the session's permissions or a rate limit) and call again.";
+      code === "InvalidSwap" && request.staleRecord !== undefined
+        ? recordChanged(operation, reason, request.staleRecord)
+        : code === "InvalidSwap" && request.swapCommit !== undefined
+          ? repositoryChanged(operation, reason, request)
+          : `${operation}: the PDS rejected the request (HTTP ${status}: ${reason}), so ${describeEffects(request, NOT_WRITTEN)}. ` +
+            "Nothing needs cleaning up. Fix the cause (for example the input, the session's permissions or a rate limit) and call again.";
     return new WriteRejectedError(message, attempted, details, { cause: error });
   }
   return new WriteOutcomeUnknownError(
@@ -423,11 +490,26 @@ function retryAdvice(
         : "the record has a fixed key and is only created if absent, so the call either creates it or fails because it already exists");
     return `The SDK does not retry, but calling ${operation} again is safe: ${subject}, most likely from the first attempt. To check first, use com.atproto.repo.getRecord.`;
   }
+  if (request.created.length === 0) {
+    return `Read ${request.updated.length === 1 ? "the updated record" : "the updated records"} (for example with com.atproto.repo.getRecord) to see whether the change was applied before trying again. The SDK does not retry, because calling ${operation} again would apply the change a second time if the first attempt succeeded.`;
+  }
   const check =
     request.updated.length === 0
       ? "Check whether they exist"
       : "Check which of the new records exist and whether the updated record changed";
   return `${check} (for example with com.atproto.repo.getRecord) before trying again. The SDK does not retry, because calling ${operation} again would create duplicates with new record keys if the first attempt succeeded.`;
+}
+
+// `InvalidSwap` on `putRecord` with `swapRecord`: the record no longer has the CID the caller read.
+function recordChanged(
+  operation: string,
+  reason: string,
+  { uri, noun }: { uri: string; noun: string },
+): string {
+  return (
+    `${operation}: the ${noun} changed since it was read (HTTP 400: ${reason}), so the PDS refused to replace ${uri}. ` +
+    `Nothing was written: ${uri} was not changed. Other writes to the account do not cause this. The SDK neither retries nor merges. Nothing needs cleaning up. Call again to read the ${noun} afresh and try once more.`
+  );
 }
 
 // `InvalidSwap` is what the PDS answers when the repo head is no longer the one the caller read:

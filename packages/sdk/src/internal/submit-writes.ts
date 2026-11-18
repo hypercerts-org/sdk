@@ -1,7 +1,7 @@
 import type { CidString } from "@atproto/lex";
 import type { BuildContext } from "./build-context.js";
 import type { PreparedRecord } from "./prepare-record.js";
-import type { DeleteTarget } from "./write-target.js";
+import type { DeleteTarget, PlannedUpdate } from "./write-target.js";
 
 /** What a request writes besides the records it creates. */
 interface SubmitOptions {
@@ -9,13 +9,15 @@ interface SubmitOptions {
    * Existing records to replace with a new full value, written after the creates in the same
    * commit. Each is prepared with the record key it already has (see `prepareRecord`).
    */
-  readonly updates?: readonly PreparedRecord[];
+  readonly updates?: readonly PlannedUpdate[];
   /**
    * The CID of the repo's head commit as the caller read it (see `WriteTarget.readHead`). The PDS rejects
    * the whole request with `InvalidSwap` if the repo has a newer commit by then. Set it when an
-   * update is based on a record the caller read, because `applyWrites` has no per-record check.
+   * update is based on a record the caller read and the request also creates records, because
+   * `applyWrites` has no per-record check. For a request that is one update, give that update's
+   * `swapRecord` instead.
    */
-  readonly swapCommit?: CidString;
+  readonly swapCommit?: CidString | undefined;
   /**
    * Whether calling again after an unknown outcome cannot duplicate records: either every record has
    * a key the input decided and the caller checks none exists before sending, or the caller reads a

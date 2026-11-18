@@ -46,16 +46,19 @@ interface AddActivityTarget {
 
 /**
  * Adds one Activity, new or existing, to a Collection in the signed-in account's repo, in one atomic
- * write guarded by the repository's head commit.
+ * write guarded against a concurrent change to the Collection.
  *
  * Order, so that a mistake costs as little as possible:
  * 1. the URI and the entry are checked, with no request;
  * 2. the Collection is read and checked, so a missing, invalid or full one fails before any upload;
  * 3. an existing Activity is read and blobs are uploaded (see `prepareSlots`);
- * 4. the repository's head is read, then the Collection again, which is the read `swapCommit`
- *    guards: a write that lands between the head and the second read moves the head and fails the
- *    request, and one before the head is part of the Collection that was read;
- * 5. one `applyWrites` creates the new records and replaces the Collection.
+ * 4. with new records to create, the repository's head is read, then the Collection again, which is
+ *    the read `swapCommit` guards: a write that lands between the head and the second read moves the
+ *    head and fails the request, and one before the head is part of the Collection that was read.
+ *    With an existing Activity only, there is no head: the Collection is read, and its CID is the
+ *    `swapRecord` of the write;
+ * 5. new records and the Collection go in one `applyWrites`; the Collection alone in one `putRecord`
+ *    with `swapRecord`, which other writes to the account do not fail.
  *
  * Throws TypeError for input the caller must change, Error for anything unreadable or a Collection
  * that cannot take the item, and what `submitWrites` throws.
@@ -79,13 +82,15 @@ export async function addActivity(
     // The Collection update goes in the same request.
     otherWrites: 1,
   });
-  const head = await build.target.readHead();
+  // Only a request that also creates records needs the whole repo's head: it is one `applyWrites`,
+  // which has no per-record check. An update alone is guarded by the Collection's own CID.
+  const head = created.size === 0 ? undefined : await build.target.readHead();
   const stored = await readRecord(context, uri, build.operation);
   const item = compact({ itemIdentifier: refOf(planned.slot), itemWeight: weight });
   const updated = await appendItem(build, target, stored, rkey, item);
 
   await submitWrites(build, [...created.values()], {
-    updates: [updated],
+    updates: [{ record: updated, swapRecord: stored.ref.cid, noun: target.noun }],
     swapCommit: head,
   });
   return { ...updated.ref, activity: planned.result(created, refOf) };
