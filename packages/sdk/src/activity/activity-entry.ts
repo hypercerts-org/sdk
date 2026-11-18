@@ -2,9 +2,8 @@ import { l } from "@atproto/lex";
 import * as activity from "@hypercerts-org/lexicon/org/hypercerts/claim/activity";
 import { type BuildContext, parseInput } from "../internal/build-context.js";
 import { strictObject, weightString } from "../internal/input.js";
-import type { PreparedRecord } from "../internal/prepare-record.js";
 import {
-  type ReferenceOf,
+  type ResultOf,
   type Slot,
   type SupportingRecordRef,
   toExistingSlot,
@@ -101,10 +100,7 @@ export interface PlannedActivityEntry {
   /** The Activity to create, or the existing one to read for its CID. */
   readonly slot: Slot;
   /** What the caller gets back for the entry once its records are prepared. */
-  readonly result: (
-    created: ReadonlyMap<Slot, PreparedRecord>,
-    refOf: ReferenceOf,
-  ) => ActivityEntryResult;
+  readonly result: ResultOf<ActivityEntryResult>;
 }
 
 /**

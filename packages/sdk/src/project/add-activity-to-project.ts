@@ -1,43 +1,35 @@
-import { l } from "@atproto/lex";
-import {
-  type ActivityEntry,
-  type ActivityEntryResult,
-  entryWeight,
-} from "../activity/activity-entry.js";
 import { addActivity } from "../collection/add-activity.js";
+import type {
+  AddActivityToCollectionInput,
+  AddActivityToCollectionResult,
+} from "../collection/add-activity-to-collection.js";
 import type { SDKContext } from "../context.js";
-import { createBuildContext, parseInput } from "../internal/build-context.js";
-import { strictObject } from "../internal/input.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 
 const OPERATION = "addActivityToProject";
 
-/** The input of {@link addActivityToProject}. */
-export interface AddActivityToProjectInput {
+/**
+ * The input of {@link addActivityToProject}: {@link AddActivityToCollectionInput} with `projectUri`
+ * in place of `collectionUri`.
+ */
+export interface AddActivityToProjectInput
+  extends Omit<AddActivityToCollectionInput, "collectionUri"> {
   /**
    * The Project to add to, as `at://<did>/org.hypercerts.collection/<rkey>`: a Collection of type
    * `project` that belongs to the account the client is signed in as, identified by a DID.
    */
   projectUri: string;
-  /** The Activity to add: `{ activity }` (new) or `{ uri }` (existing). See {@link ActivityEntry}. */
-  activity: ActivityEntry;
-  /** A positive decimal as a string, such as `"2"` or `"0.5"`, kept as written. Up to 100 chars. */
-  weight?: string | undefined;
 }
 
-/** The result of {@link addActivityToProject}. */
-export interface AddActivityToProjectResult {
-  /** The Activity: created or reused, with the records created for it. See {@link ActivityEntryResult}. */
-  activity: ActivityEntryResult;
+/**
+ * The result of {@link addActivityToProject}: {@link AddActivityToCollectionResult} with `project`
+ * in place of `collection`.
+ */
+export interface AddActivityToProjectResult
+  extends Omit<AddActivityToCollectionResult, "collection"> {
   /** The Project after the update: its unchanged URI and the CID of its new version. */
   project: StrongRef;
 }
-
-const inputSchema = strictObject({
-  projectUri: l.string(),
-  activity: l.unknown(),
-  weight: entryWeight,
-});
 
 /**
  * Adds an Activity to an existing Project (a Collection of type `project`) in one atomic write.
@@ -85,10 +77,9 @@ export async function addActivityToProject(
   context: SDKContext,
   input: AddActivityToProjectInput,
 ): Promise<AddActivityToProjectResult> {
-  const build = createBuildContext(context, OPERATION);
-  const { projectUri, activity, weight } = parseInput(build, "input", inputSchema, input);
   const { collection, ...added } = await addActivity(
-    build,
+    context,
+    OPERATION,
     {
       uriField: "projectUri",
       noun: "Project",
@@ -100,7 +91,7 @@ export async function addActivityToProject(
         );
       },
     },
-    { uri: projectUri, entry: activity, weight },
+    input,
   );
   return { ...added, project: collection };
 }

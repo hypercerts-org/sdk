@@ -1,12 +1,5 @@
-import { l } from "@atproto/lex";
-import {
-  type ActivityEntry,
-  type ActivityEntryResult,
-  entryWeight,
-} from "../activity/activity-entry.js";
+import type { ActivityEntry, ActivityEntryResult } from "../activity/activity-entry.js";
 import type { SDKContext } from "../context.js";
-import { createBuildContext, parseInput } from "../internal/build-context.js";
-import { strictObject } from "../internal/input.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import { addActivity } from "./add-activity.js";
 
@@ -32,12 +25,6 @@ export interface AddActivityToCollectionResult {
   /** The Collection after the update: its unchanged URI and the CID of its new version. */
   collection: StrongRef;
 }
-
-const inputSchema = strictObject({
-  collectionUri: l.string(),
-  activity: l.unknown(),
-  weight: entryWeight,
-});
 
 /**
  * Adds an Activity to an existing Collection (`org.hypercerts.collection`) in one atomic write.
@@ -84,11 +71,5 @@ export async function addActivityToCollection(
   context: SDKContext,
   input: AddActivityToCollectionInput,
 ): Promise<AddActivityToCollectionResult> {
-  const build = createBuildContext(context, OPERATION);
-  const { collectionUri, activity, weight } = parseInput(build, "input", inputSchema, input);
-  return addActivity(
-    build,
-    { uriField: "collectionUri", noun: "Collection" },
-    { uri: collectionUri, entry: activity, weight },
-  );
+  return addActivity(context, OPERATION, { uriField: "collectionUri", noun: "Collection" }, input);
 }

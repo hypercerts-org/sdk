@@ -1,9 +1,19 @@
-import type { RecordKeyString } from "@atproto/lex";
+import { l, type RecordKeyString } from "@atproto/lex";
 import * as collection from "@hypercerts-org/lexicon/org/hypercerts/collection";
-import { type ActivityEntryResult, planActivityEntry } from "../activity/activity-entry.js";
-import { type BuildContext, parseOwnRecordUri } from "../internal/build-context.js";
+import {
+  type ActivityEntryResult,
+  entryWeight,
+  planActivityEntry,
+} from "../activity/activity-entry.js";
+import type { SDKContext } from "../context.js";
+import {
+  type BuildContext,
+  createBuildContext,
+  parseInput,
+  parseOwnRecordUri,
+} from "../internal/build-context.js";
 import { describeError } from "../internal/describe.js";
-import { compact } from "../internal/input.js";
+import { compact, strictObject } from "../internal/input.js";
 import { type PreparedRecord, prepareUpdate } from "../internal/prepare-record.js";
 import { readRepoHead } from "../internal/read-repo-head.js";
 import { readRecord, type StoredRecord, type StrongRef } from "../internal/resolve-record-ref.js";
@@ -32,16 +42,6 @@ export interface AddActivityTarget {
   readonly check?: (stored: collection.Main, uri: string) => void;
 }
 
-/** What `addActivity` needs from the public input, which the caller has validated as a whole. */
-export interface AddActivityInput {
-  /** The URI of the Collection, as the caller passed it. */
-  readonly uri: string;
-  /** The Activity entry: `{ activity }` or `{ uri }`. Validated here. */
-  readonly entry: unknown;
-  /** The weight of the new item, already checked. */
-  readonly weight: string | undefined;
-}
-
 /**
  * Adds one Activity, new or existing, to a Collection in the signed-in account's repo, in one atomic
  * write guarded by the repository's head commit.
@@ -59,11 +59,13 @@ export interface AddActivityInput {
  * that cannot take the item, and what `submitWrites` throws.
  */
 export async function addActivity(
-  build: BuildContext,
+  context: SDKContext,
+  operation: string,
   target: AddActivityTarget,
-  { uri, entry, weight }: AddActivityInput,
+  input: unknown,
 ): Promise<{ activity: ActivityEntryResult; collection: StrongRef }> {
-  const { context } = build;
+  const build = createBuildContext(context, operation);
+  const { uri, entry, weight } = parseAddInput(build, target.uriField, input);
   const rkey = parseCollectionUri(build, target, uri);
   const planned = planActivityEntry(build, "input.activity", entry);
   checkCollection(build, target, await readRecord(context, uri, build.operation));
@@ -85,6 +87,22 @@ export async function addActivity(
     swapCommit: head,
   });
   return { activity: planned.result(created, refOf), collection: updated.ref };
+}
+
+// The input of both public operations, which differ only in the name of the URI field: the
+// Collection's URI, the Activity entry (checked by `planActivityEntry`) and the weight of its item.
+function parseAddInput(build: BuildContext, uriField: string, input: unknown) {
+  const shape: Record<string, l.Validator> = {
+    [uriField]: l.string(),
+    activity: l.unknown(),
+    weight: entryWeight,
+  };
+  const parsed = parseInput(build, "input", strictObject(shape), input);
+  return {
+    uri: parsed[uriField] as string,
+    entry: parsed.activity,
+    weight: parsed.weight as string | undefined,
+  };
 }
 
 // Checked before any request: the URI must name a Collection in the signed-in account's repo.
