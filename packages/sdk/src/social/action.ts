@@ -1,7 +1,7 @@
 import { type CidString, isCidString, isDidString, l } from "@atproto/lex";
 import type { SDKContext } from "../context.js";
 import { strictObject } from "../internal/input.js";
-import { parseRecordUri, resolveRecordRef } from "../internal/resolve-record-ref.js";
+import { resolveRecordRef, tryParseRecordUri } from "../internal/resolve-record-ref.js";
 
 /** A record the action refers to, as `{ uri }`. */
 export interface RecordSubject {
@@ -169,15 +169,8 @@ export function undoInputSchema<TField extends UndoField>(
   return strictObject({ [field]: strictObject({ uri: recordUri, cid }) }) as never;
 }
 
-// `parseRecordUri` is the one definition of a record URI; it reports by throwing.
 function isRecordUri(value: unknown): value is string {
-  if (typeof value !== "string") return false;
-  try {
-    parseRecordUri(value, "isRecordUri");
-    return true;
-  } catch {
-    return false;
-  }
+  return typeof value === "string" && tryParseRecordUri(value) !== undefined;
 }
 
 /**
