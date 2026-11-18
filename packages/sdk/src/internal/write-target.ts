@@ -33,13 +33,13 @@ export interface WritePlan {
    */
   readonly swapCommit?: CidString | undefined;
   /**
-   * Whether calling again after an unknown outcome cannot duplicate records. Every target uses it
+   * Whether calling again after an unknown outcome cannot duplicate records. A target must use it
    * (with `retrySafeReason`) to word the advice in its outcome-unknown error; it changes nothing
-   * else. See `SubmitOptions`.
+   * else. See `SubmitOptions.retrySafe` in submit-writes.ts.
    */
   readonly retrySafe?: boolean | undefined;
   /**
-   * Why calling again is safe, when it is not "every record has a fixed key". Used by every target
+   * Why calling again is safe, when it is not "every record has a fixed key". Used by a target
    * in its outcome-unknown message, with `retrySafe`.
    */
   readonly retrySafeReason?: string | undefined;
@@ -164,6 +164,7 @@ async function recordExists(
 ): Promise<StrongRef | undefined> {
   try {
     const { body } = await context.client.getRecord(collection, rkey, { repo: did });
+    // The lexicon types `cid` as optional; a PDS always sends it, and callers only test for presence.
     return { uri: body.uri, cid: body.cid } as StrongRef;
   } catch (error) {
     if (isRecordNotFound(error)) return undefined;
