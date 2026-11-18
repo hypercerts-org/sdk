@@ -11,7 +11,7 @@ import {
 } from "../internal/long-description.js";
 import { type RecordKind, recordKind, references } from "../internal/record-kind.js";
 import type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
-import { type LocationInput, locationKind } from "../location/build-location.js";
+import { type LocationInput, locationKind } from "../location/create-location.js";
 import {
   type CreateVocabularyTagResult,
   type VocabularyTagInput,

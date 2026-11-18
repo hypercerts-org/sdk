@@ -42,18 +42,18 @@ import {
   toSlot,
 } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
-import { type LocationInput, locationKind } from "../location/build-location.js";
+import { type LocationInput, locationKind } from "../location/create-location.js";
 import {
   type CreateWorkScopeTagResult,
   type WorkScopeTagInput,
   workScopeTagKind,
 } from "../tag/build-tag.js";
-import { type ContributionInput, contributionKind } from "./build-contribution.js";
+import { type ContributionInput, contributionKind } from "./create-contribution.js";
 import {
   type ContributorInformationInput,
   contributorInformationKind,
-} from "./build-contributor-information.js";
-import { type RightsInput, rightsKind } from "./build-rights.js";
+} from "./create-contributor-information.js";
+import { type RightsInput, rightsKind } from "./create-rights.js";
 
 /**
  * A value the Activity stores directly, without a supporting record: a contributor's identity

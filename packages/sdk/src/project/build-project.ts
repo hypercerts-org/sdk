@@ -7,7 +7,7 @@ import {
   entryWeight,
   existingActivitySlot,
 } from "../activity/activity-entry.js";
-import { type ActivityInput, activityTextFields } from "../activity/build-activity.js";
+import { type ActivityInput, activityTextFields } from "../activity/create-activity.js";
 import {
   type CollectionInput,
   type CreateCollectionItemResult,

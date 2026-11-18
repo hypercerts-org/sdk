@@ -1,6 +1,6 @@
 // Entry point for @hypercerts-org/sdk/project.
 export type { ActivityEntryResult } from "../activity/activity-entry.js";
-export type { ActivityInput, CreateActivityResult } from "../activity/build-activity.js";
+export type { ActivityInput, CreateActivityResult } from "../activity/create-activity.js";
 export {
   RecordAlreadyExistsError,
   WriteError,
@@ -11,7 +11,7 @@ export {
 export type { LeafletDocument } from "../internal/long-description.js";
 export type { StrongRef } from "../internal/resolve-record-ref.js";
 export type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
-export type { LocationInput } from "../location/build-location.js";
+export type { LocationInput } from "../location/create-location.js";
 export type { CreateVocabularyTagResult, VocabularyTagInput } from "../tag/build-tag.js";
 export type {
   AddActivityToProjectInput,

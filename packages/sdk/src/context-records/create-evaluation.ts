@@ -2,12 +2,12 @@ import { l } from "@atproto/lex";
 import * as evaluation from "@hypercerts-org/lexicon/org/hypercerts/context/evaluation";
 import { type RecordKind, recordKind, references } from "../internal/record-kind.js";
 import type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
-import type { LocationInput } from "../location/build-location.js";
+import type { LocationInput } from "../location/create-location.js";
 import {
   type CreateMeasurementResult,
   type MeasurementInput,
   measurementKind,
-} from "./build-measurement.js";
+} from "./create-measurement.js";
 import { type EvaluationScore, scoreInput } from "./score.js";
 import {
   contentInput,

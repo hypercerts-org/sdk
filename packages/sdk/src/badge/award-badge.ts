@@ -17,7 +17,7 @@ import {
   resolveDefinition,
   resolveSubject,
 } from "./award-targets.js";
-import type { BadgeDefinitionInput } from "./build-definition.js";
+import type { BadgeDefinitionInput } from "./create-badge-definition.js";
 
 const OPERATION = "awardBadge";
 

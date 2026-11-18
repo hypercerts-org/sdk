@@ -1,7 +1,7 @@
 import { type CidString, l, type NsidString, type RecordKeyString } from "@atproto/lex";
 import * as organization from "@hypercerts-org/lexicon/app/certified/actor/organization";
 import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
-import { type ProfileInput, profileKind } from "../actor/build-profile.js";
+import { type ProfileInput, profileKind } from "../actor/create-profile.js";
 import type { SDKContext } from "../context.js";
 import { RecordAlreadyExistsError, WriteRejectedError } from "../errors.js";
 import { type BuildContext, createBuildContext, parseInput } from "../internal/build-context.js";

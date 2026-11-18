@@ -9,7 +9,7 @@ import {
   type SupportingRecordRef,
   toExistingSlot,
 } from "../internal/slots.js";
-import { type CreateActivityResult, planActivitySlot } from "./build-activity.js";
+import { type CreateActivityResult, planActivitySlot } from "./create-activity.js";
 
 /**
  * What a call did for one Activity that may be new or existing: created the Activity (with its records) or reused

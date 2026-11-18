@@ -1,5 +1,5 @@
 import type { ActivityEntryResult } from "../activity/activity-entry.js";
-import type { ActivityInput } from "../activity/build-activity.js";
+import type { ActivityInput } from "../activity/create-activity.js";
 import type { SDKContext } from "../context.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import type { ExistingRecord } from "../internal/slots.js";

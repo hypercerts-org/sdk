@@ -10,7 +10,7 @@ import {
 import { mediaTransform } from "../internal/media.js";
 import { type RecordKind, recordKind, references } from "../internal/record-kind.js";
 import type { ExistingRecord } from "../internal/slots.js";
-import { type LocationInput, locationKind } from "../location/build-location.js";
+import { type LocationInput, locationKind } from "../location/create-location.js";
 
 /** A labeled URL of an organization. */
 export interface OrganizationUrl {
