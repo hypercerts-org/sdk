@@ -10,6 +10,7 @@ import {
   type NsidString,
   type TypedBlobRef,
 } from "@atproto/lex";
+import * as organization from "@hypercerts-org/lexicon/app/certified/actor/organization";
 import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
 import * as badgeAward from "@hypercerts-org/lexicon/app/certified/badge/award";
 import * as badgeDefinition from "@hypercerts-org/lexicon/app/certified/badge/definition";
@@ -108,6 +109,7 @@ export const collections = {
   rights: rights.main.$type,
   location: location.main.$type,
   profile: profile.main.$type,
+  organization: organization.main.$type,
   contributorInformation: contributorInformation.main.$type,
   contribution: contribution.main.$type,
   vocabularyTag: vocabularyTag.main.$type,
