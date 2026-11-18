@@ -94,7 +94,7 @@ Not supported: `type` and `items` (a Project is always `type: "project"`; its it
 
 ## addActivityToProject
 
-`addActivityToProject(context, { project: { uri }, activity, weight? })` appends an Activity to an **existing** Project in your repo in one `applyWrites` commit. It is [`addActivityToCollection`](collection.md#addactivitytocollection) for a Collection of type `project`: the input names it `project`, and the result has the same shape.
+`addActivityToProject(context, { project: { uri }, activity, weight? })` appends an Activity to an **existing** Project in your repo (one `applyWrites` commit for a new Activity, one `putRecord` for `{ uri }`). It is [`addActivityToCollection`](collection.md#addactivitytocollection) for a Collection of type `project`: the input names it `project`, and the result has the same shape.
 
 ```ts
 import { addActivityToProject } from "@hypercerts-org/sdk/project";

@@ -107,9 +107,9 @@ await addActivityToCollection(context, {
 
 ### Concurrent writes (`InvalidSwap`)
 
-The write is conditional on the account not having changed since the Collection was read, so a concurrent change to its `items` cannot be overwritten with a stale list. When it did change you get `WriteRejectedError` with `code === "InvalidSwap"`: see [Concurrent changes](../SKILL.md#concurrent-changes-invalidswap) for the rule and the retry example.
+A concurrent change to the Collection's `items` is never overwritten with a stale list. With `activity: { uri }` the write is conditional on the Collection's own version (`putRecord` with `swapRecord`): only a change to that Collection fails it, other writes to the account do not. With a new Activity the write is one `applyWrites` conditional on the account's latest commit, so any write to the account since the read fails it. When it did change you get `WriteRejectedError` with `code === "InvalidSwap"`: see [Concurrent changes](../SKILL.md#concurrent-changes-invalidswap) for the rule and the retry example.
 
-Any other `WriteRejectedError` (4xx) is not fixed by calling again. After `WriteOutcomeUnknownError`, `attempted` lists the new records and, last, the Collection (only the Collection for a `{ uri }`): read the Collection and check whether its CID changed since you read it before retrying, or you add a second item. An existing Activity may already be listed, so its presence proves nothing; if later writes make the CID check impossible, reconcile `items` by hand.
+Any other `WriteRejectedError` (4xx) is not fixed by calling again. After `WriteOutcomeUnknownError`, `attempted` lists the new records and, last, the Collection (only the Collection for a `{ uri }`, written with one `putRecord`): read the Collection and check whether its CID changed since you read it before retrying, or you add a second item. An existing Activity may already be listed, so its presence proves nothing; if later writes make the CID check impossible, reconcile `items` by hand.
 
 ### Uploads are outside the commit
 

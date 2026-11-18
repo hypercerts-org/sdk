@@ -21,6 +21,7 @@ beforeAll(async () => {
 });
 
 const base = () => ({ title: unique("E2E activity"), shortDescription: "Planting native trees" });
+const rkeyOf = (uri: string) => uri.slice(uri.lastIndexOf("/") + 1);
 const refOnly = ({ uri, cid }: Ref): Ref => ({ uri, cid });
 
 // A Collection that already lists one Activity, as an application or an earlier call left it, and
@@ -300,6 +301,73 @@ describe("addActivityToCollection", () => {
     // the version it was.
     expect(await snapshotCounts(user.client)).toEqual({ ...before, rights: before.rights + 1 });
     await expectStored(user.client, seeded.ref);
+  });
+});
+
+describe("addActivityToCollection with an existing Activity under concurrent writes", () => {
+  it("is not refused when an unrelated record is written between the read and the write", async () => {
+    const seeded = await seedCollection();
+    const existing = await createActivity(user.context, base());
+    let interfered = 0;
+    const interfering = await loginAs("user1", async (path, init) => {
+      if (path.includes("com.atproto.repo.putRecord")) {
+        interfered += 1;
+        await createRights(user.context, rights);
+      }
+      return init;
+    });
+
+    const result = await addActivityToCollection(interfering.context, {
+      collection: { uri: seeded.ref.uri },
+      activity: { uri: existing.uri },
+    });
+
+    // The repository moved, but the Collection did not, so the write is accepted.
+    expect(interfered, "the putRecord request was not intercepted").toBe(1);
+    const stored = await expectStored(user.client, result);
+    expect(itemsOf(stored)).toEqual([
+      ...itemsOf(seeded.stored),
+      { itemIdentifier: refOnly(existing) },
+    ]);
+  });
+
+  it("writes nothing when the Collection itself changes between the read and the write", async () => {
+    const seeded = await seedCollection();
+    const [existing, other] = [
+      await createActivity(user.context, base()),
+      await createActivity(user.context, base()),
+    ];
+    let interfered = 0;
+    const interfering = await loginAs("user1", async (path, init) => {
+      if (path.includes("com.atproto.repo.putRecord") && interfered++ === 0) {
+        // Another writer adds an item to the same Collection first.
+        await addActivityToCollection(user.context, {
+          collection: { uri: seeded.ref.uri },
+          activity: { uri: other.uri },
+        });
+      }
+      return init;
+    });
+
+    const error = await addActivityToCollection(interfering.context, {
+      collection: { uri: seeded.ref.uri },
+      activity: { uri: existing.uri },
+    }).catch((e) => e);
+
+    expect(error).toMatchObject({ name: "WriteRejectedError", code: "InvalidSwap" });
+    expect(error.message).toMatch(/the Collection changed since it was read/);
+    // Only the other writer's item is stored: the stale write did not overwrite it.
+    const { body } = await user.client.getRecord(
+      "org.hypercerts.collection",
+      rkeyOf(seeded.ref.uri),
+      {
+        repo: user.did,
+      },
+    );
+    expect(itemsOf(body.value).map((item) => item.itemIdentifier.uri)).toEqual([
+      ...itemsOf(seeded.stored).map((item) => item.itemIdentifier.uri),
+      other.uri,
+    ]);
   });
 });
 

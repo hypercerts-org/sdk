@@ -1,7 +1,15 @@
 import { type LexMap, lexParse } from "@atproto/lex";
+import { cidForLex } from "@atproto/lex-cbor";
 import { describe, expect, it } from "vitest";
 import { CID, DID, json } from "../test-utils/fake-pds.js";
-import { fakeRepo, HEAD, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
+import {
+  type FakeRepoOptions,
+  fakeRepo,
+  HEAD,
+  methods,
+  refTo,
+  writeOf,
+} from "../test-utils/fake-repo.js";
 import {
   type AddActivityToCollectionInput,
   addActivityToCollection,
@@ -27,6 +35,9 @@ const stored = {
   title: "Bhutan portfolio",
   createdAt: "2024-01-01T00:00:00.000Z",
 };
+// The CID a PDS computes for the stored Collection, which the update's `swapRecord` must carry.
+const cidOf = async (record: LexMap) =>
+  (await cidForLex(lexParse(JSON.stringify(record)))).toString();
 const itemAt = (rkey: string) => ({
   itemIdentifier: { uri: `at://${DID}/${ACTIVITY}/${rkey}`, cid: CID },
 });
@@ -157,8 +168,8 @@ describe("addActivityToCollection with a new Activity", () => {
 describe("addActivityToCollection with an existing Activity", () => {
   const existing = `at://${DID}/${ACTIVITY}/3jzfcijpj2z2a`;
 
-  it("reads it once and lists it at that CID, creating no record but changing the Collection", async () => {
-    const { context, requests, creates, updates, swapCommits } = fakeRepo({
+  it("reads it once and lists it at that CID, creating no record but replacing the Collection with a putRecord guarded by the Collection's CID", async () => {
+    const { context, requests, creates, updates, puts, swapCommits } = fakeRepo({
       existing: { [existing]: ACTIVITY_CID },
       records: { [collectionUri]: stored },
     });
@@ -171,33 +182,72 @@ describe("addActivityToCollection with an existing Activity", () => {
     expect(methods(requests)).toEqual([
       "com.atproto.repo.getRecord", // the Collection, checked before anything else
       "com.atproto.repo.getRecord", // the Activity
-      "com.atproto.sync.getLatestCommit",
-      "com.atproto.repo.getRecord", // the Collection again, after the head
-      "com.atproto.repo.applyWrites",
+      "com.atproto.repo.getRecord", // the Collection again, the read whose CID guards the write
+      "com.atproto.repo.putRecord", // no head is read and no applyWrites is sent
     ]);
-    expect(creates[0]).toEqual([]);
-    const update = writeOf(updates[0] ?? [], COLLECTION);
-    expect(update.value.items).toEqual([
+    expect([creates, updates, swapCommits]).toEqual([[], [], []]);
+    const [put] = puts;
+    expect(put?.collection).toBe(COLLECTION);
+    expect(put?.rkey).toBe("3k2a4b5c6d7e8");
+    expect(put?.swapRecord).toBe(await cidOf(stored));
+    expect(put?.value.items).toEqual([
       { itemIdentifier: { uri: existing, cid: ACTIVITY_CID }, itemWeight: "3" },
     ]);
-    expect(swapCommits).toEqual([HEAD]);
     expect(result).toEqual({
       uri: collectionUri,
-      cid: update.cid,
+      cid: put?.cid,
       activity: { uri: existing, cid: ACTIVITY_CID, created: false },
     });
   });
 
+  it("is not refused when another record of the account changes meanwhile, only when the Collection does", async () => {
+    let reads = 0;
+    const unrelated = fakeRepo({
+      existing: { [existing]: ACTIVITY_CID },
+      records: { [collectionUri]: stored },
+      onRequest: (method, state) => {
+        if (method === "com.atproto.repo.getRecord" && ++reads === 3) state.head = OTHER_HEAD;
+      },
+    });
+    await expect(
+      addActivityToCollection(unrelated.context, call({ activity: { uri: existing } })),
+    ).resolves.toMatchObject({ uri: collectionUri });
+
+    // The Collection is replaced by another writer between the read and the write.
+    const options: FakeRepoOptions = {
+      existing: { [existing]: ACTIVITY_CID },
+      records: { [collectionUri]: stored },
+      onRequest: (method) => {
+        if (method.endsWith("putRecord")) {
+          options.records = { [collectionUri]: { ...stored, title: "Changed meanwhile" } };
+        }
+      },
+    };
+    const fake = fakeRepo(options);
+    const error = await addActivityToCollection(
+      fake.context,
+      call({ activity: { uri: existing } }),
+    ).catch((e) => e);
+
+    expect(error).toBeInstanceOf(WriteRejectedError);
+    expect(error).toMatchObject({ status: 400, code: "InvalidSwap" });
+    expect(error.message).toMatch(
+      /the Collection changed since it was read.*Nothing was written.*Call again/,
+    );
+    expect(error.attempted).toEqual([{ uri: collectionUri, cid: expect.any(String) }]);
+    expect(fake.puts).toEqual([]);
+  });
+
   it("lists the same Activity again when it is already an item: nothing is deduplicated", async () => {
     const listed = { itemIdentifier: { uri: existing, cid: ACTIVITY_CID } };
-    const { context, updates } = fakeRepo({
+    const { context, puts } = fakeRepo({
       existing: { [existing]: ACTIVITY_CID },
       records: { [collectionUri]: { ...stored, items: [listed] } },
     });
 
     await addActivityToCollection(context, call({ activity: { uri: existing } }));
 
-    expect(writeOf(updates[0] ?? [], COLLECTION).value.items).toEqual([listed, listed]);
+    expect(puts[0]?.value.items).toEqual([listed, listed]);
   });
 
   it("does not write when the Activity cannot be read", async () => {
