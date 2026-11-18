@@ -34,7 +34,9 @@ export function createAction<TCreate extends ActionOptions, TUndo extends UndoOp
     const { build, parsed } = start(context, action.names.create, action.createInput, input);
     const [subject, via] = await Promise.all([
       action.subject(context, parsed),
-      parsed.via === undefined ? undefined : resolveRecordRef(context, parsed.via),
+      parsed.via === undefined
+        ? undefined
+        : resolveRecordRef(context, parsed.via, action.names.create),
     ]);
     const record = await prepareChecked(
       build,

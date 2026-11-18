@@ -378,7 +378,7 @@ export async function readBeforeWriting(
   const read = (uri: string): Promise<StrongRef> => {
     let pending = reads.get(uri);
     if (pending === undefined) {
-      pending = resolveRecordRef(build.context, uri, pdsClients);
+      pending = resolveRecordRef(build.context, uri, build.operation, pdsClients);
       reads.set(uri, pending);
     }
     return pending;

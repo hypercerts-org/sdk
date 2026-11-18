@@ -131,6 +131,22 @@ describe("creating", () => {
   });
 });
 
+describe("read failures name the calling operation", () => {
+  it("names the operation when `via` cannot be read", async () => {
+    const { context } = fakeRepo();
+
+    await expect(followAccount(context, { targetDid: ACCOUNT, via: VIA })).rejects.toThrow(
+      /^followAccount: cannot resolve /,
+    );
+  });
+
+  it("names the operation when a like's target cannot be read", async () => {
+    const { context } = fakeRepo();
+
+    await expect(like(context, { targetUri: TARGET })).rejects.toThrow(/^like: cannot resolve /);
+  });
+});
+
 describe("target validation", () => {
   it.each([
     ["a handle", "alice.bsky.social"],

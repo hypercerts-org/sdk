@@ -191,7 +191,7 @@ export function recordRefAction<TUndo extends UndoOptions>(
     names,
     schema,
     createInput: recordCreateInput,
-    subject: (context, { targetUri }) => resolveRecordRef(context, targetUri),
+    subject: (context, { targetUri }) => resolveRecordRef(context, targetUri, names.create),
     ...undo,
   };
 }

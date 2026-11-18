@@ -32,14 +32,15 @@ export interface StoredRecord {
  *
  * Boundaries: the same as `readRecord`, which does the reading. This keeps only the reference.
  *
- * Throws what `readRecord` throws.
+ * `operation` names the calling operation in error messages. Throws what `readRecord` throws.
  */
 export async function resolveRecordRef(
   context: SDKContext,
   uri: string,
+  operation: string,
   pdsClients?: PdsClients,
 ): Promise<StrongRef> {
-  return (await readRecord(context, uri, "resolveRecordRef", pdsClients)).ref;
+  return (await readRecord(context, uri, operation, pdsClients)).ref;
 }
 
 /**

@@ -366,6 +366,26 @@ describe("createOrganization when the write does not go through", () => {
     expect(methods(requests).filter((method) => method === WRITE)).toHaveLength(1);
   });
 
+  it("throws OrganizationAlreadyExistsError when another writer created the organization after it was read", async () => {
+    const existing: Record<string, string> = { ...withProfile };
+    const { context, creates } = fakeRepo({
+      existing,
+      onRequest: (method, state) => {
+        // The other write lands after both singletons were read, just before this one is sent.
+        if (method === WRITE) {
+          state.head = OTHER_HEAD;
+          existing[ORGANIZATION_URI] = CID;
+        }
+      },
+    });
+
+    const error = await createOrganization(context, input).catch((e) => e);
+
+    expect(error).toBeInstanceOf(OrganizationAlreadyExistsError);
+    expect(error).toMatchObject({ uri: ORGANIZATION_URI, code: "InvalidSwap" });
+    expect(creates).toEqual([]);
+  });
+
   it("lists every record it tried to create when the outcome is unknown, and says calling again is safe", async () => {
     const { context } = fakeRepo({ applyWrites: () => json(500, {}) });
 

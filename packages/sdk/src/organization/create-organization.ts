@@ -3,7 +3,7 @@ import * as organization from "@hypercerts-org/lexicon/app/certified/actor/organ
 import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
 import { type ProfileInput, profileKind } from "../actor/build-profile.js";
 import type { SDKContext } from "../context.js";
-import { RecordAlreadyExistsError } from "../errors.js";
+import { RecordAlreadyExistsError, WriteRejectedError } from "../errors.js";
 import { type BuildContext, createBuildContext, parseInput } from "../internal/build-context.js";
 import { describeError, isRecordNotFound } from "../internal/describe.js";
 import { strictObject } from "../internal/input.js";
@@ -124,7 +124,9 @@ const inputSchema = strictObject({
  * Concurrent changes: the write is conditional on the account not having changed since the profile
  * and the organization were read, so another call creating either one in the meantime cannot make
  * the decision "reuse or create the profile" stale. If it did change, this throws
- * {@link WriteRejectedError} with `code` `"InvalidSwap"`; see there.
+ * {@link WriteRejectedError} with `code` `"InvalidSwap"`; see there. When the account has an
+ * organization by then (another writer created it), the SDK reads it again and throws
+ * {@link OrganizationAlreadyExistsError} instead.
  *
  * The order is: validate the input, read the latest commit, read the profile and the organization,
  * read the existing records the input points at, upload blobs, write. An invalid input, an existing
@@ -156,7 +158,8 @@ const inputSchema = strictObject({
  * @throws {@link OrganizationAlreadyExistsError} If the account already has an organization.
  * Nothing was uploaded or written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx). With `code`
- * `"InvalidSwap"` the repository changed after it was read; call again.
+ * `"InvalidSwap"` the repository changed after it was read; call again. If the change was another
+ * writer creating the organization, {@link OrganizationAlreadyExistsError} is thrown instead.
  * {@link OrganizationAlreadyExistsError} has the same `code` but is not retryable: rule out
  * `instanceof RecordAlreadyExistsError` first.
  * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
@@ -277,11 +280,15 @@ export async function createOrganization(
 
   // The organization has a fixed key and was found absent above, so calling again after an unknown
   // outcome creates everything or finds the organization, and never makes a copy.
-  await submitWrites(context, build.did, [...created.values()], OPERATION, {
-    swapCommit: start.head,
-    retrySafe: true,
-    retrySafeReason: RETRY_SAFE_REASON,
-  });
+  try {
+    await submitWrites(context, build.did, [...created.values()], OPERATION, {
+      swapCommit: start.head,
+      retrySafe: true,
+      retrySafeReason: RETRY_SAFE_REASON,
+    });
+  } catch (error) {
+    throw await explainLostRace(build, error);
+  }
 
   return {
     organization: refOf(organizationSlot),
@@ -359,6 +366,19 @@ async function readSingleton(
       `${OPERATION}: cannot check whether ${uri} exists (${describeError(cause ?? error)}), so nothing was uploaded or written.`,
       { cause: error },
     );
+  }
+}
+
+// A swap rejection can mean another writer created the organization after it was read. Nothing was
+// written, so look once more: if it exists now, report that instead of the generic rejection. Any
+// other outcome, including a failed look, keeps the original error.
+async function explainLostRace(build: BuildContext, error: unknown): Promise<unknown> {
+  if (!(error instanceof WriteRejectedError) || error.code !== "InvalidSwap") return error;
+  try {
+    const found = await readSingleton(build, organization.main.$type);
+    return found === undefined ? error : organizationExists(found.ref.uri);
+  } catch {
+    return error;
   }
 }
 
