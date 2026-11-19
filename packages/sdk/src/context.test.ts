@@ -1,7 +1,7 @@
 import { Client } from "@atproto/lex";
 import { createDidResolver, type DidResolver, DidResolverCommon } from "@atproto-labs/did-resolver";
 import type { IdentityResolver } from "@atproto-labs/identity-resolver";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSDKContext } from "./context.js";
 
 const client = new Client({ service: "https://pds.example.test" });
@@ -132,4 +132,58 @@ describe("createSDKContext", () => {
       expect(create).toThrow(/oauthClient\.identityResolver/);
     },
   );
+});
+
+describe("createSDKContext with a CGS API key", () => {
+  const cgs = { url: "https://cgs.test", did: "did:web:cgs.test" } as const;
+  const key = "cgsk_ref123.s3cr3tValue";
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("needs no client and keeps the key frozen on cgs.auth", () => {
+    const context = createSDKContext({ cgs: { ...cgs, auth: { kind: "apiKey", key } } });
+
+    expect(context.client).toBeUndefined();
+    expect(context.cgs?.auth).toEqual({ kind: "apiKey", key });
+    expect(Object.isFrozen(context.cgs?.auth)).toBe(true);
+  });
+
+  it("defaults to no auth entry, meaning service auth, and accepts it explicitly", () => {
+    expect(createSDKContext({ client, cgs }).cgs?.auth).toBeUndefined();
+    expect(
+      createSDKContext({ client, cgs: { ...cgs, auth: { kind: "serviceAuth" } } }).cgs?.auth,
+    ).toEqual({ kind: "serviceAuth" });
+  });
+
+  it("still needs a client when the auth is not a key", () => {
+    // @ts-expect-error `client` is optional only with an API key.
+    expect(() => createSDKContext({ cgs })).toThrow(/client/);
+    // @ts-expect-error Same with explicit service auth.
+    expect(() => createSDKContext({ cgs: { ...cgs, auth: { kind: "serviceAuth" } } })).toThrow(
+      /client/,
+    );
+  });
+
+  it.each([
+    ["no prefix", "ref123.secret"],
+    ["no dot", "cgsk_ref123secret"],
+    ["no secret", "cgsk_ref123."],
+    ["no ref", "cgsk_.secret"],
+    ["whitespace", "cgsk_ref123.sec ret"],
+  ])("rejects a key with %s without repeating it", (_name, bad) => {
+    const attempt = () => createSDKContext({ cgs: { ...cgs, auth: { kind: "apiKey", key: bad } } });
+
+    expect(attempt).toThrow(TypeError);
+    expect(attempt).toThrow(/cgsk_<ref>\.<secret>/);
+    expect(attempt).not.toThrow(new RegExp(bad.replace(".", "\\.")));
+  });
+
+  it("refuses a key in a browser", () => {
+    vi.stubGlobal("window", {});
+
+    expect(() => createSDKContext({ cgs: { ...cgs, auth: { kind: "apiKey", key } } })).toThrow(
+      /must not be used in a browser/,
+    );
+  });
 });
