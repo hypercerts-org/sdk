@@ -72,16 +72,17 @@ const written = l.jsonPayload({
 });
 
 // The group lexicons, declared here because `Client` bundles only `com.atproto.*`. `swapRecord` is
-// not in CGS's own lexicons: it passes through to the PDS (see the top comment).
+// not in CGS's own lexicons: it passes through to the PDS (see the top comment). `repo` is a
+// querystring parameter on all of them, besides the body.
 const createRecord = l.procedure(
   "app.certified.group.repo.createRecord",
-  l.params(),
+  l.params({ repo: repoDid }),
   l.jsonPayload({ repo: repoDid, collection, rkey, record: l.lexMap() }),
   written,
 );
 const putRecord = l.procedure(
   "app.certified.group.repo.putRecord",
-  l.params(),
+  l.params({ repo: repoDid }),
   l.jsonPayload({
     repo: repoDid,
     collection,
@@ -93,7 +94,7 @@ const putRecord = l.procedure(
 );
 const deleteRecord = l.procedure(
   "app.certified.group.repo.deleteRecord",
-  l.params(),
+  l.params({ repo: repoDid }),
   l.jsonPayload({
     repo: repoDid,
     collection,
@@ -186,8 +187,7 @@ export function cgsTarget(
     recordExists: async (collection, rkey) => recordExists(await orgPds(), repo, collection, rkey),
     uploadBlob: (body: BlobData, mimeType) =>
       uploadVia(
-        async (data, encoding) =>
-          (await call(uploadBlob, { params: { repo }, body: data, encoding })).blob,
+        async (data, encoding) => (await call(uploadBlob, { body: data, encoding })).blob,
         body,
         mimeType,
         CGS_SERVICE,
@@ -211,7 +211,9 @@ export function cgsTarget(
         return globalThis.fetch(`${cgs.url}${path}`, { ...init, headers });
       },
     });
-    return (await client.xrpc(method as never, options as never)).body as CallBody;
+    // `repo` is also on the querystring of every request: an API-key request finds its group there.
+    const withRepo = { ...options, params: { ...options.params, repo } };
+    return (await client.xrpc(method as never, withRepo as never)).body as CallBody;
   }
 
   async function serviceAuth(lxm: NsidString): Promise<string> {

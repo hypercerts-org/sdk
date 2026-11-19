@@ -53,7 +53,7 @@ export interface FakeCgsOptions {
  * `vi.unstubAllGlobals()` after each test.
  *
  * Like the real service it checks that every request carries a token for its own method and
- * audience that was not used before, requires `repo` on the querystring of an upload, stores what
+ * audience that was not used before, requires `repo` on the querystring of every request, stores what
  * is written so later reads see it, enforces `swapRecord` as the PDS does, and answers `createRecord`
  * at a taken key with HTTP 502, the way CGS turns the PDS's 500.
  */
@@ -153,10 +153,10 @@ export function fakeCgs(options: FakeCgsOptions = {}) {
   }
 
   async function handle({ method, params, body, bytes, headers }: CgsRequest): Promise<Response> {
+    if (params.repo !== ORG) {
+      return json(400, { error: "InvalidRequest", message: "repo is required" });
+    }
     if (method.endsWith("uploadBlob")) {
-      if (params.repo !== ORG) {
-        return json(400, { error: "InvalidRequest", message: "repo is required" });
-      }
       return json(200, {
         blob: {
           $type: "blob",

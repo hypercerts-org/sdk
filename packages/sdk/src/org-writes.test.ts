@@ -320,6 +320,8 @@ describe("writes with { repo: orgDid }", () => {
 
     expect(liked.uri.startsWith(`at://${ORG}/app.certified.feed.like/`)).toBe(true);
     expect(cgs.of("deleteRecord")[0]?.body).toMatchObject({ repo: ORG, swapRecord: liked.cid });
+    // `repo` is on the querystring of every method, because an API-key request finds its group there.
+    expect(cgs.requests.map((request) => request.params.repo)).toEqual([ORG, ORG]);
     expect(cgs.store.has(liked.uri)).toBe(false);
   });
 
