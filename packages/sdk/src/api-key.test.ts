@@ -139,13 +139,24 @@ describe("a CGS refusal of an API key", () => {
   });
 
   it("403 for the member's role says that a key never exceeds the member's role", async () => {
-    const cgs = refuse(403, "Forbidden", "Insufficient role");
+    const cgs = refuse(403, "Forbidden", "Role 'member' cannot perform 'putRecord'");
 
     const error = await createRights(cgs.context, rights, { repo }).catch((e) => e);
 
     expect(error).toBeInstanceOf(WriteRejectedError);
     expect(error.message).toContain("never exceeds its member's current role");
     expect(error.message).not.toContain("scope for this write");
+  });
+
+  it("403 with wording the SDK does not know names both possible causes", async () => {
+    const cgs = refuse(403, "Forbidden", "Something new");
+
+    const error = await createRights(cgs.context, rights, { repo }).catch((e) => e);
+
+    expect(error.message).toContain(
+      "lacks the scope repo:org.hypercerts.claim.rights?action=create",
+    );
+    expect(error.message).toContain("member's role");
   });
 
   it("403 for a removed member says the key's member is gone", async () => {
@@ -194,7 +205,7 @@ describe("a CGS refusal of an API key", () => {
     for (const cgs of [
       refuse(401, "AuthRequired", "Invalid API key"),
       refuse(403, "Forbidden", "API key scopes do not permit 'createRecord'"),
-      refuse(403, "Forbidden", "Insufficient role"),
+      refuse(403, "Forbidden", "Role 'member' cannot perform 'putRecord'"),
       refuse(500, "InternalServerError", "boom"),
     ]) {
       const error = await createRights(cgs.context, rights, { repo }).catch((e) => e);

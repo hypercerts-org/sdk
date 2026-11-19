@@ -11,7 +11,7 @@ import { cgsTarget } from "./cgs-target.js";
 import { describeError, describeValue } from "./describe.js";
 import { type PreparedRecord, prepareRecord } from "./prepare-record.js";
 import { assertRecordUriOfType, parseRecordUri } from "./resolve-record-ref.js";
-import { pdsTarget, type SessionContext, type WriteTarget } from "./write-target.js";
+import { hasClient, pdsTarget, type WriteTarget } from "./write-target.js";
 
 /**
  * What every step of one creation call shares: the client's repo, the timestamp used as the
@@ -64,14 +64,14 @@ function selectTarget(
   const repo: unknown = options?.repo;
   if (context.cgs?.auth?.kind === "apiKey")
     return apiKeyTarget(context, context.cgs, operation, repo);
-  const own = context.client?.did;
-  if (own === undefined) {
+  if (!hasClient(context) || context.client.did === undefined) {
     throw new Error(
       `${operation}: the client is not authenticated, so there is no repository to write to. Sign in first, then create the context with \`createSDKContext({ client: new Client(session) })\`.`,
     );
   }
+  const own = context.client.did;
   if (repo === undefined || repo === own) {
-    return pdsTarget(context as SessionContext, own, operation);
+    return pdsTarget(context, own, operation);
   }
   assertRepoDid(operation, repo);
   if (context.cgs === undefined) {

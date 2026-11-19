@@ -57,7 +57,7 @@ export const context = createSDKContext({
 
 | Import from                    | Exports                                                                                                                                                                                                |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@hypercerts-org/sdk`          | `createSDKContext`, `SDKContext`, `CgsConfig`, `CgsAuth`, `WriteOptions`, `DidDocumentResolver`                                                                                                                    |
+| `@hypercerts-org/sdk`          | `createSDKContext`, `SDKContext`, `CgsConfig`, `CgsAuth`, `ApiKeyContextOptions`, `WriteOptions`, `DidDocumentResolver`                                                                                                                 |
 | `@hypercerts-org/sdk/activity` | `createActivity`, `createRights`, `createContribution`, `createContributorInformation`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types |
 | `@hypercerts-org/sdk/actor`    | `createProfile`, `ProfileAlreadyExistsError`, `RecordAlreadyExistsError`, the same `Write*` errors, `ProfileInput`                                                                                     |
 | `@hypercerts-org/sdk/location` | `createLocation`, the same `Write*` errors, `LocationInput`, `LocationValue`                                                                                                                           |

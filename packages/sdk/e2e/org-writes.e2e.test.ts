@@ -3,15 +3,13 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { createActivity, createRights } from "../src/activity/index.js";
 import { uploadBlob } from "../src/blob/index.js";
 import { addActivityToCollection, createCollection } from "../src/collection/index.js";
-import { createSDKContext } from "../src/index.js";
-import {
+import { createSDKContext, type SDKContext } from "../src/index.js";
   addActivityToProject,
   createProject,
   PartialWriteError,
   RecordAlreadyExistsError,
   WriteRejectedError,
 } from "../src/project/index.js";
-import { like, unlike } from "../src/social/index.js";
 import { readE2eEnv } from "./env.js";
 import { coordinates, png, rights, unique } from "./fixtures.js";
 import {
@@ -366,6 +364,7 @@ describe("{ repo: ownDid }", () => {
 
 describe("with a CGS API key and no client", () => {
   // The key acts as `member`, the group member who minted it, with only the scopes it was given.
+  // The unit tests (src/api-key.test.ts) cover every other refusal and the wording of each.
   const scope = (collection: string, ...actions: string[]) =>
     `repo:${collection}?${actions.map((action) => `action=${action}`).join("&")}`;
 
@@ -375,11 +374,33 @@ describe("with a CGS API key and no client", () => {
     return { groupDid, minted, context: apiKeyContext(minted.key) };
   }
 
-  // The secret is the part after the dot: no message of the error or its causes may repeat it.
-  function expectNoSecret(error: unknown, { key }: Pick<MintedKey, "key">) {
+  // What the call threw, which must be a refusal by CGS with `status` that never repeats the secret.
+  async function expectRefused(call: Promise<unknown>, status: number, { key }: MintedKey) {
+    const error = await call.catch((e: unknown) => e);
+    const refusal = error instanceof PartialWriteError ? error.failure : error;
+    expect(refusal).toBeInstanceOf(WriteRejectedError);
+    expect(refusal).toMatchObject({ status });
     const secret = key.slice(key.indexOf(".") + 1);
-    for (let e = error; e instanceof Error; e = e.cause) expect(e.message).not.toContain(secret);
-    if (error instanceof PartialWriteError) expectNoSecret(error.failure, { key });
+    for (const top of [error, refusal]) {
+      for (let e = top; e instanceof Error; e = e.cause) expect(e.message).not.toContain(secret);
+    }
+    return error;
+  }
+
+  // An owner's Collection and an Activity, for a key to try to change the Collection.
+  async function ownersCollection(groupDid: DidString) {
+    const activity = await createActivity(owner.context, activityInput(), { repo: groupDid });
+    const collection = await createCollection(
+      owner.context,
+      { title: unique("E2E collection") },
+      { repo: groupDid },
+    );
+    return (context: SDKContext) =>
+      addActivityToCollection(
+        context,
+        { collection: { uri: collection.uri }, activity: { uri: activity.uri } },
+        { repo: groupDid },
+      );
   }
 
   it("writes records to the group with the key alone: no token is asked for, the member's own repo is untouched", async () => {
@@ -408,131 +429,66 @@ describe("with a CGS API key and no client", () => {
     expect(await snapshotCounts(member.client)).toEqual(own);
   });
 
-  it("is refused with WriteRejectedError 403 naming the missing scope when the key may create but not update", async () => {
-    const { groupDid, minted, context } = await keyedGroup(
-      scope(collections.activity, "create"),
-      scope(collections.collection, "create"),
-    );
-    const activity = await createActivity(context, activityInput(), { repo: groupDid });
-    const collection = await createCollection(
-      context,
-      { title: unique("E2E collection") },
-      { repo: groupDid },
-    );
-
-    const error = await addActivityToCollection(
-      context,
-      { collection: { uri: collection.uri }, activity: { uri: activity.uri } },
-      { repo: groupDid },
-    ).catch((e: unknown) => e);
-
-    expect(error).toBeInstanceOf(WriteRejectedError);
-    expect(error).toMatchObject({ status: 403 });
-    expect((error as Error).message).toContain(scope(collections.collection, "update"));
-    expect((error as Error).message).toContain(minted.keyRef);
-    expectNoSecret(error, minted);
-  });
-
-  it("is refused with 403 naming the member's role when the key has the scope but its member may not replace another member's record", async () => {
-    const { groupDid, minted, context } = await keyedGroup(
-      scope(collections.collection, "create", "update"),
-    );
-    const activity = await createActivity(owner.context, activityInput(), { repo: groupDid });
-    const collection = await createCollection(
-      owner.context,
-      { title: unique("E2E collection") },
-      { repo: groupDid },
-    );
-
-    const error = await addActivityToCollection(
-      context,
-      { collection: { uri: collection.uri }, activity: { uri: activity.uri } },
-      { repo: groupDid },
-    ).catch((e: unknown) => e);
-
-    expect(error).toBeInstanceOf(WriteRejectedError);
-    expect(error).toMatchObject({ status: 403 });
-    expect((error as Error).message).toContain("current role");
-    expectNoSecret(error, minted);
-  });
-
   it("is refused with 401 once the key is revoked", async () => {
     const { groupDid, minted, context } = await keyedGroup(scope(collections.rights, "create"));
     await createRights(context, rights, { repo: groupDid });
     await revokeApiKey(member, groupDid, minted.keyRef);
 
-    const error = await createRights(context, rights, { repo: groupDid }).catch((e: unknown) => e);
+    const error = await expectRefused(
+      createRights(context, rights, { repo: groupDid }),
+      401,
+      minted,
+    );
 
-    expect(error).toBeInstanceOf(WriteRejectedError);
-    expect(error).toMatchObject({ status: 401 });
     expect((error as Error).message).toContain(minted.keyRef);
-    expectNoSecret(error, minted);
   });
 
-  it("is refused with 401 when used for another group than it was minted for", async () => {
-    const { minted, context } = await keyedGroup(scope(collections.rights, "create"));
-    const other = await newGroup();
+  it("is refused with 403 naming the missing scope when the key may create but not update", async () => {
+    const { groupDid, minted, context } = await keyedGroup(scope(collections.collection, "create"));
+    const addToCollection = await ownersCollection(groupDid);
 
-    const error = await createRights(context, rights, { repo: other }).catch((e: unknown) => e);
+    const error = await expectRefused(addToCollection(context), 403, minted);
 
-    expect(error).toBeInstanceOf(WriteRejectedError);
-    expect(error).toMatchObject({ status: 401 });
-    expectNoSecret(error, minted);
+    expect((error as Error).message).toContain(scope(collections.collection, "update"));
+    expect((error as Error).message).toContain(minted.keyRef);
+  });
+
+  it("is refused with 403 for the member's current role once the member who made the key is demoted", async () => {
+    const groupDid = await newGroup();
+    await setRole(owner, groupDid, member, "admin");
+    const minted = await createApiKey(member, groupDid, [
+      scope(collections.collection, "create", "update"),
+    ]);
+    const addToCollection = await ownersCollection(groupDid);
+    // As an admin the key may replace the owner's Collection; as a member it may not.
+    await setRole(owner, groupDid, member, "member");
+
+    const error = await expectRefused(addToCollection(apiKeyContext(minted.key)), 403, minted);
+
+    expect((error as Error).message).toContain("current role");
   });
 
   it("refuses an upload without a blob scope, naming blob:<mime>", async () => {
     const { groupDid, minted, context } = await keyedGroup(scope(collections.rights, "create"));
 
-    const error = await uploadBlob(context, png(), { repo: groupDid }).catch((e: unknown) => e);
+    const error = await expectRefused(uploadBlob(context, png(), { repo: groupDid }), 403, minted);
 
-    expect(error).toBeInstanceOf(WriteRejectedError);
-    expect(error).toMatchObject({ status: 403 });
     expect((error as Error).message).toContain("blob:image/png");
-    expectNoSecret(error, minted);
   });
 
   it("reports PartialWriteError with what landed when a later record is outside the key's scopes", async () => {
     const { groupDid, minted, context } = await keyedGroup(scope(collections.rights, "create"));
 
-    const error = await createActivity(
-      context,
-      { ...activityInput(), rights },
-      { repo: groupDid },
-    ).catch((e: unknown) => e);
+    const error = await expectRefused(
+      createActivity(context, { ...activityInput(), rights }, { repo: groupDid }),
+      403,
+      minted,
+    );
 
     expect(error).toBeInstanceOf(PartialWriteError);
     const partial = error as PartialWriteError;
-    expect(partial.failure).toBeInstanceOf(WriteRejectedError);
-    expect(partial.failure).toMatchObject({ status: 403 });
     expect(partial.written).toHaveLength(1);
     await expectStored(member.client, defined(partial.written[0]));
     await expectMissing(member.client, partial.failed.uri);
-    expectNoSecret(error, minted);
-  });
-
-  it("refuses a delete without the delete scope and leaves the record", async () => {
-    const { groupDid, minted, context } = await keyedGroup(scope(collections.like, "create"));
-    const subject = await createActivity(member.context, activityInput(), { repo: groupDid });
-    const liked = await like(context, { subject: { uri: subject.uri } }, { repo: groupDid });
-
-    const error = await unlike(context, { like: liked }, { repo: groupDid }).catch(
-      (e: unknown) => e,
-    );
-
-    expect(error).toBeInstanceOf(WriteRejectedError);
-    expect(error).toMatchObject({ status: 403 });
-    expect((error as Error).message).toContain(scope(collections.like, "delete"));
-    expectNoSecret(error, minted);
-    await expectStored(member.client, liked);
-  });
-
-  it("without { repo } throws a TypeError and sends nothing", async () => {
-    const { context } = await keyedGroup(scope(collections.rights, "create"));
-    const requests = watchCgs();
-
-    const error = await createRights(context, rights).catch((e: unknown) => e);
-
-    expect(error).toBeInstanceOf(TypeError);
-    expect(requests).toEqual([]);
   });
 });

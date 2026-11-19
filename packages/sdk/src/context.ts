@@ -190,6 +190,27 @@ export interface ApiKeyContextOptions {
  * });
  * ```
  *
+ * @example Writing to a group with a Certified Group Service API key, server-side, with no client
+ * ```ts
+ * import { createSDKContext } from "@hypercerts-org/sdk";
+ * import { createRights } from "@hypercerts-org/sdk/activity";
+ *
+ * const context = createSDKContext({
+ *   cgs: {
+ *     url: "https://cgs.example.com",
+ *     did: "did:web:cgs.example.com",
+ *     // The `key` that `keys.create` returned, kept in the server's secrets.
+ *     auth: { kind: "apiKey", key: process.env.CGS_API_KEY },
+ *   },
+ * });
+ * await createRights(context, rights, { repo: groupDid }); // `rights`, `groupDid`: yours
+ * ```
+ *
+ * @example Forgetting `{ repo }` with an API key throws
+ * ```ts
+ * await createRights(context, rights); // TypeError: pass `{ repo: groupDid }`; nothing was sent
+ * ```
+ *
  * @example Passing the session directly throws
  * ```ts
  * createSDKContext({ client: session }); // TypeError: wrap it with `new Client(session)`
@@ -259,8 +280,10 @@ function checkedCgs(value: unknown): CgsConfig {
 }
 
 // `cgsk_<ref>.<secret>`. A malformed key is refused here, before any request, and the message never
-// repeats what was given: it may be a real secret with a typo.
-const API_KEY = /^cgsk_[^.\s]+\.\S+$/;
+// repeats what was given: it may be a real secret with a typo. Keys are base64url, so anything
+// else is refused here: a character outside ASCII would make `Headers.set` throw a message that
+// quotes it, which would put part of the secret in an error.
+const API_KEY = /^cgsk_[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 
 function checkedAuth(value: unknown): CgsAuth | undefined {
   if (value === undefined) return undefined;

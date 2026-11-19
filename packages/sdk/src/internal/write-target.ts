@@ -10,10 +10,6 @@ import {
 } from "@atproto/lex";
 import type { BlobData } from "../blob/upload-blob.js";
 import type { SDKContext } from "../context.js";
-
-/** A context with a client: the only kind that can write to an account's own repository. */
-export type SessionContext = SDKContext & { readonly client: Client };
-
 import {
   RecordAlreadyExistsError,
   WriteOutcomeUnknownError,
@@ -24,6 +20,14 @@ import { describeError, isRecordNotFound } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import { parseRecordUri, type StrongRef } from "./resolve-record-ref.js";
 import { uploadVia } from "./upload-via.js";
+
+/** A context with a client: the only kind that can write to an account's own repository. */
+export type SessionContext = SDKContext & { readonly client: Client };
+
+/** Narrows `context` to one that has a client. */
+export function hasClient(context: SDKContext): context is SessionContext {
+  return context.client !== undefined;
+}
 
 /** An existing record to replace with a new full value. */
 export interface PlannedUpdate {

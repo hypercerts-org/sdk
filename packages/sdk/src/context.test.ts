@@ -171,6 +171,7 @@ describe("createSDKContext with a CGS API key", () => {
     ["no secret", "cgsk_ref123."],
     ["no ref", "cgsk_.secret"],
     ["whitespace", "cgsk_ref123.sec ret"],
+    ["a non-ASCII character", "cgsk_ref123.s3cr€tValue"],
   ])("rejects a key with %s without repeating it", (_name, bad) => {
     const attempt = () => createSDKContext({ cgs: { ...cgs, auth: { kind: "apiKey", key: bad } } });
 
