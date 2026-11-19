@@ -459,13 +459,7 @@ function classifyFailure(
   const details = definiteRejection(error);
   if (details !== undefined) {
     const { status, code } = details;
-    const message =
-      code === "InvalidSwap" && request.staleRecord !== undefined
-        ? recordChanged(operation, reason, request.staleRecord)
-        : code === "InvalidSwap" && request.swapCommit !== undefined
-          ? repositoryChanged(operation, reason, request)
-          : `${operation}: the PDS rejected the request (HTTP ${status}: ${reason}), so ${describeEffects(request, NOT_WRITTEN)}. ` +
-            "Nothing needs cleaning up. Fix the cause (for example the input, the session's permissions or a rate limit) and call again.";
+    const message = rejectionMessage(operation, reason, status, code, request);
     return new WriteRejectedError(message, attempted, details, { cause: error });
   }
   return new WriteOutcomeUnknownError(
@@ -473,6 +467,25 @@ function classifyFailure(
       retryAdvice(operation, request, retrySafe, retrySafeReason),
     attempted,
     { cause: error },
+  );
+}
+
+function rejectionMessage(
+  operation: string,
+  reason: string,
+  status: number,
+  code: string | undefined,
+  request: Request,
+): string {
+  if (code === "InvalidSwap" && request.staleRecord !== undefined) {
+    return recordChanged(operation, reason, request.staleRecord);
+  }
+  if (code === "InvalidSwap" && request.swapCommit !== undefined) {
+    return repositoryChanged(operation, reason, request);
+  }
+  return (
+    `${operation}: the PDS rejected the request (HTTP ${status}: ${reason}), so ${describeEffects(request, NOT_WRITTEN)}. ` +
+    "Nothing needs cleaning up. Fix the cause (for example the input, the session's permissions or a rate limit) and call again."
   );
 }
 
