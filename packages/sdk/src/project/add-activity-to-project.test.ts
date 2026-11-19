@@ -2,6 +2,7 @@ import type { LexMap } from "@atproto/lex";
 import { describe, expect, it } from "vitest";
 import { CID, DID } from "../test-utils/fake-pds.js";
 import { fakeRepo, HEAD, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
+import { cidOf } from "../test-utils/records.js";
 import { addActivityToProject } from "./index.js";
 
 const ACTIVITY = "org.hypercerts.claim.activity";
@@ -59,7 +60,7 @@ describe("addActivityToProject", () => {
       "com.atproto.repo.putRecord",
     ]);
     expect([updates, swapCommits]).toEqual([[], []]);
-    expect(puts[0]?.swapRecord).toEqual(expect.any(String));
+    expect(puts[0]?.swapRecord).toBe(await cidOf(project));
     expect(puts[0]?.value.items).toEqual([
       ...project.items,
       { itemIdentifier: { uri: existing, cid: CID } },

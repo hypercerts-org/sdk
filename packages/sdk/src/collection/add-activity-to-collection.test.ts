@@ -200,7 +200,7 @@ describe("addActivityToCollection with an existing Activity", () => {
     });
   });
 
-  it("is not refused when another record of the account changes meanwhile, only when the Collection does", async () => {
+  it("is not refused when another record of the account changes meanwhile", async () => {
     let reads = 0;
     const unrelated = fakeRepo({
       existing: { [existing]: ACTIVITY_CID },
@@ -212,7 +212,9 @@ describe("addActivityToCollection with an existing Activity", () => {
     await expect(
       addActivityToCollection(unrelated.context, call({ activity: { uri: existing } })),
     ).resolves.toMatchObject({ uri: collectionUri });
+  });
 
+  it("is refused when the Collection itself changes between the read and the write", async () => {
     // The Collection is replaced by another writer between the read and the write.
     const options: FakeRepoOptions = {
       existing: { [existing]: ACTIVITY_CID },
