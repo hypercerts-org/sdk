@@ -304,8 +304,10 @@ function checkedAuth(value: unknown): CgsAuth | undefined {
     );
   }
   if (typeof key !== "string" || !API_KEY.test(key)) {
+    const malformed =
+      typeof key === "string" ? ` of ${key.length} characters that does not have that form` : "";
     throw new TypeError(
-      `createSDKContext: \`cgs.auth.key\` must be a Certified Group Service API key of the form "cgsk_<ref>.<secret>", but received ${describeValue(key)}${typeof key === "string" ? ` of ${key.length} characters that does not have that form` : ""}. Use the \`key\` that keys.create returned; it is shown only once.`,
+      `createSDKContext: \`cgs.auth.key\` must be a Certified Group Service API key of the form "cgsk_<ref>.<secret>", but received ${describeValue(key)}${malformed}. Use the \`key\` that keys.create returned; it is shown only once.`,
     );
   }
   return redactedApiKeyAuth(key);
