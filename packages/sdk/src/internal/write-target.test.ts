@@ -7,7 +7,10 @@ import { prepareRecord } from "./prepare-record.js";
 import { pdsTarget } from "./write-target.js";
 
 describe("pdsTarget", () => {
-  it("rejects a create-only plan that is not exactly one create", async () => {
+  it.each([
+    { name: "is not exactly one create", twoCreates: true, match: "exactly one create" },
+    { name: "carries swapCommit", twoCreates: false, swapCommit: "bafyhead", match: "swapCommit" },
+  ])("rejects a create-only plan that $name", async ({ twoCreates, swapCommit, match }) => {
     const { context } = fakeRepo({});
     const record = await prepareRecord(DID, rights.main, {
       rightsName: "CC BY",
@@ -17,37 +20,28 @@ describe("pdsTarget", () => {
     });
 
     const error = await pdsTarget(context, DID, "op")
-      .submit({ creates: [record, record], updates: [], createOnly: true })
+      .submit({
+        creates: twoCreates ? [record, record] : [record],
+        updates: [],
+        createOnly: true,
+        swapCommit,
+      })
       .catch((e) => e);
 
     expect(error).toBeInstanceOf(TypeError);
-    expect(error.message).toContain("exactly one create");
+    expect(error.message).toContain(match);
   });
 
-  it("rejects a create-only plan that carries swapCommit", async () => {
-    const { context } = fakeRepo({});
-    const record = await prepareRecord(DID, rights.main, {
-      rightsName: "CC BY",
-      rightsType: "CC-BY",
-      rightsDescription: "Share with credit",
-      createdAt: "2024-01-01T00:00:00.000Z",
+  it("returns the uri and cid of an existing record", async () => {
+    const rkey = "3k2a4b5c6d7e8" as RecordKeyString;
+    const uri = `at://${DID}/${rights.$nsid}/${rkey}`;
+    const cid = "bafkreie7fzwthi3rp3ucmnj2ibf2iymndlxlnb4226jwxtuo2x2gqfesju";
+    const { context } = fakeRepo({ existing: { [uri]: cid } });
+
+    await expect(pdsTarget(context, DID, "op").recordExists(rights.$nsid, rkey)).resolves.toEqual({
+      uri,
+      cid,
     });
-
-    const error = await pdsTarget(context, DID, "op")
-      .submit({ creates: [record], updates: [], createOnly: true, swapCommit: "bafyhead" })
-      .catch((e) => e);
-
-    expect(error).toBeInstanceOf(TypeError);
-    expect(error.message).toContain("swapCommit");
-  });
-
-  it("reports a missing record as undefined", async () => {
-    const { context } = fakeRepo({});
-    const target = pdsTarget(context, DID, "op");
-
-    await expect(
-      target.recordExists(rights.$nsid, "3k2a4b5c6d7e8" as RecordKeyString),
-    ).resolves.toBeUndefined();
   });
 
   it("names the operation and cause when the head cannot be read", async () => {
