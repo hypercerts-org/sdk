@@ -58,4 +58,21 @@ const { uri, cid } = await createActivity(context, {
 
 Each domain has a reference with examples, pitfalls and field tables in the [consumer skill](https://github.com/hypercerts-org/sdk/blob/main/.agents/skills/hypercerts-org-sdk/SKILL.md), for example [activities](https://github.com/hypercerts-org/sdk/blob/main/.agents/skills/hypercerts-org-sdk/references/activity.md), [profiles](https://github.com/hypercerts-org/sdk/blob/main/.agents/skills/hypercerts-org-sdk/references/profile.md) and [tags](https://github.com/hypercerts-org/sdk/blob/main/.agents/skills/hypercerts-org-sdk/references/tag.md).
 
+## Write to an organization
+
+Every operation that writes takes an optional last argument `{ repo }`. Leave it out and the record goes to your own repository. Pass an organization's DID and the SDK writes through the [Certified Group Service](https://github.com/hypercerts-org/certified-group-service) (CGS) instead. Tell the context where CGS is, once:
+
+```ts
+export const context = createSDKContext({
+  client: new Client(session),
+  cgs: { url: "https://cgs.example.com", did: "did:web:cgs.example.com" },
+});
+
+await createProject(context, input, { repo: orgDid });
+```
+
+CGS takes one record per request, so a call that writes several records is not atomic: if it fails part-way it throws `PartialWriteError`, which lists what landed. Writes to an organization also lose the repository-wide `swapCommit` guard. The signed-in account must be a member of the group; CGS checks the role.
+
+The SDK asks your PDS for a service-auth token before each CGS request. With OAuth, add one scope per method to the session (a scope's `lxm` must be a full method name, and its `aud` needs the `#certified_group_service` fragment, written `%23`): `rpc:app.certified.group.repo.createRecord?aud=did:web:cgs.example.com%23certified_group_service`, and the same for `putRecord`, `deleteRecord` and `uploadBlob`. Set `cgs.did` to the DID without the fragment; the SDK adds it.
+
 See the TSDoc on `createSDKContext` (shown in your editor) for the full contract.

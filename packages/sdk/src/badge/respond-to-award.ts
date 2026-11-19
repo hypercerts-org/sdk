@@ -4,7 +4,7 @@ import * as response from "@hypercerts-org/lexicon/app/certified/badge/response"
 import * as certifiedDefs from "@hypercerts-org/lexicon/app/certified/defs";
 import * as strongRef from "@hypercerts-org/lexicon/com/atproto/repo/strongRef";
 import type { SDKContext } from "../context.js";
-import { createBuildContext, parseInput, prepareChecked } from "../internal/build-context.js";
+import { describeWrittenRepo, prepareChecked, startCall } from "../internal/build-context.js";
 import { describeError } from "../internal/describe.js";
 import { compact, optionalText, strictObject, weightString } from "../internal/input.js";
 import {
@@ -15,6 +15,7 @@ import {
 } from "../internal/resolve-record-ref.js";
 import type { ExistingRecord } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
+import type { WriteOptions } from "../write-options.js";
 
 const OPERATION = "respondToBadgeAward";
 
@@ -111,6 +112,7 @@ function recipientOf({ subject }: award.Main, uri: string): DidString {
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated as the recipient.
  * @param input - The award, the answer and an optional weight. See {@link RespondToBadgeAwardInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new response's URI and CID.
  * @throws {@link TypeError} If `award.uri` is not `at://<did>/app.certified.badge.award/<rkey>`, if
  * `response` is not `"accepted"` or `"rejected"`, if `weight` is given with a rejected response or
@@ -151,9 +153,9 @@ function recipientOf({ subject }: award.Main, uri: string): DidString {
 export async function respondToBadgeAward(
   context: SDKContext,
   input: RespondToBadgeAwardInput,
+  options?: WriteOptions,
 ): Promise<StrongRef> {
-  const build = createBuildContext(context, OPERATION);
-  const parsed = parseInput(build, "input", inputSchema, input);
+  const { build, parsed } = startCall(context, OPERATION, inputSchema, input, options);
   assertAwardUri(parsed.award.uri);
 
   const stored = await readRecord(context, parsed.award.uri, OPERATION);
@@ -167,7 +169,7 @@ export async function respondToBadgeAward(
   const recipient = recipientOf(checked.value, parsed.award.uri);
   if (recipient !== build.did) {
     throw new Error(
-      `${OPERATION}: only the recipient can respond to a badge award, but ${parsed.award.uri} is for ${recipient} and the client is signed in as ${build.did}. No record was written. For an award to a record, the recipient is the account whose repository holds that record.`,
+      `${OPERATION}: only the recipient can respond to a badge award, but ${parsed.award.uri} is for ${recipient} and the response would be written to ${describeWrittenRepo(build)}. No record was written. For an award to a record, the recipient is the account whose repository holds that record.`,
     );
   }
 

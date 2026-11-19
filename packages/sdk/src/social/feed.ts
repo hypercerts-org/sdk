@@ -35,6 +35,7 @@ const repostAction = recordRefAction(
  * authenticated.
  * @param input - The record to like and optional `createdAt` and `via`. See
  * {@link RecordActionInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new like's URI and CID (not the subject's).
  * @throws {@link TypeError} If `input` has an unknown field, a `subject.uri` that is not a full record
  * URI (a bare DID, a handle authority or a partial URI), a `via.uri` that is not a record URI, or a
@@ -97,6 +98,7 @@ export const like = createAction(likeAction);
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; only that account's own records can be deleted.
  * @param input - The like record, `{ uri, cid? }`, as {@link like} returned it. See {@link UnlikeInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns Nothing. It resolves when the PDS confirmed the deletion or that the record is absent.
  * @throws {@link TypeError} If `input` has an unknown field, a `like.uri` that is not a full record
  * URI, one whose collection is not `app.certified.feed.like` or that is in another account's
@@ -153,6 +155,7 @@ export const unlike = undoAction(likeAction);
  * authenticated.
  * @param input - The record to repost and optional `createdAt` and `via`. See
  * {@link RecordActionInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new repost's URI and CID (not the subject's).
  * @throws {@link TypeError} If `input` has an unknown field, a `subject.uri` that is not a full record
  * URI (a bare DID, a handle authority or a partial URI), a `via.uri` that is not a record URI, or a
@@ -215,6 +218,7 @@ export const repost = createAction(repostAction);
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; only that account's own records can be deleted.
  * @param input - The repost record, `{ uri, cid? }`, as {@link repost} returned it. See {@link UnrepostInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns Nothing. It resolves when the PDS confirmed the deletion or that the record is absent.
  * @throws {@link TypeError} If `input` has an unknown field, a `repost.uri` that is not a full record
  * URI, one whose collection is not `app.certified.feed.repost` or that is in another account's

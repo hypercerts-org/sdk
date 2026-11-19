@@ -2,6 +2,7 @@ import type { SDKContext } from "../context.js";
 import { createBuildContext } from "../internal/build-context.js";
 import { prepareSlots } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
+import type { WriteOptions } from "../write-options.js";
 import {
   type CollectionInput,
   type CreateCollectionResult,
@@ -55,6 +56,7 @@ const OPERATION = "createCollection";
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the records are created in that account's repo.
  * @param input - The Collection, its items and the records it needs. See {@link CollectionInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new Collection's URI and CID, and what was created or reused for its location, tags
  * and items, in input order. See {@link CreateCollectionResult}.
  * @throws {@link TypeError} If `input` has an unknown field, an item that is not exactly one of
@@ -68,6 +70,7 @@ const OPERATION = "createCollection";
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
  * a retry can duplicate records under new keys. `attempted` lists the new records, Collection last.
+ * @throws {@link PartialWriteError} For organization writes through CGS, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *
@@ -145,8 +148,9 @@ const OPERATION = "createCollection";
 export async function createCollection(
   context: SDKContext,
   input: CollectionInput,
+  options?: WriteOptions,
 ): Promise<CreateCollectionResult> {
-  const build = createBuildContext(context, OPERATION);
+  const build = createBuildContext(context, OPERATION, options);
   const planned = planCollection(build, "input", input);
   // Reads first, then uploads: a URI that cannot be resolved, or a taken tag key, fails before
   // anything is uploaded.

@@ -48,6 +48,7 @@ export const rightsKind: RecordKind<RightsInput> = recordKind(
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
  * @param input - The rights data. See {@link RightsInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new record's URI and CID.
  * @throws {@link TypeError} If `input` has an unknown field or a value the lexicon does not
  * allow, for example a `rightsName` over 100 characters. Nothing was written. Blobs may already have been uploaded when a lexicon rule rejects the record.

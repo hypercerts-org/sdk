@@ -17,6 +17,7 @@ import {
   type SupportingRecordRef,
 } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
+import type { WriteOptions } from "../write-options.js";
 import { type OrganizationInput, organizationKind } from "./build-organization.js";
 
 const OPERATION = "createOrganization";
@@ -137,12 +138,21 @@ const inputSchema = strictObject({
  * `app.certified.actor.profile` and `app.certified.location` when this call creates them. Unlike
  * {@link createProfile}, no `update` permission is needed.
  *
- * This creates records in the repository the client is signed in to. It does not create accounts,
- * and has no connection to a group service.
+ * This creates records in the repository the client is signed in to, or with `{ repo }` in an
+ * organization's. It does not create accounts and does not register or create groups.
+ *
+ * With `{ repo: orgDid }` the profile and the organization are created in the organization's
+ * repository, one request each, the profile first. The `swapCommit` that guards the account's own
+ * repository against a concurrent write is not available through the Certified Group Service and is
+ * not sent. A concurrent creation of the organization is still caught, because both records have a
+ * fixed key: the loser gets {@link OrganizationAlreadyExistsError}, or {@link PartialWriteError} with
+ * a {@link RecordAlreadyExistsError} as its `failure` when the profile had already been written. The
+ * profile is then reused by a second call.
  *
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the records are created in that account's repo.
  * @param input - The organization and the fallback profile. See {@link CreateOrganizationInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The organization's URI and CID, the profile's with whether it was created or reused,
  * and the locations. See {@link CreateOrganizationResult}.
  * @throws {@link TypeError} If `input` has an unknown field or a value the lexicons do not allow, a
@@ -161,10 +171,14 @@ const inputSchema = strictObject({
  * {@link OrganizationAlreadyExistsError} has the same `code` but is not retryable: rule out
  * `instanceof RecordAlreadyExistsError` first.
  * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
- * is safe even though new locations get fresh record keys: the call reads the organization first,
- * so it either creates everything or throws {@link OrganizationAlreadyExistsError}, which then
- * means the first attempt succeeded and no second set of locations or profile is created. The new
- * records are the ones in `attempted` of the first error.
+ * is safe in your own repo even though new locations get fresh record keys: the write is one commit
+ * and the call reads the organization first, so it either creates everything or throws
+ * {@link OrganizationAlreadyExistsError}, which then means the first attempt succeeded and no second
+ * set of locations or profile is created. The new records are the ones in `attempted` of the first
+ * error. For organization writes through CGS the records are written one request at a time, so
+ * with new locations calling again can create a second set: check `attempted` first. With no new
+ * locations every key is fixed and calling again is safe.
+ * @throws {@link PartialWriteError} For organization writes through CGS, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *
@@ -259,8 +273,9 @@ const inputSchema = strictObject({
 export async function createOrganization(
   context: SDKContext,
   input: CreateOrganizationInput,
+  options?: WriteOptions,
 ): Promise<CreateOrganizationResult> {
-  const build = createBuildContext(context, OPERATION);
+  const build = createBuildContext(context, OPERATION, options);
   const { organization: organizationSlot, fallback } = planInput(build, input);
 
   const start = await readStartingPoint(build);
@@ -278,11 +293,19 @@ export async function createOrganization(
 
   // The organization has a fixed key and was found absent above, so calling again after an unknown
   // outcome creates everything or finds the organization, and never makes a copy.
+  const records = [...created.values()];
+  // Only the profile and the organization have fixed keys; every other record is a new location.
+  const hasGeneratedKeys = records.some(
+    (record) =>
+      record.collection !== profile.main.$type && record.collection !== organization.main.$type,
+  );
   try {
-    await submitWrites(build, [...created.values()], {
+    await submitWrites(build, records, {
       swapCommit: start.head,
       retrySafe: true,
       retrySafeReason: RETRY_SAFE_REASON,
+      // New locations get generated keys: a retry is only safe when the write was atomic (own PDS).
+      retrySafeOnlyAtomically: hasGeneratedKeys,
     });
   } catch (error) {
     throw await explainLostRace(build, error);

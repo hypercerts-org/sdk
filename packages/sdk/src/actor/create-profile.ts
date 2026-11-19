@@ -7,6 +7,7 @@ import { optionalMedia, optionalText } from "../internal/input.js";
 import { mediaTransform } from "../internal/media.js";
 import { type RecordKind, recordKind } from "../internal/record-kind.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
+import type { WriteOptions } from "../write-options.js";
 
 /** The data of the `app.certified.actor.profile` record of an account. */
 export interface ProfileInput {
@@ -93,6 +94,7 @@ const createStandaloneProfile = standaloneCreatorOf("createProfile", profileKind
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
  * @param input - The profile's data. See {@link ProfileInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new record's URI and CID.
  * @throws {@link TypeError} If `input` has an unknown field, or a value the lexicon does not
  * allow, for example more than three `langs` or an avatar that is not a JPEG, PNG or WebP image.
@@ -138,9 +140,13 @@ const createStandaloneProfile = standaloneCreatorOf("createProfile", profileKind
  * }
  * ```
  */
-export async function createProfile(context: SDKContext, input: ProfileInput): Promise<StrongRef> {
+export async function createProfile(
+  context: SDKContext,
+  input: ProfileInput,
+  options?: WriteOptions,
+): Promise<StrongRef> {
   try {
-    return await createStandaloneProfile(context, input);
+    return await createStandaloneProfile(context, input, options);
   } catch (error) {
     throw error instanceof RecordAlreadyExistsError ? alreadyExists(error) : error;
   }

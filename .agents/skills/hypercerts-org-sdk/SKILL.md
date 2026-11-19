@@ -3,7 +3,7 @@ name: hypercerts-org-sdk
 description: "Write Hypercerts and Certified records (org.hypercerts.*, app.certified.*) to a PDS from an app with @hypercerts-org/sdk: setting up the SDK context from an authenticated @atproto/lex Client, choosing the right operation and subpath, uploading blobs, and handling write errors without duplicates. Use when app code imports @hypercerts-org/sdk, or the user wants to create, link or write hypercert-related records from an app. Not for changing the SDK's own source."
 metadata:
   author: hypercerts-org
-  version: "9"
+  version: "10"
 ---
 
 # @hypercerts-org/sdk
@@ -40,7 +40,7 @@ import { createSDKContext } from "@hypercerts-org/sdk";
 export const context = createSDKContext({ client: new Client(session) });
 ```
 
-Make a new context when the signed-in account changes. Records are always written to the account behind `client`.
+Make a new context when the signed-in account changes. Records are written to the account behind `client`, unless a call passes `{ repo: orgDid }` as its last argument to write to an organization through the Certified Group Service. That needs `cgs: { url, did }` in `createSDKContext`; see [references/org-writes.md](references/org-writes.md).
 
 To read another account's record (a `{ uri }` that is not in your repo), the SDK looks up that account's DID document to find its PDS. By default it uses its own resolver and keeps each document in memory for up to an hour per context. If the app has an `@atproto/oauth-client` (or `@atproto/oauth-client-node`) client, pass its resolver to reuse the cache it already has:
 
@@ -57,7 +57,7 @@ export const context = createSDKContext({
 
 | Import from                    | Exports                                                                                                                                                                                                |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@hypercerts-org/sdk`          | `createSDKContext`, `SDKContext`, `DidDocumentResolver`                                                                                                                                                 |
+| `@hypercerts-org/sdk`          | `createSDKContext`, `SDKContext`, `CgsConfig`, `WriteOptions`, `DidDocumentResolver`                                                                                                                    |
 | `@hypercerts-org/sdk/activity` | `createActivity`, `createRights`, `createContribution`, `createContributorInformation`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types |
 | `@hypercerts-org/sdk/actor`    | `createProfile`, `ProfileAlreadyExistsError`, `RecordAlreadyExistsError`, the same `Write*` errors, `ProfileInput`                                                                                     |
 | `@hypercerts-org/sdk/location` | `createLocation`, the same `Write*` errors, `LocationInput`, `LocationValue`                                                                                                                           |
@@ -90,6 +90,7 @@ Operations are grouped by domain, each under its own subpath. Read the domain's 
 | Social (follow accounts and records, like, repost, and undo them) | `@hypercerts-org/sdk/social` | [references/social.md](references/social.md) |
 | Badge (`app.certified.badge.*`: definitions, awards to an account or record, responses) | `@hypercerts-org/sdk/badge` | [references/badge.md](references/badge.md) |
 | Context (attachments, measurements, evaluations, acknowledgements) | `@hypercerts-org/sdk/context` | [references/context.md](references/context.md) |
+| Organization writes (any write operation with `{ repo: orgDid }`, through the Certified Group Service) | the operation's own subpath | [references/org-writes.md](references/org-writes.md) |
 
 Things to know before opening a reference:
 
@@ -144,6 +145,7 @@ Every `WriteError` has `attempted`: the URI and CID of every record in the reque
 | `RecordAlreadyExistsError` | A key you chose is taken (a `WriteRejectedError`). `uri` names the record. Nothing written.    | Use it as `{ uri }`, or choose another key.   |
 | `WriteOutcomeUnknownError` | Network error, timeout or 5xx. The records may exist. `attempted` lists every URI (empty for an undo without `cid`; the message names the URI). | Check `attempted` before retrying. Which operations are safe to repeat: see [Pitfalls](#pitfalls). |
 | `WriteResultMismatchError` | Created, but the PDS reported other URIs/CIDs (`reported` vs `attempted`).                     | Do not retry. Log it and inspect the records. |
+| `PartialWriteError`        | Only with `{ repo: orgDid }`: a write failed after at least one record landed. `written`, `failed`, `failure`, `notAttempted`. | Keep what landed, or call again passing `written` and, if it exists, the failed record as `{ uri }` (check `failure.attempted` first if `failure` is a `WriteOutcomeUnknownError`: that record may exist too). See [references/org-writes.md](references/org-writes.md). |
 
 ```ts
 import { Client } from "@atproto/lex";
@@ -215,6 +217,7 @@ try {
 - A work-scope tag URI is not a vocabulary tag URI: each field accepts one collection, and a `{ uri }` of another throws a `TypeError`.
 - One write holds at most 200 records on the reference PDS. A larger call throws a `TypeError` before anything is written; the SDK does not split it. Create some records first and pass their URIs.
 - The SDK reads a record you reference only to pin its CID in a strong reference (`{ uri }` inputs, the `subject` of `like` and `repost`, `via`); a record it cannot read stops the call. A plain DID or URI (`followAccount`'s `subject.did`, `followEntity`'s `subject.uri`) is stored as given and never looked up, so a mistyped one is stored too. Check it yourself if that matters.
+- `{ repo }` goes in the **last** argument of every write function (`createProject(context, input, { repo: orgDid })`; for `uploadBlob` it is inside the options). A DID only, never a handle. A DID other than the signed-in account's, without `cgs` on the context, throws a `TypeError` before any request. Details and what is lost on an organization: [references/org-writes.md](references/org-writes.md).
 - Do not call operations a subpath does not export, even if a TSDoc example mentions them.
 
 ## Verify

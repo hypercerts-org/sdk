@@ -1,6 +1,7 @@
 // Entry point for @hypercerts-org/sdk/tag.
 
 export {
+  PartialWriteError,
   RecordAlreadyExistsError,
   WriteError,
   WriteOutcomeUnknownError,
@@ -9,6 +10,7 @@ export {
 } from "../errors.js";
 export type { StrongRef } from "../internal/resolve-record-ref.js";
 export type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
+export type { WriteOptions } from "../write-options.js";
 export type {
   CreateVocabularyTagResult,
   CreateWorkScopeTagResult,

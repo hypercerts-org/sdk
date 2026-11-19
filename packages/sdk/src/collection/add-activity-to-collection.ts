@@ -3,6 +3,7 @@ import type { ActivityInput } from "../activity/create-activity.js";
 import type { SDKContext } from "../context.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import type { ExistingRecord } from "../internal/slots.js";
+import type { WriteOptions } from "../write-options.js";
 import { addActivity } from "./add-activity.js";
 
 const OPERATION = "addActivityToCollection";
@@ -11,7 +12,7 @@ const OPERATION = "addActivityToCollection";
 export interface AddActivityToCollectionInput {
   /**
    * The Collection to add to: `{ uri }` as `at://<did>/org.hypercerts.collection/<rkey>`. It must
-   * belong to the account the client is signed in as, and be identified by a DID, not a handle. The
+   * be in the repository written to (your own, or `{ repo }`), and be identified by a DID, not a handle. The
    * SDK reads it and writes the new version.
    */
   collection: ExistingRecord;
@@ -54,8 +55,21 @@ export interface AddActivityToCollectionResult extends StrongRef {
  * {@link WriteRejectedError} (`code` `"InvalidSwap"`) and nothing is written: call again. Only your
  * own Collections; `signatures` are neither checked nor re-signed. See the SDK skill reference.
  *
+ * With `{ repo: orgDid }` the Collection must be in the organization's repository. A new Activity is
+ * created first, then the Collection is replaced with one `putRecord` guarded by the Collection's own
+ * version (`swapRecord`), so a concurrent change to it is still refused. The repository-wide
+ * `swapCommit` that guards the account's own repository when a new Activity is created is not
+ * available through the Certified Group Service and is not sent: another write to the organization
+ * that does not touch the Collection is not detected. If the update fails after the Activity was created,
+ * {@link PartialWriteError} says so; pass the new Activity as `{ uri }` to try again, but only when
+ * the Collection update was rejected. When its `failure` is a {@link WriteOutcomeUnknownError}, the
+ * update may have landed: read the Collection first, because adding the Activity again appends a
+ * second item (items are not deduplicated). Replacing a
+ * Collection that another member created needs the admin role.
+ *
  * @param context - The shared context from {@link createSDKContext}, with an authenticated client.
  * @param input - The Collection, the Activity and an optional weight.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The Collection's new version as `uri` and `cid`, and the Activity as `activity` (`created`
  * is `false` for `{ uri }`).
  * @throws {@link TypeError} If the input is invalid or the Collection is not your own. Nothing
@@ -64,6 +78,7 @@ export interface AddActivityToCollectionResult extends StrongRef {
  * items). Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write, including `"InvalidSwap"` (the
  * Collection, or for a new Activity the repository, changed since it was read). Nothing was changed.
+ * @throws {@link PartialWriteError} For organization writes through CGS, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
  * a retry can duplicate new records under new keys. For `activity: { uri }` only the Collection was written
  * (one `putRecord`): its stored CID is no proof either way. Compare it with the Collection entry of `attempted`:
@@ -86,6 +101,13 @@ export interface AddActivityToCollectionResult extends StrongRef {
 export async function addActivityToCollection(
   context: SDKContext,
   input: AddActivityToCollectionInput,
+  options?: WriteOptions,
 ): Promise<AddActivityToCollectionResult> {
-  return addActivity(context, OPERATION, { field: "collection", noun: "Collection" }, input);
+  return addActivity(
+    context,
+    OPERATION,
+    { field: "collection", noun: "Collection" },
+    input,
+    options,
+  );
 }

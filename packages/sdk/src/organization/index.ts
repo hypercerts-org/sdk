@@ -4,6 +4,7 @@
 // errors a write can end with.
 export type { ProfileInput } from "../actor/create-profile.js";
 export {
+  PartialWriteError,
   RecordAlreadyExistsError,
   WriteError,
   WriteOutcomeUnknownError,
@@ -14,6 +15,7 @@ export type { LeafletDocument } from "../internal/long-description.js";
 export type { StrongRef } from "../internal/resolve-record-ref.js";
 export type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 export type { LocationInput } from "../location/create-location.js";
+export type { WriteOptions } from "../write-options.js";
 export type { OrganizationInput, OrganizationUrl } from "./build-organization.js";
 export type { CreateOrganizationInput, CreateOrganizationResult } from "./create-organization.js";
 export { createOrganization, OrganizationAlreadyExistsError } from "./create-organization.js";

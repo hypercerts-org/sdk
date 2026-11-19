@@ -1,6 +1,6 @@
 # Profile domain (`@hypercerts-org/sdk/actor`)
 
-`createProfile(context, input)` creates the signed-in account's profile: the single `app.certified.actor.profile` record at key `self`. It returns `{ uri, cid }`.
+`createProfile(context, input)` creates the signed-in account's profile (or `{ repo }`'s, see [org-writes.md](org-writes.md)): the single `app.certified.actor.profile` record at key `self`. It returns `{ uri, cid }`.
 
 It only creates. It never overwrites or merges into an existing profile, and the SDK has no operation that updates one yet.
 

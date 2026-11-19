@@ -6,7 +6,12 @@ import {
   planActivityEntry,
 } from "../activity/activity-entry.js";
 import type { SDKContext } from "../context.js";
-import { type BuildContext, createBuildContext, parseInput } from "../internal/build-context.js";
+import {
+  type BuildContext,
+  createBuildContext,
+  describeWrittenRepo,
+  parseInput,
+} from "../internal/build-context.js";
 import { describeError } from "../internal/describe.js";
 import { compact, strictObject } from "../internal/input.js";
 import { type PreparedRecord, prepareUpdate } from "../internal/prepare-record.js";
@@ -19,6 +24,7 @@ import {
 } from "../internal/resolve-record-ref.js";
 import { prepareSlots } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
+import type { WriteOptions } from "../write-options.js";
 
 // The `maxLength` of the lexicon's `items`. Only used to explain a full Collection in plain words:
 // validating the updated record against the lexicon still decides what is valid.
@@ -68,8 +74,9 @@ export async function addActivity(
   operation: string,
   target: AddActivityTarget,
   input: unknown,
+  options?: WriteOptions,
 ): Promise<StrongRef & { activity: ActivityEntryResult }> {
-  const build = createBuildContext(context, operation);
+  const build = createBuildContext(context, operation, options);
   const { uri, activity: activityValue, weight } = parseAddInput(build, target.field, input);
   const rkey = parseCollectionUri(build, target, uri);
   const planned = planActivityEntry(build, "input.activity", activityValue);
@@ -126,7 +133,7 @@ function parseCollectionUri(
   );
   if (parsed.did !== build.did) {
     throw new TypeError(
-      `${build.operation}: ${field}.uri is in the repository of ${parsed.did}, but the client is signed in as ${build.did} and this operation changes only the signed-in account's own ${noun}s: ${uri}.`,
+      `${build.operation}: ${field}.uri is in the repository of ${parsed.did}, but this operation writes to ${describeWrittenRepo(build)} and changes only that repository's own ${noun}s: ${uri}.`,
     );
   }
   return parsed.rkey;

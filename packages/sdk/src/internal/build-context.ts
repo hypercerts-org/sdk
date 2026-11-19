@@ -1,6 +1,14 @@
-import type { DidString, l, RecordKeyString, TypedBlobRef } from "@atproto/lex";
+import {
+  type DidString,
+  isDidString,
+  type l,
+  type RecordKeyString,
+  type TypedBlobRef,
+} from "@atproto/lex";
 import type { SDKContext } from "../context.js";
-import { describeError } from "./describe.js";
+import type { WriteOptions } from "../write-options.js";
+import { cgsTarget } from "./cgs-target.js";
+import { describeError, describeValue } from "./describe.js";
 import { type PreparedRecord, prepareRecord } from "./prepare-record.js";
 import { assertRecordUriOfType, parseRecordUri } from "./resolve-record-ref.js";
 import { pdsTarget, type WriteTarget } from "./write-target.js";
@@ -23,25 +31,73 @@ export interface BuildContext {
 
 /**
  * Starts a creation call. Fails before any request is sent when the client is not authenticated,
- * so a missing session is not discovered after blobs were uploaded.
+ * or when `options.repo` names an organization and the context has no `cgs`, so a missing session
+ * or setup is not discovered after blobs were uploaded.
  *
- * Throws Error when the client has no DID.
+ * `options.repo` absent or the client's own DID: the target is the account's own repo. Any other
+ * DID: the target is that repo through the Certified Group Service.
+ *
+ * Throws Error when the client has no DID, TypeError when `options.repo` is not a DID or names
+ * another repo and the context has no `cgs`.
  */
-export function createBuildContext(context: SDKContext, operation: string): BuildContext {
+export function createBuildContext(
+  context: SDKContext,
+  operation: string,
+  options?: WriteOptions,
+): BuildContext {
   const did = context.client.did;
   if (did === undefined) {
     throw new Error(
       `${operation}: the client is not authenticated, so there is no repository to write to. Sign in first, then create the context with \`createSDKContext({ client: new Client(session) })\`.`,
     );
   }
+  const target = selectTarget(context, operation, did, options);
   return {
     context,
-    did,
-    target: pdsTarget(context, did, operation),
+    did: target.did,
+    target,
     createdAt: new Date().toISOString(),
     operation,
     uploads: new Map(),
   };
+}
+
+function selectTarget(
+  context: SDKContext,
+  operation: string,
+  own: DidString,
+  options: WriteOptions | undefined,
+): WriteTarget {
+  const repo: unknown = options?.repo;
+  if (repo === undefined || repo === own) return pdsTarget(context, own, operation);
+  if (typeof repo !== "string" || !isDidString(repo)) {
+    throw new TypeError(
+      `${operation}: \`repo\` must be the DID of a repository, for example "did:plc:abc123", but received ${describeValue(repo)}. Handles are not accepted. Nothing was sent.`,
+    );
+  }
+  if (context.cgs === undefined) {
+    throw new TypeError(
+      `${operation}: \`repo\` is ${repo}, which is not the signed-in account (${own}), so the write goes through the Certified Group Service, but the context has no \`cgs\`. Create it with \`createSDKContext({ client, cgs: { url, did } })\`. Nothing was sent.`,
+    );
+  }
+  return cgsTarget(context, context.cgs, repo, operation);
+}
+
+/**
+ * Starts a creation call (see {@link createBuildContext}) and checks `input` against `schema`, so
+ * a missing session or setup is reported before a bad input is.
+ *
+ * Throws what `createBuildContext` and `parseInput` throw.
+ */
+export function startCall<T>(
+  context: SDKContext,
+  operation: string,
+  schema: l.Schema<T>,
+  input: unknown,
+  options: WriteOptions | undefined,
+): { build: BuildContext; parsed: T } {
+  const build = createBuildContext(context, operation, options);
+  return { build, parsed: parseInput(build, "input", schema, input) };
 }
 
 /**
@@ -61,6 +117,16 @@ export function parseInput<T>(
   throw new TypeError(`${build.operation}: invalid ${field}: ${describeError(result)}.`, {
     cause: result,
   });
+}
+
+/**
+ * Names the repository a call writes to, for error messages that print `build.did`: "the
+ * signed-in account" for the client's own repo, the organization repo when `{ repo }` chose it.
+ */
+export function describeWrittenRepo(build: BuildContext): string {
+  return build.did === build.context.client.did
+    ? `the signed-in account (${build.did})`
+    : `the organization repo ${build.did} (written via { repo })`;
 }
 
 /**

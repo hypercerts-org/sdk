@@ -1,16 +1,12 @@
 import { type DatetimeString, l, type UriString } from "@atproto/lex";
 import * as award from "@hypercerts-org/lexicon/app/certified/badge/award";
 import type { SDKContext } from "../context.js";
-import {
-  type BuildContext,
-  createBuildContext,
-  parseInput,
-  prepareChecked,
-} from "../internal/build-context.js";
+import { type BuildContext, prepareChecked, startCall } from "../internal/build-context.js";
 import { compact, endsBeforeStart, optionalText, strictObject } from "../internal/input.js";
 import type { StrongRef } from "../internal/resolve-record-ref.js";
 import type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 import { submitWrites } from "../internal/submit-writes.js";
+import type { WriteOptions } from "../write-options.js";
 import {
   parseSubject,
   planDefinition,
@@ -145,6 +141,7 @@ function assertValidityRange(build: BuildContext, input: l.InferOutput<typeof aw
  * authenticated; the award, and a new definition, are created in that account's repo.
  * @param input - The badge, the subject and the optional note, link and validity. See
  * {@link AwardBadgeInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The award's URI and CID at the top, and the definition's beside them, with whether this call created it. See
  * {@link AwardBadgeResult}.
  * @throws {@link TypeError} If `input` has an unknown field; `subject` is neither `{ did }` nor
@@ -158,6 +155,7 @@ function assertValidityRange(build: BuildContext, input: l.InferOutput<typeof aw
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
  * a retry can duplicate records under new keys. `attempted` lists a new definition, if any, then the award.
+ * @throws {@link PartialWriteError} For organization writes through CGS, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *
@@ -189,9 +187,9 @@ function assertValidityRange(build: BuildContext, input: l.InferOutput<typeof aw
 export async function awardBadge(
   context: SDKContext,
   input: AwardBadgeInput,
+  options?: WriteOptions,
 ): Promise<AwardBadgeResult> {
-  const build = createBuildContext(context, OPERATION);
-  const parsed = parseInput(build, "input", awardInput, input);
+  const { build, parsed } = startCall(context, OPERATION, awardInput, input, options);
   assertValidityRange(build, parsed);
   const subject = parseSubject(build, parsed.subject);
   const plan = planDefinition(build, parsed.definition);

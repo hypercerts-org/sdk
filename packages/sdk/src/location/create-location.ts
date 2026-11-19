@@ -141,6 +141,7 @@ function isGeoJsonPoint(value: string): boolean {
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
  * @param input - The location's data. See {@link LocationInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new record's URI and CID.
  * @throws {@link TypeError} If `input` has an unknown field, a `location` that is not exactly one
  * of `{ uri }`, `{ string }` and `{ blob }`, a `location` that does not match a `country-code` or

@@ -89,6 +89,7 @@ export const badgeDefinitionKind: RecordKind<BadgeDefinitionInput> = recordKind(
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated.
  * @param input - The definition's data. See {@link BadgeDefinitionInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new record's URI and CID.
  * @throws {@link TypeError} If `input` has an unknown field, an `allowedIssuers` entry that is not
  * a DID, an `icon` that is not a PNG, JPEG, WebP or SVG of at most 1 MiB, or a value the lexicon

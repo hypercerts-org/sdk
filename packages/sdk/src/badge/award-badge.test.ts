@@ -203,7 +203,9 @@ describe("awardBadge issuers", () => {
     const error = await awardBadge(context, award()).catch((e) => e);
 
     expect(error.message).toMatch(message);
-    expect(error.message).toMatch(/signed in as did:plc:testowner123.*No record was written/);
+    expect(error.message).toMatch(
+      /the award would be written to the signed-in account \(did:plc:testowner123\).*No record was written/,
+    );
     expect(methods(requests)).not.toContain("com.atproto.repo.applyWrites");
   });
 

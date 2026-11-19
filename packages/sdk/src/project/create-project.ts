@@ -1,6 +1,7 @@
 import type { SDKContext } from "../context.js";
 import { createBuildContext } from "../internal/build-context.js";
 import { submitWrites } from "../internal/submit-writes.js";
+import type { WriteOptions } from "../write-options.js";
 import { type CreateProjectResult, type ProjectInput, prepareProject } from "./build-project.js";
 
 const OPERATION = "createProject";
@@ -27,10 +28,12 @@ const OPERATION = "createProject";
  *
  * @param context - The shared context from {@link createSDKContext}, with an authenticated client.
  * @param input - The Project and its Activities. See {@link ProjectInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new Project's URI and CID, and what was created or reused. See
  * {@link CreateProjectResult}.
  * @throws {@link TypeError} If the input is not valid. Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write. Nothing was created.
+ * @throws {@link PartialWriteError} For organization writes through CGS, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
  * a retry can duplicate records under new keys. `attempted` lists the new records, Project last.
  *
@@ -65,8 +68,9 @@ const OPERATION = "createProject";
 export async function createProject(
   context: SDKContext,
   input: ProjectInput,
+  options?: WriteOptions,
 ): Promise<CreateProjectResult> {
-  const build = createBuildContext(context, OPERATION);
+  const build = createBuildContext(context, OPERATION, options);
   const { writes, result } = await prepareProject(build, input);
   await submitWrites(build, writes);
   return result;

@@ -11,7 +11,7 @@ Read [../SKILL.md](../SKILL.md) first for setup, blob uploads and error handling
 
 `createMeasurement` returns `{ uri, cid, created: true, subjects?, locations? }`: it can also appear nested in an evaluation, so its result carries `created`. The other three results have no top-level `created`, because the record is always new. Each nested reference in a result is `{ uri, cid, created }`: `created: false` for an existing `{ uri }` record, with the CID it was pinned at.
 
-All four write a TID-keyed record to the signed-in account's repo. The first three also create the new locations, tags and measurements they are given, in the **same** `applyWrites` as the record (all of it exists afterwards, or none); with nothing new to create, the call is a write of one record. For the location and tag fields see [location.md](location.md) and [tag.md](tag.md).
+All four write a TID-keyed record to the signed-in account's repo (or `{ repo }`, see [org-writes.md](org-writes.md)). The first three also create the new locations, tags and measurements they are given, in the same write as the record. On the signed-in account's repo this is one `applyWrites`: all of it exists, or none. For organization writes through CGS the write is not atomic: the supporting records are written first, one request each, and if a later write fails the records already written stay in the repo and the call throws `PartialWriteError`. With nothing new to create, the call is a write of one record. For the location and tag fields see [location.md](location.md) and [tag.md](tag.md).
 
 ## Linking to records
 
@@ -106,7 +106,7 @@ await createAcknowledgement(context, {
 });
 ```
 
-- Always written to the **signed-in** account's repo; there is no way to write one for another account. The SDK does not check the account's relationship to the subject.
+- Written to the signed-in account's repo, or to an organization's with `{ repo }` (see [org-writes.md](org-writes.md)); never to a repo you do not name. The SDK does not check the account's relationship to the subject.
 - `context` is optional: a string is stored as a URI with no CID (lightweight); `{ uri }` is stored as a strong reference pinned to the CID read before the write. Use `{ uri }` when the version matters.
 - No `location` or `tags`. Acknowledging the same subject twice creates two records.
 

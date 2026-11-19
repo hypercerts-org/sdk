@@ -19,6 +19,59 @@ describe("createSDKContext", () => {
     expect(Object.isFrozen(context)).toBe(true);
   });
 
+  it("keeps a validated cgs, with a trailing slash removed from its URL", () => {
+    const context = createSDKContext({
+      client,
+      cgs: { url: "https://cgs.example.test/", did: "did:web:cgs.example.test" },
+    });
+
+    expect(context.cgs).toEqual({
+      url: "https://cgs.example.test",
+      did: "did:web:cgs.example.test",
+    });
+  });
+
+  it("keeps a path prefix in the cgs URL", () => {
+    const context = createSDKContext({
+      client,
+      cgs: { url: "https://example.test/cgs/", did: "did:web:cgs.example.test" },
+    });
+
+    expect(context.cgs?.url).toBe("https://example.test/cgs");
+  });
+
+  it("has no cgs unless one is given", () => {
+    expect(createSDKContext({ client }).cgs).toBeUndefined();
+  });
+
+  it.each([
+    ["a URL that is not http(s)", { url: "ftp://cgs.test", did: "did:web:cgs.test" }, "cgs.url"],
+    ["a URL that does not parse", { url: "cgs.test", did: "did:web:cgs.test" }, "cgs.url"],
+    ["a handle as the DID", { url: "https://cgs.test", did: "cgs.test" }, "cgs.did"],
+    ["a missing DID", { url: "https://cgs.test" }, "cgs.did"],
+    [
+      "a DID with a service fragment",
+      { url: "https://cgs.test", did: "did:web:cgs.test#certified_group_service" },
+      "cgs.did",
+    ],
+    ["no URL", { did: "did:web:cgs.test" }, "cgs.url"],
+    [
+      "a URL with a query",
+      { url: "https://cgs.test?region=us", did: "did:web:cgs.test" },
+      "cgs.url",
+    ],
+    [
+      "a URL with an empty query",
+      { url: "https://cgs.test/?", did: "did:web:cgs.test" },
+      "cgs.url",
+    ],
+    ["a URL with a fragment", { url: "https://cgs.test/#x", did: "did:web:cgs.test" }, "cgs.url"],
+    ["a URL with credentials", { url: "https://u:p@cgs.test", did: "did:web:cgs.test" }, "cgs.url"],
+  ])("throws a TypeError for cgs with %s", (_name, cgs, field) => {
+    // @ts-expect-error The point is to reject what the types already forbid.
+    expect(() => createSDKContext({ client, cgs })).toThrow(new RegExp(`\\\`${field}\\\``));
+  });
+
   it("recognises a client by its xrpc() method, not by instanceof", () => {
     // A second installed copy of @atproto/lex defines its own `Client` class, so `instanceof` fails.
     const foreignClient = { xrpc: () => Promise.resolve() };

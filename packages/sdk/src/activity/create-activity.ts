@@ -48,6 +48,7 @@ import {
   type WorkScopeTagInput,
   workScopeTagKind,
 } from "../tag/build-tag.js";
+import type { WriteOptions } from "../write-options.js";
 import { type ContributionInput, contributionKind } from "./create-contribution.js";
 import {
   type ContributorInformationInput,
@@ -349,6 +350,7 @@ function supportingSlots(plan: ActivityPlan): Slot[] {
  * @param context - The shared context from {@link createSDKContext}. Its client must be
  * authenticated; the records are created in that account's repo.
  * @param input - The Activity and its supporting records. See {@link ActivityInput}.
+ * @param options - Optional. `{ repo }`: the DID of an organization to write to through the Certified Group Service instead of the account's own repository; see {@link WriteOptions}. Needs `cgs` on the context.
  * @returns The new Activity's URI and CID, and the references of the supporting records that
  * were created. See {@link CreateActivityResult}.
  * @throws {@link TypeError} If `input` has an unknown field, a mixed or wrongly typed choice (a
@@ -362,6 +364,7 @@ function supportingSlots(plan: ActivityPlan): Slot[] {
  * @throws {@link WriteRejectedError} If the PDS rejected the write (HTTP 4xx).
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
  * a retry can duplicate records under new keys.
+ * @throws {@link PartialWriteError} For organization writes through CGS, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *
@@ -450,8 +453,9 @@ function supportingSlots(plan: ActivityPlan): Slot[] {
 export async function createActivity(
   context: SDKContext,
   input: ActivityInput,
+  options?: WriteOptions,
 ): Promise<CreateActivityResult> {
-  const build = createBuildContext(context, "createActivity");
+  const build = createBuildContext(context, "createActivity", options);
   const { writes, result } = await prepareActivity(build, input);
   await submitWrites(build, writes);
   return result;

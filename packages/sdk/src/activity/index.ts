@@ -1,6 +1,7 @@
 // Entry point for @hypercerts-org/sdk/activity.
 
 export {
+  PartialWriteError,
   WriteError,
   WriteOutcomeUnknownError,
   WriteRejectedError,
@@ -11,6 +12,7 @@ export type { StrongRef } from "../internal/resolve-record-ref.js";
 export type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 export type { LocationInput, LocationValue } from "../location/create-location.js";
 export type { CreateWorkScopeTagResult, WorkScopeTagInput } from "../tag/build-tag.js";
+export type { WriteOptions } from "../write-options.js";
 export type {
   ActivityInput,
   CelWorkScopeInput,

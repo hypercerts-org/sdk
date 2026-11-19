@@ -28,7 +28,7 @@ const definition = await createBadgeDefinition(context, {
 
 `awardBadge(context, { definition, subject, note?, url?, validFrom?, validUntil?, createdAt? })` creates an award in your repo and returns `{ uri, cid, definition }`: `uri` and `cid` are the award's, `definition` is the definition record with `created`.
 
-`definition` is either the fields of a **new** definition (created in the same commit) or `{ uri }` of an **existing** one (read, never rewritten):
+`definition` is either the fields of a **new** definition (created in the same commit in your own repo; for organization writes through CGS it is a separate request first) or `{ uri }` of an **existing** one (read, never rewritten):
 
 ```ts
 import { awardBadge } from "@hypercerts-org/sdk/badge";
@@ -50,10 +50,10 @@ await awardBadge(context, {
 ```
 
 - `subject` is `{ did }` (an account) or `{ uri }` (a record, identified by a DID, not a handle). You never build a strong reference or DID object: the SDK reads the record and pins its current CID.
-- The award pins the definition by the CID it read. The signed-in account must be in **that version's** `allowedIssuers` (omitted: anyone, `[]`: no one), otherwise `Error` and nothing is written or uploaded.
+- The award pins the definition by the CID it read. The repo written to (the signed-in account, or `{ repo }`, see [org-writes.md](org-writes.md)) must be in **that version's** `allowedIssuers` (omitted: anyone, `[]`: no one), otherwise `Error` and nothing is written or uploaded.
 - `validFrom` defaults to `createdAt` (which defaults to the time of the call). A `validUntil` earlier than `validFrom`, or than `createdAt` when `validFrom` is omitted, throws `TypeError`. Timestamps are stored as given. `validUntil` marks the award expired; it is not revocation.
 - Awarding does not accept the badge for the recipient; they use `respondToBadgeAward`.
-- The new definition and the award are one `applyWrites` commit: both exist afterwards, or neither does.
+- In your own repo the new definition and the award are one `applyWrites` commit: both exist, or neither does. For organization writes through CGS they are two requests, the definition first: if the award fails, the new definition stays in the organization's repo and the call throws `PartialWriteError` (see [org-writes.md](org-writes.md)).
 - After `WriteOutcomeUnknownError`, `attempted` lists the new definition (if any) first, then the award. Calling again is not safe: it would create a second award.
 - Nothing is deduplicated: awarding the same badge to the same subject twice creates two awards.
 
@@ -72,7 +72,7 @@ await respondToBadgeAward(context, { award: { uri: awardUri }, response: "accept
 await respondToBadgeAward(context, { award: { uri: awardUri }, response: "rejected" });
 ```
 
-- The recipient of an award to an account is that account. For an award to a record it is the account whose repository holds the record (the SDK's rule; the lexicon does not say). Any other signed-in account, the issuer included, gets an `Error` and nothing is written.
+- The recipient must be the repo written to (the signed-in account, or `{ repo }`). The recipient of an award to an account is that account. For an award to a record it is the account whose repository holds the record (the SDK's rule; the lexicon does not say). Any other repo written to (the signed-in account or `{ repo }`), the issuer included, gets an `Error` and nothing is written.
 - `weight` only goes with `"accepted"`; with `"rejected"` it throws `TypeError`. It must be a positive decimal number written as a string of at most 50 characters and is stored exactly as written (`"007.50"` stays `"007.50"`).
 - Nothing is deduplicated or overwritten: every call creates a response under a new key. Responding twice leaves two responses. Calling again after `WriteOutcomeUnknownError` is not safe: it would create a second response.
 

@@ -48,6 +48,8 @@ pnpm test:e2e
 
 ## Things to know
 
+- **Writes to an organization (`{ repo: orgDid }`) are only partly covered end to end.** The sandbox has no Certified Group Service, so `cgs.e2e.test.ts` tests what the real PDS does for such a write: it issues a service-auth token with `aud` `<cgs did>#certified_group_service` and the method as `lxm` (the SDK's own `cgsTarget` asks for it, and a stand-in for the CGS host, which is not a real service, answers the request and keeps the token), and `{ repo: ownDid }` writes go to the account's own PDS with no `cgs` configured. The unit tests cover the rest against a fake CGS, which cannot show that a real CGS accepts the SDK's tokens. The end-to-end tests of full org writes (and of the organization-repo reads) wait until a CGS runs in the sandbox.
+
 - Most tests leave their records and blobs in the two accounts (the social tests delete theirs). Each test counts records only around its own call, so earlier runs do not matter. Destroy the sandbox (`deno task sandbox destroy --accept-destructive`) to start clean.
 - An account has one profile, so the `createProfile` tests delete the first account's profile (the `self` record) before each test.
 - A vocabulary tag's key is chosen by the caller and cannot be reused, so the tag tests give every tag a key that is different on every run.

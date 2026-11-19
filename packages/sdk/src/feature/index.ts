@@ -1,6 +1,7 @@
 // Entry point for @hypercerts-org/sdk/feature.
 
 export {
+  PartialWriteError,
   RecordAlreadyExistsError,
   WriteError,
   WriteOutcomeUnknownError,
@@ -12,5 +13,6 @@ export type { StrongRef } from "../internal/resolve-record-ref.js";
 export type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 export type { LocationInput, LocationValue } from "../location/create-location.js";
 export type { CreateVocabularyTagResult, VocabularyTagInput } from "../tag/build-tag.js";
+export type { WriteOptions } from "../write-options.js";
 export type { CreateFeatureResult, FeatureInput } from "./create-feature.js";
 export { createFeature } from "./create-feature.js";

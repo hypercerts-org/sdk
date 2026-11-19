@@ -2,6 +2,7 @@
 export type { ActivityEntryResult } from "../activity/activity-entry.js";
 export type { ActivityInput, CreateActivityResult } from "../activity/create-activity.js";
 export {
+  PartialWriteError,
   RecordAlreadyExistsError,
   WriteError,
   WriteOutcomeUnknownError,
@@ -14,6 +15,7 @@ export type { StrongRef } from "../internal/resolve-record-ref.js";
 export type { ExistingRecord, SupportingRecordRef } from "../internal/slots.js";
 export type { LocationInput } from "../location/create-location.js";
 export type { CreateVocabularyTagResult, VocabularyTagInput } from "../tag/build-tag.js";
+export type { WriteOptions } from "../write-options.js";
 export type {
   AddActivityToCollectionInput,
   AddActivityToCollectionResult,

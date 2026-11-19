@@ -1,4 +1,5 @@
 import type { SDKContext } from "../context.js";
+import type { WriteOptions } from "../write-options.js";
 import { createBuildContext } from "./build-context.js";
 import type { RecordKind } from "./record-kind.js";
 import type { StrongRef } from "./resolve-record-ref.js";
@@ -28,8 +29,8 @@ export function creatorOf<T extends { createdAt?: string | undefined }, TResult>
   operation: string,
   kind: RecordKind<T>,
 ): StandaloneCreator<T, TResult> {
-  return async (context, input) => {
-    const build = createBuildContext(context, operation);
+  return async (context, input, options) => {
+    const build = createBuildContext(context, operation, options);
     const root = planNew(build, "input", kind, input);
     const { created, refOf, fresh, createOnly } = await prepareSlots(build, [root], {
       createOnly: true,
@@ -58,8 +59,8 @@ export function standaloneCreatorOf<T extends { createdAt?: string | undefined }
   kind: RecordKind<T>,
 ): StandaloneCreator<T> {
   const create = creatorOf<T, StrongRef>(operation, kind);
-  return async (context, input) => {
-    const { uri, cid } = await create(context, input);
+  return async (context, input, options) => {
+    const { uri, cid } = await create(context, input, options);
     return { uri, cid };
   };
 }
@@ -72,4 +73,5 @@ export function standaloneCreatorOf<T extends { createdAt?: string | undefined }
 export type StandaloneCreator<T, TResult = StrongRef> = (
   context: SDKContext,
   input: T,
+  options?: WriteOptions,
 ) => Promise<TResult>;

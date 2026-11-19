@@ -108,7 +108,7 @@ export async function readRecord(
  */
 export type PdsClients = Map<DidString, Promise<Client>>;
 
-async function clientForRepo(
+export async function clientForRepo(
   context: SDKContext,
   did: DidString,
   pdsClients?: PdsClients,

@@ -2,8 +2,8 @@ import type { StrongRef } from "./internal/resolve-record-ref.js";
 
 /**
  * Base class of the errors thrown when the single request that writes records did not succeed.
- * Check `instanceof` against {@link WriteRejectedError}, {@link WriteOutcomeUnknownError} and
- * {@link WriteResultMismatchError} to tell them apart.
+ * Check `instanceof` against {@link WriteRejectedError}, {@link WriteOutcomeUnknownError},
+ * {@link WriteResultMismatchError} and {@link PartialWriteError} to tell them apart.
  */
 export abstract class WriteError extends Error {
   /**
@@ -134,5 +134,59 @@ export class WriteResultMismatchError extends WriteError {
   constructor(message: string, attempted: readonly StrongRef[], reported: readonly StrongRef[]) {
     super(message, attempted);
     this.reported = reported;
+  }
+}
+
+/**
+ * A call that writes to an organization's repository (`{ repo: orgDid }`) failed after at least one
+ * of its records was written. The Certified Group Service takes one record per request, so the
+ * records of a call cannot be committed together as they are in the account's own repository.
+ *
+ * @remarks
+ * - `written`: the records that landed, in the order they were written.
+ * - `failed`: the record whose write failed, and `failure`: why. `failure` is the error the same
+ *   write would have thrown on its own ({@link WriteRejectedError}, {@link WriteOutcomeUnknownError},
+ *   {@link RecordAlreadyExistsError} or {@link WriteResultMismatchError}), or a plain `Error` when
+ *   the SDK could not get the service-auth token, in which case nothing was sent for `failed`.
+ *   After {@link WriteOutcomeUnknownError} or {@link WriteResultMismatchError}, `failed` may exist
+ *   too: check `failure.attempted`.
+ * - `notAttempted`: the records that were never sent.
+ * - `attempted` (inherited): all three lists, `written` then `failed` then `notAttempted`.
+ *
+ * Records are written in dependency order (a record's supporting records first), so what is left
+ * is records that nothing written points at; a Collection update goes last, so a Collection is
+ * never changed to point at an Activity that does not exist. The SDK does not roll back (it would
+ * need delete rights the caller may not have) and does not retry. To recover, call again and pass
+ * the `written` records as `{ uri }` where the input accepts existing records, or leave them: they
+ * are valid on their own. Calls that write one record never throw this error. It is thrown only
+ * when at least one record landed; if none did, the call throws `failure` itself.
+ */
+export class PartialWriteError extends WriteError {
+  override readonly name = "PartialWriteError";
+  /** The records that were written, in order. */
+  readonly written: readonly StrongRef[];
+  /** The record whose write failed. */
+  readonly failed: StrongRef;
+  /** Why `failed` was not written (or not known to be). */
+  readonly failure: Error;
+  /** The records after `failed` that were never sent. */
+  readonly notAttempted: readonly StrongRef[];
+
+  constructor(
+    message: string,
+    parts: {
+      written: readonly StrongRef[];
+      failed: StrongRef;
+      failure: Error;
+      notAttempted: readonly StrongRef[];
+    },
+  ) {
+    super(message, [...parts.written, parts.failed, ...parts.notAttempted], {
+      cause: parts.failure,
+    });
+    this.written = parts.written;
+    this.failed = parts.failed;
+    this.failure = parts.failure;
+    this.notAttempted = parts.notAttempted;
   }
 }

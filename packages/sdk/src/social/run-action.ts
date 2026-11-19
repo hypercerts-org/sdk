@@ -1,11 +1,9 @@
-import type { l } from "@atproto/lex";
-import type { SDKContext } from "../context.js";
 import {
   type BuildContext,
-  createBuildContext,
-  parseInput,
+  describeWrittenRepo,
   parseOwnRecordUri,
   prepareChecked,
+  startCall,
 } from "../internal/build-context.js";
 import type { StandaloneCreator } from "../internal/create-record.js";
 import { compact } from "../internal/input.js";
@@ -37,8 +35,14 @@ import {
 export function createAction<TCreate extends ActionOptions, TField extends UndoField>(
   action: SocialAction<TCreate, TField>,
 ): StandaloneCreator<TCreate> {
-  return async (context, input) => {
-    const { build, parsed } = start(context, action.names.create, action.createInput, input);
+  return async (context, input, options) => {
+    const { build, parsed } = startCall(
+      context,
+      action.names.create,
+      action.createInput,
+      input,
+      options,
+    );
     const [subject, via] = await Promise.all([
       action.subject(context, parsed),
       parsed.via === undefined
@@ -76,8 +80,8 @@ export function undoAction<TCreate extends ActionOptions, TField extends UndoFie
   action: SocialAction<TCreate, TField>,
 ): UndoFunction<UndoInput<TField>> {
   const schema = undoInputSchema(action.undoField);
-  return async (context, input) => {
-    const { build, parsed } = start(context, action.names.undo, schema, input);
+  return async (context, input, options) => {
+    const { build, parsed } = startCall(context, action.names.undo, schema, input, options);
     const { uri, cid } = parsed[action.undoField];
     assertOwnRecord(build, uri, action.schema.$type);
     await submitDelete(build, { uri, cid });
@@ -91,17 +95,6 @@ function assertOwnRecord(build: BuildContext, uri: string, collection: string) {
     collection: (actual) =>
       `${build.operation}: ${uri} is a ${actual} record, not a ${collection} record. Pass the URI of the ${collection} record the account created (for example the \`uri\` its create function returned), not the URI of its subject. Nothing was sent.`,
     repository: (did) =>
-      `${build.operation}: ${uri} is in the repository of ${did}, not of the signed-in account (${build.did}). Only the account's own records can be deleted. Nothing was sent.`,
+      `${build.operation}: ${uri} is in the repository of ${did}, not of ${describeWrittenRepo(build)}. Only records in the repository written to can be deleted. Nothing was sent.`,
   });
-}
-
-// Checks that the client is signed in, then the input, before anything is sent.
-function start<T>(
-  context: SDKContext,
-  operation: string,
-  schema: l.Schema<T>,
-  input: unknown,
-): { build: BuildContext; parsed: T } {
-  const build = createBuildContext(context, operation);
-  return { build, parsed: parseInput(build, "input", schema, input) };
 }
