@@ -25,7 +25,31 @@ rpc:app.certified.group.repo.deleteRecord?aud=did:web:cgs.example.com%23certifie
 rpc:app.certified.group.repo.uploadBlob?aud=did:web:cgs.example.com%23certified_group_service
 ```
 
-`cgs.did` stays the bare DID; the SDK appends the fragment. The SDK asks the account's PDS for a service-auth token before every CGS request, so a missing scope fails with a plain `Error` that names the scope.
+`cgs.did` stays the bare DID; the SDK appends the fragment. With a session, the SDK asks the account's PDS for a service-auth token before every CGS request, so a missing scope fails with a plain `Error` that names the scope.
+
+## With an API key (server only, no client)
+
+A backend with no signed-in user uses a CGS API key. A group member mints it (`app.certified.group.keys.create`, over service auth, with scopes; the SDK has no wrapper). The key acts as that member: scopes ∩ the member's current role, so demoting the member caps the key at once. `client` is optional here and every write needs `{ repo: groupDid }`:
+
+```ts
+const context = createSDKContext({
+  cgs: {
+    url: "https://cgs.example.com",
+    did: "did:web:cgs.example.com",
+    auth: { kind: "apiKey", key: process.env.CGS_API_KEY! }, // "cgsk_<ref>.<secret>"
+  },
+});
+
+await createProject(context, input, { repo: groupDid });
+```
+
+Scopes the key needs: `repo:<collection>?action=create|update|delete` per record type the call writes (`repo:org.hypercerts.claim.activity?action=create`, several actions with `&action=`), and `blob:<mime>` for uploads (`blob:image/*`). Group admin and key creation are not available to a key.
+
+- The key is a secret: never in a browser (`createSDKContext` throws a `TypeError`), never logged. Errors name only `cgsk_<ref>`.
+- Without `{ repo }` the call throws a `TypeError` before any request, even if you also passed a `client`: a key context never writes to a PDS.
+- No token is asked for from a PDS, so one request per CGS call.
+- 401 (`WriteRejectedError`): the key is unknown, revoked, or for another group. CGS does not say which. 403: the message says whether the key lacks a scope (it names it) or its member's role does not allow the write (for example replacing another member's record needs admin, or the member left the group).
+- A later record outside the key's scopes makes a `PartialWriteError`; the earlier records stay.
 
 ## Calls
 
@@ -51,7 +75,6 @@ Records get URIs in the organization's repo. A `{ uri }` you reference can be an
 - **Taken keys** (a chosen key such as a vocabulary tag's) are detected by reading the organization's PDS before the write (and again after an unknown outcome), so they still throw `RecordAlreadyExistsError`. Two calls racing for the same key can both pass the check.
 - **Undo functions** (`unlike`, ...) take the organization's own record and are safe to repeat: a second delete that CGS refuses to a non-admin counts as done when the record is gone.
 - Blobs go to the organization's repo, so its records never point at blobs the repo does not have.
-- No API keys (`cgsk_...`): the SDK always acts as the signed-in account.
 
 ## `PartialWriteError`
 

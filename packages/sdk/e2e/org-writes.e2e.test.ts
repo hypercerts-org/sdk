@@ -376,7 +376,7 @@ describe("with a CGS API key and no client", () => {
   }
 
   // The secret is the part after the dot: no message of the error or its causes may repeat it.
-  function expectNoSecret(error: unknown, { key }: MintedKey) {
+  function expectNoSecret(error: unknown, { key }: Pick<MintedKey, "key">) {
     const secret = key.slice(key.indexOf(".") + 1);
     for (let e = error; e instanceof Error; e = e.cause) expect(e.message).not.toContain(secret);
     if (error instanceof PartialWriteError) expectNoSecret(error.failure, { key });
