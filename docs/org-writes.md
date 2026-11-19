@@ -100,7 +100,8 @@ import { Client } from "@atproto/lex";
 import { createSDKContext } from "@hypercerts-org/sdk";
 import { createProject } from "@hypercerts-org/sdk/project";
 
-const cgs = { url: "https://cgs.example.com", did: "did:web:cgs.example.com" };
+// `did` defaults to did:web:<CGS host>; pass it only if the CGS has a custom SERVICE_DID.
+const cgs = { url: "https://cgs.example.com" };
 
 // Acts as the signed-in user. `session` comes from your own auth code.
 const userContext = createSDKContext({ client: new Client(session), cgs });
