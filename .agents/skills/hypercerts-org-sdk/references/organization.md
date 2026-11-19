@@ -75,9 +75,9 @@ The write is conditional on the account not having changed since the profile and
 
 ## After `WriteOutcomeUnknownError`
 
-`attempted` lists the profile (if it would be created), the new locations and, last, the organization. In your own repo (or with `{ repo }` equal to your DID), calling `createOrganization` again is safe even though new locations get fresh record keys: the write is one commit and the call reads the organization first, so it either creates everything or throws `OrganizationAlreadyExistsError`, which means the first attempt succeeded (no second set of locations or profile). The new records are those of the first error's `attempted`.
+In your own repo (or with `{ repo }` equal to your DID), `attempted` lists the profile (if it would be created), the new locations and, last, the organization, and calling `createOrganization` again is safe even though new locations get fresh record keys: the write is one commit and the call reads the organization first, so it either creates everything or throws `OrganizationAlreadyExistsError`, which means the first attempt succeeded (no second set of locations or profile). The new records are those of the first error's `attempted`.
 
-For organization writes through CGS this does not hold: the records are written one request at a time, so a new location may exist while the organization does not, and calling again with inline locations creates another one. Check `attempted` with `com.atproto.repo.getRecord` first and pass the locations that exist as `{ uri }`. A `PartialWriteError` says the same.
+For organization writes through CGS this does not hold: the records are written one request at a time, so `attempted` lists only the record whose outcome is unknown (a later failure is a `PartialWriteError` listing written, failed and not-attempted records), a new location may exist while the organization does not, and calling again with inline locations creates another one. Check the records with `com.atproto.repo.getRecord` first and pass the locations that exist as `{ uri }`. A `PartialWriteError` says the same.
 
 ## Uploads are outside the commit
 
