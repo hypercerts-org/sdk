@@ -1,12 +1,13 @@
-import type {
-  CidString,
-  DidString,
-  NsidString,
-  RecordKeyString,
-  TypedBlobRef,
-  TypedLexMap,
+import {
+  type CidString,
+  type Client,
+  type DidString,
+  l,
+  type NsidString,
+  type RecordKeyString,
+  type TypedBlobRef,
+  type TypedLexMap,
 } from "@atproto/lex";
-import { type Client, l } from "@atproto/lex";
 import type { BlobData } from "../blob/upload-blob.js";
 import type { SDKContext } from "../context.js";
 import {
@@ -495,7 +496,7 @@ function rejectionMessage(
   reason: string,
   status: number,
   code: string | undefined,
-  request: Request,
+  request: WriteRequest,
 ): string {
   if (code === "InvalidSwap" && request.staleRecord !== undefined) {
     return recordChanged(operation, reason, request.staleRecord, serviceOf(request));

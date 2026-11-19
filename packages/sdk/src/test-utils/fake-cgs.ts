@@ -89,25 +89,28 @@ export function fakeCgs(options: FakeCgsOptions = {}) {
 
   const client = new Client({
     did: DID,
-    fetchHandler: async (path, init) =>
-      accountPds({
-        path,
-        method: init.method ?? "GET",
-        headers: new Headers(init.headers),
-        body: undefined,
-      }),
+    fetchHandler: (path, init) =>
+      Promise.resolve(
+        accountPds({
+          path,
+          method: init.method ?? "GET",
+          headers: new Headers(init.headers),
+          body: undefined,
+        }),
+      ),
   });
   const cgsConfig: CgsConfig = { url: CGS_URL, did: CGS_DID };
   const context: SDKContext = createSDKContext({
     client,
     cgs: cgsConfig,
     didResolver: {
-      resolve: async () => ({
-        id: ORG,
-        service: [
-          { id: "#atproto_pds", type: "AtprotoPersonalDataServer", serviceEndpoint: ORG_PDS },
-        ],
-      }),
+      resolve: () =>
+        Promise.resolve({
+          id: ORG,
+          service: [
+            { id: "#atproto_pds", type: "AtprotoPersonalDataServer", serviceEndpoint: ORG_PDS },
+          ],
+        }),
     },
   });
 
@@ -141,7 +144,7 @@ export function fakeCgs(options: FakeCgsOptions = {}) {
   function checkToken({ method, headers }: CgsRequest): Response | undefined {
     const bearer = headers.get("authorization")?.replace(/^Bearer /, "");
     const token = bearer === undefined ? undefined : (JSON.parse(atob(bearer)) as IssuedToken);
-    if (token === undefined || token.aud !== CGS_AUD || token.lxm !== method) {
+    if (token?.aud !== CGS_AUD || token.lxm !== method) {
       return json(401, { error: "AuthRequired", message: "token not for this method" });
     }
     if (used.has(token.jti)) return json(401, { error: "AuthRequired", message: "jti reused" });
