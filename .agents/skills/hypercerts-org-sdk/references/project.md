@@ -94,7 +94,7 @@ Not supported: `type` and `items` (a Project is always `type: "project"`; its it
 
 ## addActivityToProject
 
-`addActivityToProject(context, { project: { uri }, activity, weight? })` appends an Activity to an **existing** Project in your repo in one `applyWrites` commit. It is [`addActivityToCollection`](collection.md#addactivitytocollection) for a Collection of type `project`: the input names it `project`, and the result has the same shape.
+`addActivityToProject(context, { project: { uri }, activity, weight? })` appends an Activity to an **existing** Project in your repo (one `applyWrites` commit for a new Activity, one `putRecord` for `{ uri }`). It is [`addActivityToCollection`](collection.md#addactivitytocollection) for a Collection of type `project`: the input names it `project`, and the result has the same shape.
 
 ```ts
 import { addActivityToProject } from "@hypercerts-org/sdk/project";
@@ -119,7 +119,7 @@ await addActivityToProject(context, {
 - `activity` is the data of a new Activity or `{ uri }` of an existing one, never both; `weight` goes beside it, not inside. Validation, the item's position and weight, `signatures`, the 1000-item limit, no deduplication, `InvalidSwap` and uploads are all as in [addActivityToCollection](collection.md#addactivitytocollection).
 - The Collection must have `type: "project"`. Any other type, or none, is a `TypeError` that names `addActivityToCollection`; the check also runs on the second read, so a Collection that stopped being a Project in between is refused. A Collection of another type: use `addActivityToCollection`.
 - `project` is `{ uri }`, never a bare string, and must be your own Project, with a DID. Another account's Project is a `TypeError`.
-- After `WriteOutcomeUnknownError`, `attempted` lists the new records and, last, the Project (only the Project for a `{ uri }`). Check before retrying, or you add a second item.
+- After `WriteOutcomeUnknownError`, `attempted` lists the new records and, last, the Project (only the Project for a `{ uri }`). Compare the Project's stored CID with the Project entry of `attempted`: a match means the append applied, so do not retry; any other CID is inconclusive, so reconcile `items` by hand before retrying, or you add a second item.
 
 ### `AddActivityToProjectInput`
 

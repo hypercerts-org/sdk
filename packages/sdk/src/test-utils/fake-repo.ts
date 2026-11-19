@@ -1,4 +1,4 @@
-import { cidForRawBytes, type LexMap, lexParse } from "@atproto/lex";
+import { cidForRawBytes, type LexMap, lexParse, lexStringify } from "@atproto/lex";
 import { cidForLex } from "@atproto/lex-cbor";
 import { DID, fakePds, json, type RecordedRequest } from "./fake-pds.js";
 
@@ -36,7 +36,7 @@ export interface FakeRepoOptions {
   records?: Record<string, LexMap>;
   /** Called with the method of every request before it is answered. */
   onRequest?: (method: string, state: FakeRepoState) => void;
-  /** Replaces the fake's answer to `putRecord`, to simulate failures. */
+  /** Replaces the fake's answer to `putRecord` (the default enforces `swapRecord` and stores the record), to simulate failures. */
   putRecord?: (request: RecordedRequest) => Response;
   /** Replaces the fake's answer to `getLatestCommit`, to simulate failures. */
   getLatestCommit?: (request: RecordedRequest) => Response;
@@ -54,10 +54,10 @@ export interface FakeRepoOptions {
  * with `getLatestCommit`, and answers `applyWrites` by decoding the request body from the wire and
  * computing each record's CID from the decoded value. An `applyWrites` request with a `swapCommit`
  * other than the current head is refused with `InvalidSwap`, as a PDS refuses it. It answers
- * `putRecord` the same way, except that `swapRecord: null` ("only if absent") fails with
- * `InvalidSwap`, as the reference PDS does, when the record is in `existing`.
- *
- * It stores nothing and cannot show that a real PDS commits a request atomically. The CIDs come
+ * `putRecord` the same way: `swapRecord: null` ("only if absent") fails with `InvalidSwap`, as the
+ * reference PDS does, when the record exists, and a non-null `swapRecord` fails unless it is the
+ * record's current CID. A `putRecord` that succeeds is stored, so later reads see it. `applyWrites`
+ * stores nothing, and the fake cannot show that a real PDS commits a request atomically. The CIDs come
  * from the same CBOR encoder the reference PDS uses, so a matching CID shows that the SDK's
  * request round-trips through the wire format unchanged, not that every PDS agrees.
  */
@@ -65,6 +65,9 @@ export function fakeRepo(options: FakeRepoOptions = {}) {
   const received: ReceivedWrites = { creates: [], updates: [], swapCommits: [] };
   const puts: ReceivedPut[] = [];
   const state: FakeRepoState = { head: HEAD };
+  // Reading the stored CID is async, so concurrent puts could both pass the `swapRecord` guard before
+  // either stores. A PDS applies one write at a time; chain the puts to do the same.
+  let putQueue: Promise<unknown> = Promise.resolve();
   const pds = fakePds((request) => {
     const path = new URL(request.path, "https://pds.test").pathname;
     options.onRequest?.(path.slice(6), state);
@@ -86,7 +89,10 @@ export function fakeRepo(options: FakeRepoOptions = {}) {
       return options.deleteRecord(request);
     }
     if (path.endsWith("com.atproto.repo.putRecord")) {
-      return options.putRecord?.(request) ?? putRecord(request, puts, options.existing);
+      if (options.putRecord) return options.putRecord(request);
+      const result = putQueue.then(() => putRecord(request, puts, options));
+      putQueue = result.catch(() => undefined);
+      return result;
     }
     return json(404, { error: "XRPCNotSupported", message: path });
   });
@@ -175,7 +181,7 @@ async function applyWrites(
 async function putRecord(
   request: RecordedRequest,
   received: ReceivedPut[],
-  existing: Record<string, string> = {},
+  options: FakeRepoOptions,
 ): Promise<Response> {
   const body = lexParse(new TextDecoder().decode(request.body)) as unknown as {
     repo: string;
@@ -185,11 +191,18 @@ async function putRecord(
     swapRecord?: string | null;
   };
   const uri = `at://${body.repo}/${body.collection}/${body.rkey}`;
-  const current = existing[uri];
-  if (body.swapRecord === null && current !== undefined) {
+  const current = await currentCid(uri, options);
+  // A non-null `swapRecord` must match the stored CID, and a missing record matches none.
+  const stale =
+    body.swapRecord === null
+      ? current !== undefined
+      : body.swapRecord !== undefined && body.swapRecord !== current;
+  if (stale) {
     return json(400, { error: "InvalidSwap", message: `Record was at ${current}` });
   }
   const cid = (await cidForLex(body.record)).toString();
+  // Persist, so a later read sees the new version, as it would on a PDS.
+  options.records = { ...options.records, [uri]: JSON.parse(lexStringify(body.record)) };
   received.push({
     collection: body.collection,
     rkey: body.rkey,
@@ -198,6 +211,13 @@ async function putRecord(
     swapRecord: body.swapRecord,
   });
   return json(200, { uri, cid });
+}
+
+// The CID a PDS would report for the record now: computed from its value when the fake holds one.
+async function currentCid(uri: string, options: FakeRepoOptions): Promise<string | undefined> {
+  const value = options.records?.[uri];
+  if (value !== undefined) return (await cidForLex(lexParse(JSON.stringify(value)))).toString();
+  return options.existing?.[uri];
 }
 
 /** The create that wrote a record of `collection`. */

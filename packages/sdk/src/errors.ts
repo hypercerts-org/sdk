@@ -33,8 +33,9 @@ export abstract class WriteError extends Error {
  * "only if it is unchanged". An operation that decides something from what it read (whether a
  * record exists, what a record holds) therefore reads the repository's latest commit first, then
  * those records, and asks the PDS to apply the write only if the repository is still at that
- * commit (`swapCommit`). If anything else wrote to the account in between, the PDS rejects the
- * whole request with `code` `"InvalidSwap"` and nothing is written. The check is coarse: an
+ * commit (`swapCommit`). A write that only replaces one record is guarded by that record's own CID
+ * instead (`putRecord` with `swapRecord`), and fails only if that record changed. Otherwise, if anything else wrote to the account in between, the PDS rejects the
+ * whole request with `code` `"InvalidSwap"` and nothing is written. The `swapCommit` check is coarse: an
  * unrelated write to the same account (a post, a like, another call) causes it too, so an account
  * that writes often will see it now and then. Nothing is wrong with the input. The SDK does not
  * retry or merge; call again, which reads everything afresh. {@link RecordAlreadyExistsError} has

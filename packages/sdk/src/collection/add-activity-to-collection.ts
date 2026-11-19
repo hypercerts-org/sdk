@@ -44,8 +44,13 @@ export interface AddActivityToCollectionResult extends StrongRef {
  * `collection` is `{ uri }`: a record that is read, and written again with the Activity added.
  * `activity` is the data of a new Activity (created as {@link createActivity} does) or `{ uri }` (an
  * existing one, read once for its CID and never changed). It is appended as the
- * last item, with `weight`, and the rest of the Collection is kept. Nothing is deduplicated. If the
- * account was written to after the Collection was read, the write fails with
+ * last item, with `weight`, and the rest of the Collection is kept. Nothing is deduplicated.
+ *
+ * Concurrent changes: with `activity: { uri }` the Collection alone is replaced (`putRecord` with
+ * `swapRecord`, the CID of the version read), so only a change to the Collection itself since it
+ * was read fails the write; other writes to the account do not. With a new Activity, its records
+ * and the Collection go in one `applyWrites`, which can only be guarded by the repository's head
+ * commit (`swapCommit`), so any write to the account since then fails it. Both fail with
  * {@link WriteRejectedError} (`code` `"InvalidSwap"`) and nothing is written: call again. Only your
  * own Collections; `signatures` are neither checked nor re-signed. See the SDK skill reference.
  *
@@ -57,9 +62,14 @@ export interface AddActivityToCollectionResult extends StrongRef {
  * was written.
  * @throws {@link Error} If a read or upload fails, or the Collection is invalid or full (1000
  * items). Nothing was written.
- * @throws {@link WriteRejectedError} If the PDS rejected the write. Nothing was changed.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write, including `"InvalidSwap"` (the
+ * Collection, or for a new Activity the repository, changed since it was read). Nothing was changed.
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
- * a retry can duplicate records under new keys.
+ * a retry can duplicate new records under new keys. For `activity: { uri }` only the Collection was written
+ * (one `putRecord`): its stored CID is no proof either way. Compare it with the Collection entry of `attempted`:
+ * a match means the append applied, so do not call again. Any other CID is inconclusive (another writer
+ * may have changed the Collection before or after the append), so check `items` by hand and keep the outcome
+ * unknown if that cannot settle it; a retry re-reads the Collection and can add the item twice.
  *
  * @example
  * ```ts

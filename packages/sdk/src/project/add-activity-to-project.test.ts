@@ -2,6 +2,7 @@ import type { LexMap } from "@atproto/lex";
 import { describe, expect, it } from "vitest";
 import { CID, DID } from "../test-utils/fake-pds.js";
 import { fakeRepo, HEAD, methods, refTo, writeOf } from "../test-utils/fake-repo.js";
+import { cidOf } from "../test-utils/records.js";
 import { addActivityToProject } from "./index.js";
 
 const ACTIVITY = "org.hypercerts.claim.activity";
@@ -41,6 +42,30 @@ describe("addActivityToProject", () => {
       cid: update.cid,
       activity: { ...refTo(created), created: true, locations: [], contributors: [] },
     });
+  });
+
+  it("adds an existing Activity with one putRecord guarded by the Project's CID, and no head", async () => {
+    const existing = `at://${DID}/${ACTIVITY}/3k2a4b5c6d7e9`;
+    const { context, requests, puts, updates, swapCommits } = fakeRepo({
+      existing: { [existing]: CID },
+      records: { [projectUri]: project },
+    });
+
+    const result = await addActivityToProject(context, {
+      project: { uri: projectUri },
+      activity: { uri: existing },
+    });
+
+    expect(methods(requests).filter((m) => !m.endsWith("getRecord"))).toEqual([
+      "com.atproto.repo.putRecord",
+    ]);
+    expect([updates, swapCommits]).toEqual([[], []]);
+    expect(puts[0]?.swapRecord).toBe(await cidOf(project));
+    expect(puts[0]?.value.items).toEqual([
+      ...project.items,
+      { itemIdentifier: { uri: existing, cid: CID } },
+    ]);
+    expect(result.uri).toBe(projectUri);
   });
 
   it.each([

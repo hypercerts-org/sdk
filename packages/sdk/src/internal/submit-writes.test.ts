@@ -1,3 +1,4 @@
+import type { CidString } from "@atproto/lex";
 import * as profile from "@hypercerts-org/lexicon/app/certified/actor/profile";
 import * as rights from "@hypercerts-org/lexicon/org/hypercerts/claim/rights";
 import { describe, expect, it } from "vitest";
@@ -102,7 +103,10 @@ describe("submitWrites", () => {
       const { context, requests, creates, updates, swapCommits } = fakeRepo();
       const [created, update] = [await prepared(), await updated()];
 
-      await submitWrites(build(context), [created], { updates: [update], swapCommit: HEAD });
+      await submitWrites(build(context), [created], {
+        updates: [{ record: update }],
+        swapCommit: HEAD,
+      });
 
       expect(methods(requests)).toEqual(["com.atproto.repo.applyWrites"]);
       expect(creates[0]?.map((write) => write.rkey)).toEqual([created.rkey]);
@@ -125,7 +129,7 @@ describe("submitWrites", () => {
       });
 
       const error = await submitWrites(build(context), [created], {
-        updates: [update],
+        updates: [{ record: update }],
       }).catch((e) => e);
 
       expect(error).toBeInstanceOf(WriteResultMismatchError);
@@ -140,7 +144,7 @@ describe("submitWrites", () => {
       const update = await updated();
 
       const error = await submitWrites(build(context), [await prepared()], {
-        updates: [update],
+        updates: [{ record: update }],
       }).catch((e) => e);
 
       expect(error).toBeInstanceOf(WriteRejectedError);
@@ -153,7 +157,7 @@ describe("submitWrites", () => {
       const { context } = fakeRepo({
         applyWrites: () => json(400, { error: "InvalidSwap", message: "Commit was at x" }),
       });
-      const options = { updates: [await updated()] };
+      const options = { updates: [{ record: await updated() }] };
 
       const conditional = await submitWrites(build(context), [], {
         ...options,
@@ -251,5 +255,55 @@ describe("submitDelete", () => {
     expect(outcome.attempted).toEqual([]);
     expect(outcome.message).toContain(`whether ${ref.uri} was deleted`);
     expect(outcome.message).toContain("calling op again is safe");
+  });
+
+  describe("with one update that has a swapRecord", () => {
+    it("sends one putRecord conditional on that record's CID, and reads no head", async () => {
+      const update = await updated();
+      const { context, requests, puts } = fakeRepo({
+        records: { [update.ref.uri]: { $type: update.collection } },
+      });
+      const stored = await context.client.getRecord(update.collection, update.rkey);
+      const swapRecord = stored.body.cid as CidString;
+
+      await submitWrites(build(context), [], { updates: [{ record: update, swapRecord }] });
+
+      expect(methods(requests).filter((m) => !m.endsWith("getRecord"))).toEqual([
+        "com.atproto.repo.putRecord",
+      ]);
+      expect(puts.map((put) => [put.rkey, put.swapRecord])).toEqual([[update.rkey, swapRecord]]);
+    });
+
+    it("says the record changed, and that other writes do not cause it, when the CID is stale", async () => {
+      const update = await updated();
+      const { context, puts } = fakeRepo({
+        records: { [update.ref.uri]: { $type: update.collection } },
+      });
+
+      const error = await submitWrites(build(context), [], {
+        updates: [{ record: update, swapRecord: CID as CidString, noun: "Collection" }],
+      }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(WriteRejectedError);
+      expect(error).toMatchObject({ status: 400, code: "InvalidSwap", attempted: [update.ref] });
+      expect(error.message).toMatch(
+        /the Collection changed since it was read.*Other writes to the account do not cause this.*Call again/,
+      );
+      expect(puts).toEqual([]);
+    });
+
+    it("does not advise a retry after an unknown outcome", async () => {
+      const update = await updated();
+      const { context } = fakeRepo({
+        putRecord: () => json(500, { error: "InternalServerError" }),
+      });
+
+      const error = await submitWrites(build(context), [], {
+        updates: [{ record: update, swapRecord: CID as CidString }],
+      }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(WriteOutcomeUnknownError);
+      expect(error.message).toMatch(/apply the change a second time/);
+    });
   });
 });

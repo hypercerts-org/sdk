@@ -42,9 +42,14 @@ export interface AddActivityToProjectResult extends StrongRef {
  * @returns The Project's new version as `uri` and `cid`, and the Activity as `activity` (`created` is
  * `false` for `{ uri }`).
  * @throws {@link TypeError} If the input is invalid, or the Collection is not your own Project.
- * @throws {@link WriteRejectedError} If the PDS rejected the write, including `"InvalidSwap"`.
+ * @throws {@link WriteRejectedError} If the PDS rejected the write, including `"InvalidSwap"`: the
+ * Project changed since it was read (`activity: { uri }`), or the repository did (a new Activity).
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
- * a retry can duplicate records under new keys.
+ * a retry can duplicate new records under new keys. For `activity: { uri }` only the Project was written
+ * (one `putRecord`): its stored CID is no proof either way. Compare it with the Project entry of `attempted`:
+ * a match means the append applied, so do not call again. Any other CID is inconclusive (another writer
+ * may have changed the Project before or after the append), so check `items` by hand and keep the outcome
+ * unknown if that cannot settle it; a retry re-reads the Project and can add the item twice.
  *
  * @example
  * ```ts
