@@ -195,16 +195,18 @@ describe("a CGS refusal of an API key", () => {
     expect(error.failure.message).toContain(`repo:${ACTIVITY}?action=create`);
   });
 
-  // The 401 and 403 cases above assert their own messages; a 500 is the one answer they never read.
-  it("never puts the secret in a message or a cause, for a 500 on a write or an upload", async () => {
-    const cgs = refuse(500, "InternalServerError", "boom");
-
-    const error = await createRights(cgs.context, rights, { repo }).catch((e) => e);
-    const upload = await uploadBlob(cgs.context, png(), { repo }).catch((e) => e);
-
-    for (const caught of [error, upload]) {
-      expect(caught).toBeInstanceOf(Error);
-      for (const message of allMessages(caught)) expect(message).not.toContain(SECRET);
+  it("never puts the secret in a message or a cause, whatever CGS answers", async () => {
+    for (const cgs of [
+      refuse(401, "AuthenticationRequired", "Invalid API key"),
+      refuse(403, "Forbidden", "API key scopes do not permit 'createRecord'"),
+      refuse(500, "InternalServerError", "boom"),
+    ]) {
+      const error = await createRights(cgs.context, rights, { repo }).catch((e) => e);
+      const upload = await uploadBlob(cgs.context, png(), { repo }).catch((e) => e);
+      for (const caught of [error, upload]) {
+        expect(caught).toBeInstanceOf(Error);
+        for (const message of allMessages(caught)) expect(message).not.toContain(SECRET);
+      }
     }
   });
 });
