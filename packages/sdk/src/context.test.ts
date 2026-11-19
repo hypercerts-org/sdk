@@ -31,6 +31,15 @@ describe("createSDKContext", () => {
     });
   });
 
+  it("keeps a path prefix in the cgs URL", () => {
+    const context = createSDKContext({
+      client,
+      cgs: { url: "https://example.test/cgs/", did: "did:web:cgs.example.test" },
+    });
+
+    expect(context.cgs?.url).toBe("https://example.test/cgs");
+  });
+
   it("has no cgs unless one is given", () => {
     expect(createSDKContext({ client }).cgs).toBeUndefined();
   });
@@ -46,6 +55,18 @@ describe("createSDKContext", () => {
       "cgs.did",
     ],
     ["no URL", { did: "did:web:cgs.test" }, "cgs.url"],
+    [
+      "a URL with a query",
+      { url: "https://cgs.test?region=us", did: "did:web:cgs.test" },
+      "cgs.url",
+    ],
+    [
+      "a URL with an empty query",
+      { url: "https://cgs.test/?", did: "did:web:cgs.test" },
+      "cgs.url",
+    ],
+    ["a URL with a fragment", { url: "https://cgs.test/#x", did: "did:web:cgs.test" }, "cgs.url"],
+    ["a URL with credentials", { url: "https://u:p@cgs.test", did: "did:web:cgs.test" }, "cgs.url"],
   ])("throws a TypeError for cgs with %s", (_name, cgs, field) => {
     // @ts-expect-error The point is to reject what the types already forbid.
     expect(() => createSDKContext({ client, cgs })).toThrow(new RegExp(`\\\`${field}\\\``));

@@ -194,6 +194,13 @@ function checkedCgs(value: unknown): CgsConfig {
       `createSDKContext: \`cgs.url\` must be the http(s) base URL of the Certified Group Service, for example "https://cgs.example.com", but received ${describeValue(url)}.`,
     );
   }
+  // Requests go to `<url>/xrpc/<method>`: a query or fragment would swallow the method. Credentials
+  // are refused too, and not echoed, so they cannot leak into logs. Path prefixes stay valid.
+  if (/[?#]/.test(url as string) || parsed.username !== "" || parsed.password !== "") {
+    throw new TypeError(
+      'createSDKContext: `cgs.url` must be a base URL without a query string, fragment or credentials, for example "https://cgs.example.com" or "https://example.com/cgs".',
+    );
+  }
   if (typeof did !== "string" || !isDidString(did)) {
     throw new TypeError(
       `createSDKContext: \`cgs.did\` must be the service's DID, for example "did:web:cgs.example.com", but received ${describeValue(did)}.`,
