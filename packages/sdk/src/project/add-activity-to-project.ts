@@ -46,8 +46,10 @@ export interface AddActivityToProjectResult extends StrongRef {
  * Project changed since it was read (`activity: { uri }`), or the repository did (a new Activity).
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
  * a retry can duplicate new records under new keys. For `activity: { uri }` only the Project was written
- * (one `putRecord`): read the Project first to check whether its CID changed, or a retry re-reads it and
- * can add the item twice.
+ * (one `putRecord`): its stored CID is no proof either way. Compare it with the Project entry of `attempted`:
+ * a match means the append applied, so do not call again. Any other CID is inconclusive (another writer
+ * may have changed the Project before or after the append), so check `items` by hand and keep the outcome
+ * unknown if that cannot settle it; a retry re-reads the Project and can add the item twice.
  *
  * @example
  * ```ts

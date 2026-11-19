@@ -65,6 +65,9 @@ export function fakeRepo(options: FakeRepoOptions = {}) {
   const received: ReceivedWrites = { creates: [], updates: [], swapCommits: [] };
   const puts: ReceivedPut[] = [];
   const state: FakeRepoState = { head: HEAD };
+  // Reading the stored CID is async, so concurrent puts could both pass the `swapRecord` guard before
+  // either stores. A PDS applies one write at a time; chain the puts to do the same.
+  let putQueue: Promise<unknown> = Promise.resolve();
   const pds = fakePds((request) => {
     const path = new URL(request.path, "https://pds.test").pathname;
     options.onRequest?.(path.slice(6), state);
@@ -86,7 +89,10 @@ export function fakeRepo(options: FakeRepoOptions = {}) {
       return options.deleteRecord(request);
     }
     if (path.endsWith("com.atproto.repo.putRecord")) {
-      return options.putRecord?.(request) ?? putRecord(request, puts, options);
+      if (options.putRecord) return options.putRecord(request);
+      const result = putQueue.then(() => putRecord(request, puts, options));
+      putQueue = result.catch(() => undefined);
+      return result;
     }
     return json(404, { error: "XRPCNotSupported", message: path });
   });
