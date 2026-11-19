@@ -148,6 +148,15 @@ describe("a CGS refusal of an API key", () => {
     expect(error.message).not.toContain("scope for this write");
   });
 
+  it("403 for a removed member says the key's member is gone", async () => {
+    const cgs = refuse(403, "Forbidden", "Not a member of this group");
+
+    const error = await createRights(cgs.context, rights, { repo }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(WriteRejectedError);
+    expect(error.message).toContain("no longer a member");
+  });
+
   it("403 on an upload names the blob scope", async () => {
     const cgs = refuse(403, "Forbidden", "API key scopes do not permit 'uploadBlob'");
 

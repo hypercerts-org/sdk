@@ -87,6 +87,9 @@ export function apiKeyAuth(key: string): CgsRequestAuth {
         "mime" in purpose
           ? `blob:${purpose.mime}`
           : `repo:${purpose.collection}?action=${purpose.action}`;
+      if (/not a member/i.test(cgsMessage)) {
+        return `${operation}: the member who created the API key ${ref} is no longer a member of ${repo}, so the key no longer works and nothing was written. Create a new key as a current member.`;
+      }
       return /scopes do not permit/i.test(cgsMessage)
         ? `${operation}: the API key ${ref} has no scope for this write, so nothing was written. Create a key with the scope ${missing}.`
         : `${operation}: the member who created the API key ${ref} may not do this in ${repo} (a key never exceeds its member's current role, for example replacing another member's record needs admin), so nothing was written.`;
