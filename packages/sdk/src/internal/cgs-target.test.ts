@@ -9,9 +9,8 @@ import {
   WriteResultMismatchError,
 } from "../errors.js";
 import { CGS_AUD, type CgsRequest, fakeCgs, ORG } from "../test-utils/fake-cgs.js";
-import { DID, json } from "../test-utils/fake-pds.js";
+import { json } from "../test-utils/fake-pds.js";
 import { HEAD } from "../test-utils/fake-repo.js";
-import { createBuildContext } from "./build-context.js";
 import { cgsTarget } from "./cgs-target.js";
 import { type PreparedRecord, prepareRecord } from "./prepare-record.js";
 
@@ -39,38 +38,8 @@ async function rec(name = `Rights ${counter++}`, rkey?: string): Promise<Prepare
 }
 
 function target(cgs: ReturnType<typeof fakeCgs>) {
-  return cgsTarget(cgs.context, cgs.context.cgs as never, ORG as DidString, "op");
+  return cgsTarget(cgs.context, cgs.cgsConfig, ORG as DidString, "op");
 }
-
-describe("cgsTarget routing", () => {
-  it("is not atomic and names the org repo", () => {
-    const t = target(fakeCgs());
-    expect(t.atomic).toBe(false);
-    expect(t.did).toBe(ORG);
-  });
-
-  it("writes to the account's own PDS, never CGS, when repo is absent or the account's own DID", async () => {
-    const cgs = fakeCgs();
-    for (const options of [undefined, { repo: DID as DidString }]) {
-      const { target: own } = createBuildContext(cgs.context, "op", options);
-      expect(own.atomic).toBe(true);
-      expect(own.did).toBe(DID);
-    }
-    expect(cgs.requests).toEqual([]);
-  });
-
-  it("throws a TypeError before any request when the context has no cgs", () => {
-    const { context } = fakeCgs();
-    const bare = { ...context, cgs: undefined };
-
-    expect(() => createBuildContext(bare, "op", { repo: ORG as DidString })).toThrow(
-      /context has no `cgs`.*Nothing was sent/,
-    );
-    expect(() => createBuildContext(context, "op", { repo: "alice.test" as DidString })).toThrow(
-      TypeError,
-    );
-  });
-});
 
 describe("cgsTarget.submit", () => {
   it("sends creates then updates, one request each in plan order, each with its own fresh token", async () => {

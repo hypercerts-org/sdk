@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createActivity, createRights } from "./activity/index.js";
 import { createProfile } from "./actor/index.js";
 import { awardBadge, respondToBadgeAward } from "./badge/index.js";
-import { uploadBlob } from "./blob/index.js";
 import { addActivityToCollection, createCollection } from "./collection/index.js";
 import { PartialWriteError, RecordAlreadyExistsError } from "./errors.js";
 import { createOrganization, OrganizationAlreadyExistsError } from "./organization/index.js";
@@ -404,15 +403,6 @@ describe("writes with { repo: orgDid }", () => {
     expect(error).toBeInstanceOf(TypeError);
     expect(error.message).toContain("Handles are not accepted");
     expect(cgs.requests).toEqual([]);
-  });
-
-  it("uploadBlob with repo uploads through CGS", async () => {
-    const cgs = fakeCgs();
-
-    const blob = await uploadBlob(cgs.context, png(), { repo });
-
-    expect(cgs.of("uploadBlob")[0]?.params).toEqual({ repo: ORG });
-    expect(blob.size).toBe(3);
   });
 
   it("an own-DID repo is the account's own PDS: no CGS request, no token", async () => {

@@ -1,7 +1,7 @@
 import { Client, cidForRawBytes, type LexMap, lexParse, lexStringify } from "@atproto/lex";
 import { cidForLex } from "@atproto/lex-cbor";
 import { vi } from "vitest";
-import { createSDKContext, type SDKContext } from "../context.js";
+import { type CgsConfig, createSDKContext, type SDKContext } from "../context.js";
 import { DID, json, type RecordedRequest } from "./fake-pds.js";
 import { HEAD } from "./fake-repo.js";
 
@@ -97,9 +97,10 @@ export function fakeCgs(options: FakeCgsOptions = {}) {
         body: undefined,
       }),
   });
+  const cgsConfig: CgsConfig = { url: CGS_URL, did: CGS_DID };
   const context: SDKContext = createSDKContext({
     client,
-    cgs: { url: CGS_URL, did: CGS_DID },
+    cgs: cgsConfig,
     didResolver: {
       resolve: async () => ({
         id: ORG,
@@ -217,6 +218,8 @@ export function fakeCgs(options: FakeCgsOptions = {}) {
 
   return {
     context,
+    /** The CGS settings the context was created with. */
+    cgsConfig,
     requests,
     tokens,
     calls,
