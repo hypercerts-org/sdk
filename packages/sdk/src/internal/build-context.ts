@@ -3,15 +3,18 @@ import type { SDKContext } from "../context.js";
 import { describeError } from "./describe.js";
 import { type PreparedRecord, prepareRecord } from "./prepare-record.js";
 import { assertRecordUriOfType, parseRecordUri } from "./resolve-record-ref.js";
+import { pdsTarget, type WriteTarget } from "./write-target.js";
 
 /**
  * What every step of one creation call shares: the client's repo, the timestamp used as the
- * default `createdAt` of every record the call creates, the public function's name for
- * error messages, and the call's uploads.
+ * default `createdAt` of every record the call creates, where the call writes (`target`), the
+ * public function's name for error messages, and the call's uploads.
  */
 export interface BuildContext {
   readonly context: SDKContext;
   readonly did: DidString;
+  /** Where this call writes, reads for writing and uploads blobs. `target.did` is `did`. */
+  readonly target: WriteTarget;
   readonly createdAt: string;
   readonly operation: string;
   /** The uploads of this call by `Blob` object, so a file used twice is uploaded once. */
@@ -31,7 +34,14 @@ export function createBuildContext(context: SDKContext, operation: string): Buil
       `${operation}: the client is not authenticated, so there is no repository to write to. Sign in first, then create the context with \`createSDKContext({ client: new Client(session) })\`.`,
     );
   }
-  return { context, did, createdAt: new Date().toISOString(), operation, uploads: new Map() };
+  return {
+    context,
+    did,
+    target: pdsTarget(context, did, operation),
+    createdAt: new Date().toISOString(),
+    operation,
+    uploads: new Map(),
+  };
 }
 
 /**

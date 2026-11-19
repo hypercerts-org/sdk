@@ -10,7 +10,6 @@ import { type BuildContext, createBuildContext, parseInput } from "../internal/b
 import { describeError } from "../internal/describe.js";
 import { compact, strictObject } from "../internal/input.js";
 import { type PreparedRecord, prepareUpdate } from "../internal/prepare-record.js";
-import { readRepoHead } from "../internal/read-repo-head.js";
 import {
   assertRecordUriOfType,
   parseRecordUri,
@@ -74,13 +73,13 @@ export async function addActivity(
   checkCollection(build, target, await readRecord(context, uri, build.operation));
 
   // The records that need the network are read as late as possible, to keep the window in which
-  // another write can slip in small. The head comes first: see `readRepoHead`.
+  // another write can slip in small. The head comes first: see `WriteTarget.readHead`.
   const { created, refOf } = await prepareSlots(build, [planned.slot], {
     checkKeys: true,
     // The Collection update goes in the same request.
     otherWrites: 1,
   });
-  const head = await readRepoHead(context, build.did, build.operation);
+  const head = await build.target.readHead();
   const stored = await readRecord(context, uri, build.operation);
   const item = compact({ itemIdentifier: refOf(planned.slot), itemWeight: weight });
   const updated = await appendItem(build, target, stored, rkey, item);

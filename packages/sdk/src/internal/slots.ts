@@ -9,7 +9,6 @@ import {
   assertRecordUriOfType,
   collectionOf,
   type PdsClients,
-  recordExists,
   resolveRecordRef,
   type StrongRef,
   tryParseRecordUri,
@@ -402,7 +401,7 @@ async function assertKeysFree(build: BuildContext, slots: readonly NewSlot[]): P
       const uri = `at://${build.did}/${collection}/${key}`;
       let taken: boolean;
       try {
-        taken = await recordExists(build.context, build.did, collection, key);
+        taken = (await build.target.recordExists(collection, key)) !== undefined;
       } catch (error) {
         throw new Error(
           `${build.operation}: cannot check whether ${uri} already exists (${describeError(error)}), so nothing was written.`,
