@@ -37,8 +37,10 @@ export interface BuildContext {
  * `options.repo` absent or the client's own DID: the target is the account's own repo. Any other
  * DID: the target is that repo through the Certified Group Service.
  *
- * Throws Error when the client has no DID, TypeError when `options.repo` is not a DID or names
- * another repo and the context has no `cgs`.
+ * With an API-key `cgs` context no client is needed, and `options.repo` is required.
+ *
+ * Throws Error when the client has no DID, TypeError when `options.repo` is not a DID, names
+ * another repo and the context has no `cgs`, or is missing with an API-key context.
  */
 export function createBuildContext(
   context: SDKContext,

@@ -33,7 +33,7 @@ import {
   WriteResultMismatchError,
 } from "../errors.js";
 import { type CgsRequestAuth, cgsRequestAuth, type RequestPurpose } from "./cgs-auth.js";
-import { describeError } from "./describe.js";
+import { describeError, property } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import {
   clientForRepo,
@@ -221,20 +221,19 @@ export function cgsTarget(
 
   // Words a 401 or 403 the way the credential's kind needs; any other failure is returned as it is.
   function explainRefusal(error: Error, purpose: RequestPurpose): Error {
-    const cause = error.cause as
-      | { status?: unknown; message?: unknown; error?: unknown }
-      | undefined;
-    const status = cause?.status;
+    const cause = error.cause;
+    const status = property(cause, "status");
     if (status !== 401 && status !== 403) return error;
     const message = auth.explainRefusal(operation, {
       status,
-      cgsMessage: String(cause?.message),
+      cgsMessage: String(property(cause, "message")),
       repo,
       purpose,
     });
     if (message === undefined) return error;
     const attempted = error instanceof WriteRejectedError ? error.attempted : [];
-    const code = typeof cause?.error === "string" ? cause.error : undefined;
+    const causeCode = property(cause, "error");
+    const code = typeof causeCode === "string" ? causeCode : undefined;
     return new WriteRejectedError(message, attempted, { status, code }, { cause: error.cause });
   }
 
@@ -291,7 +290,7 @@ export function cgsTarget(
     try {
       credential = await auth.forRequest(method.nsid, repo);
     } catch (error) {
-      return error as Error;
+      return asError(error);
     }
     try {
       await submitRequest(
@@ -305,7 +304,7 @@ export function cgsTarget(
       if (step.kind === "create" && error instanceof WriteOutcomeUnknownError) {
         return readBackCreate(record, error);
       }
-      return explainRefusal(error as Error, {
+      return explainRefusal(asError(error), {
         action: step.kind,
         collection: record.collection,
       });
@@ -431,4 +430,8 @@ export function cgsTarget(
     // The service-auth failure: its message holds the reason and the scope hint.
     return failure.message.replace(`${operation}: `, "");
   }
+}
+
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }

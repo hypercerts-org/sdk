@@ -16,7 +16,7 @@ import {
   WriteRejectedError,
   WriteResultMismatchError,
 } from "../errors.js";
-import { describeError, isRecordNotFound } from "./describe.js";
+import { describeError, isRecordNotFound, property } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import { parseRecordUri, type StrongRef } from "./resolve-record-ref.js";
 import { uploadVia } from "./upload-via.js";
@@ -568,14 +568,6 @@ function repositoryChanged(operation: string, reason: string, request: WriteRequ
     `${operation}: the repository changed since it was read (HTTP 400: ${reason}), most likely because another write to this account landed in between. ` +
     `Nothing was written: ${describeEffects(request, NOT_WRITTEN)}. The SDK neither retries nor merges. Nothing needs cleaning up. Call again to read the repository afresh and try once more.`
   );
-}
-
-// Duck-typed rather than `instanceof XrpcResponseError`: see `assertClient` in context.ts. Only
-// that class has a numeric `status`; an unreadable 2xx response (XrpcInvalidResponseError) does not.
-function property(error: unknown, name: "status" | "error"): unknown {
-  return typeof error === "object" && error !== null
-    ? (error as Record<string, unknown>)[name]
-    : undefined;
 }
 
 // `results` is optional in the response schema. A PDS that omits it is trusted; one that returns

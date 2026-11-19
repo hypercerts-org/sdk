@@ -27,6 +27,14 @@ export function describeError(error: unknown): string {
   return cause && !message.includes(cause) ? `${message}: ${cause}` : message;
 }
 
+// Duck-typed rather than `instanceof XrpcResponseError`: see `assertClient` in context.ts. Only
+// that class has a numeric `status`; an unreadable 2xx response (XrpcInvalidResponseError) does not.
+export function property(error: unknown, name: string): unknown {
+  return typeof error === "object" && error !== null
+    ? (error as Record<string, unknown>)[name]
+    : undefined;
+}
+
 // Whether the failure is the XRPC error a PDS returns when a record does not exist.
 export function isRecordNotFound(error: unknown): boolean {
   return (
