@@ -303,9 +303,9 @@ export async function createOrganization(
     await submitWrites(build, records, {
       swapCommit: start.head,
       retrySafe: true,
-      ...(hasGeneratedKeys
-        ? { retrySafeReason: RETRY_SAFE_REASON, retrySafeOnlyAtomically: true }
-        : {}),
+      retrySafeReason: RETRY_SAFE_REASON,
+      // New locations get generated keys: a retry is only safe when the write was atomic (own PDS).
+      retrySafeOnlyAtomically: hasGeneratedKeys,
     });
   } catch (error) {
     throw await explainLostRace(build, error);
