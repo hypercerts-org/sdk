@@ -110,10 +110,7 @@ export function fakeCgs(options: FakeCgsOptions = {}) {
         }),
       ),
   });
-  const cgsConfig: CgsConfig =
-    options.apiKey === undefined
-      ? { url: CGS_URL, did: CGS_DID }
-      : { url: CGS_URL, did: CGS_DID, auth: { kind: "apiKey", key: options.apiKey } };
+  const cgsConfig: CgsConfig = { url: CGS_URL, did: CGS_DID };
   const didResolver: DidDocumentResolver = {
     resolve: () =>
       Promise.resolve({
@@ -126,7 +123,10 @@ export function fakeCgs(options: FakeCgsOptions = {}) {
   const context: SDKContext =
     options.apiKey === undefined
       ? createSDKContext({ client, cgs: cgsConfig, didResolver })
-      : createSDKContext({ cgs: cgsConfig, didResolver });
+      : createSDKContext({
+          cgs: { ...cgsConfig, auth: { kind: "apiKey", key: options.apiKey } },
+          didResolver,
+        });
 
   vi.stubGlobal("fetch", async (input: Request | string | URL, init?: RequestInit) => {
     await Promise.all(seed);

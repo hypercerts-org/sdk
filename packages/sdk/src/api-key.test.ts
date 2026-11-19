@@ -33,31 +33,7 @@ function allMessages(error: unknown): string[] {
 }
 
 describe("writes with a CGS API key", () => {
-  it("sends X-API-Key and repo on the querystring, never asks a PDS for a token", async () => {
-    const cgs = fakeCgs({ apiKey: KEY });
-
-    const result = await createActivity(
-      cgs.context,
-      { title: "Trees", shortDescription: "Planting trees", rights, image: png() },
-      { repo },
-    );
-
-    expect(cgs.requests.map((request) => request.method.split(".").pop())).toEqual([
-      "uploadBlob",
-      "createRecord",
-      "createRecord",
-    ]);
-    for (const request of cgs.requests) {
-      expect(request.headers.get("x-api-key")).toBe(KEY);
-      expect(request.headers.has("authorization")).toBe(false);
-      expect(request.params.repo).toBe(ORG);
-    }
-    expect(cgs.tokens).toEqual([]);
-    expect(cgs.calls.some((call) => call.startsWith("account "))).toBe(false);
-    expect(result.uri.startsWith(`at://${ORG}/${ACTIVITY}/`)).toBe(true);
-  });
-
-  it("deletes with the same key", async () => {
+  it("sends X-API-Key and repo on the querystring for every write, never asks a PDS for a token", async () => {
     const subject = `at://${ORG}/${ACTIVITY}/3k2a4b5c6d7e8`;
     const cgs = fakeCgs({
       apiKey: KEY,
@@ -71,11 +47,29 @@ describe("writes with a CGS API key", () => {
       },
     });
 
+    const result = await createActivity(
+      cgs.context,
+      { title: "Trees", shortDescription: "Planting trees", rights, image: png() },
+      { repo },
+    );
     const liked = await like(cgs.context, { subject: { uri: subject } }, { repo });
     await unlike(cgs.context, { like: liked }, { repo });
 
-    expect(cgs.of("deleteRecord")[0]?.headers.get("x-api-key")).toBe(KEY);
-    expect(cgs.of("deleteRecord")[0]?.params.repo).toBe(ORG);
+    expect(cgs.requests.map((request) => request.method.split(".").pop())).toEqual([
+      "uploadBlob",
+      "createRecord",
+      "createRecord",
+      "createRecord",
+      "deleteRecord",
+    ]);
+    for (const request of cgs.requests) {
+      expect(request.headers.get("x-api-key")).toBe(KEY);
+      expect(request.headers.has("authorization")).toBe(false);
+      expect(request.params.repo).toBe(ORG);
+    }
+    expect(cgs.tokens).toEqual([]);
+    expect(cgs.calls.some((call) => call.startsWith("account "))).toBe(false);
+    expect(result.uri.startsWith(`at://${ORG}/${ACTIVITY}/`)).toBe(true);
   });
 
   it("without { repo } throws a TypeError before any request, with or without a client", async () => {
@@ -201,19 +195,16 @@ describe("a CGS refusal of an API key", () => {
     expect(error.failure.message).toContain(`repo:${ACTIVITY}?action=create`);
   });
 
-  it("never puts the secret in a message or a cause, whatever CGS answers", async () => {
-    for (const cgs of [
-      refuse(401, "AuthRequired", "Invalid API key"),
-      refuse(403, "Forbidden", "API key scopes do not permit 'createRecord'"),
-      refuse(403, "Forbidden", "Role 'member' cannot perform 'putRecord'"),
-      refuse(500, "InternalServerError", "boom"),
-    ]) {
-      const error = await createRights(cgs.context, rights, { repo }).catch((e) => e);
-      const upload = await uploadBlob(cgs.context, png(), { repo }).catch((e) => e);
-      for (const caught of [error, upload]) {
-        expect(caught).toBeInstanceOf(Error);
-        for (const message of allMessages(caught)) expect(message).not.toContain(SECRET);
-      }
+  // The 401 and 403 cases above assert their own messages; a 500 is the one answer they never read.
+  it("never puts the secret in a message or a cause, for a 500 on a write or an upload", async () => {
+    const cgs = refuse(500, "InternalServerError", "boom");
+
+    const error = await createRights(cgs.context, rights, { repo }).catch((e) => e);
+    const upload = await uploadBlob(cgs.context, png(), { repo }).catch((e) => e);
+
+    for (const caught of [error, upload]) {
+      expect(caught).toBeInstanceOf(Error);
+      for (const message of allMessages(caught)) expect(message).not.toContain(SECRET);
     }
   });
 });

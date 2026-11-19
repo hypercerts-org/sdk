@@ -4,6 +4,7 @@ import { createActivity, createRights } from "../src/activity/index.js";
 import { uploadBlob } from "../src/blob/index.js";
 import { addActivityToCollection, createCollection } from "../src/collection/index.js";
 import { createSDKContext, type SDKContext } from "../src/index.js";
+import {
   addActivityToProject,
   createProject,
   PartialWriteError,
