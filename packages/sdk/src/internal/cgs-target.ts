@@ -291,7 +291,6 @@ export function cgsTarget(
         request,
         async () => [await send(token, method, step)],
         retrySafeOnCgs(plan),
-        undefined,
       );
       return undefined;
     } catch (error) {
