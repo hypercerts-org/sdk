@@ -12,8 +12,9 @@
 // because the PDS answers a create at a taken key with a 500 in `applyWrites` as well.
 //
 // Rules for every request:
-// - A fresh service-auth token per request (they are single-use and bound to one method), from the
-//   signed-in account's PDS. Service auth only: no API keys.
+// - Authentication comes from `cgs-auth.ts`, chosen once per target: a fresh service-auth token per
+//   request from the signed-in account's PDS, or the group's API key. `repo` is on the querystring of
+//   every request, which an API-key request needs to find its group.
 // - `createRecord` is always sent with `rkey`, so the URIs that records hold to each other stay valid.
 // - Updates use `putRecord` with the plan's `swapRecord`. CGS does not declare that field but passes
 //   it to the PDS (checked in .reports/cgs-swap-test.md), which refuses a stale one with
@@ -21,7 +22,7 @@
 // - `swapCommit` is never sent: it is repo-wide, so any other member's write would refuse the plan,
 //   and a plan that needs it (`createOrganization`) is guarded by its create-only keys instead.
 // - Reads (`readHead`, `recordExists`) go to the organization's own PDS, never through CGS.
-import { Client, type DidString, l, type NsidString } from "@atproto/lex";
+import { Client, type DidString, l } from "@atproto/lex";
 import type { BlobData } from "../blob/upload-blob.js";
 import type { CgsConfig, SDKContext } from "../context.js";
 import {
@@ -31,6 +32,7 @@ import {
   WriteRejectedError,
   WriteResultMismatchError,
 } from "../errors.js";
+import { type CgsRequestAuth, cgsRequestAuth, type RequestPurpose } from "./cgs-auth.js";
 import { describeError } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import {
@@ -53,15 +55,6 @@ import {
 } from "./write-target.js";
 
 const CGS_SERVICE = "the Certified Group Service";
-
-/**
- * The service id of CGS's DID document entry. The scope `aud` of an `rpc:` permission must be a
- * DID with a fragment, and the PDS matches a requested token's `aud` against the scope as given.
- */
-const SERVICE_ID = "certified_group_service";
-
-/** The scope an OAuth session needs for one CGS method (`#` is written `%23` in a scope string). */
-const scopeFor = (cgsDid: string, lxm: string) => `rpc:${lxm}?aud=${cgsDid}%23${SERVICE_ID}`;
 
 const repoDid = l.string({ format: "did" });
 const collection = l.string({ format: "nsid" });
@@ -110,14 +103,7 @@ const uploadBlob = l.procedure(
   l.jsonPayload({ blob: l.blob() }),
 );
 
-// `com.atproto.server.getServiceAuth` is not among the lexicons bundled with `Client`. `aud` is a
-// plain string here, not format "did": the PDS accepts a `did:web:host#service` reference (and a
-// scope can only name that form), which the `did` format would refuse before the request is sent.
-const getServiceAuth = l.query(
-  "com.atproto.server.getServiceAuth",
-  l.params({ aud: l.string(), lxm: l.string({ format: "nsid" }) }),
-  l.jsonPayload({ token: l.string() }),
-);
+type Credential = Awaited<ReturnType<CgsRequestAuth["forRequest"]>>;
 
 /**
  * Whether calling again after a failure cannot duplicate records. Only when every create has a
@@ -168,8 +154,10 @@ interface Step {
  *   already gone gets HTTP 403 (CGS then checks admin rights), so on a 403 the record is read back
  *   and its absence counts as success.
  * - Never retries. Failure classification is shared with `pdsTarget`.
- * - A failure to get the service-auth token throws a plain Error before anything is sent for that
- *   request.
+ * - A failure to get the credential (the service-auth token) throws a plain Error before anything is
+ *   sent for that request.
+ * - Under an API key, a 401 or 403 is reported as WriteRejectedError with a message that names the key
+ *   by `cgsk_<ref>` only, never its secret.
  */
 export function cgsTarget(
   context: SDKContext,
@@ -179,35 +167,50 @@ export function cgsTarget(
 ): WriteTarget {
   const pdsClients: PdsClients = new Map();
   const orgPds = () => clientForRepo(context, repo, pdsClients);
+  // Chosen once: a target never falls back from one credential to another.
+  const auth = cgsRequestAuth(context, cgs, operation);
 
   const target: WriteTarget = {
     did: repo,
     atomic: false,
     readHead: async () => readHead(await orgPds(), repo, operation),
     recordExists: async (collection, rkey) => recordExists(await orgPds(), repo, collection, rkey),
-    uploadBlob: (body: BlobData, mimeType) =>
-      uploadVia(
-        async (data, encoding) => (await call(uploadBlob, { body: data, encoding })).blob,
-        body,
-        mimeType,
-        CGS_SERVICE,
-      ),
+    uploadBlob: async (body: BlobData, mimeType) => {
+      let mime = "";
+      try {
+        return await uploadVia(
+          async (data, encoding) => {
+            mime = encoding;
+            return (await call(uploadBlob, { body: data, encoding })).blob;
+          },
+          body,
+          mimeType,
+          CGS_SERVICE,
+        );
+      } catch (error) {
+        throw error instanceof Error ? explainRefusal(error, { mime }) : error;
+      }
+    },
     submit: (plan) => submitSteps(plan),
     delete: (deleteTarget) => deleteOne(deleteTarget),
   };
   return target;
 
-  // Asks the account's PDS for a token for `method` and posts one request to CGS with it.
+  // Authenticates one request with the target's credential and posts it to CGS.
   async function call(method: CgsMethod, options: CallOptions): Promise<CallBody> {
-    return post(await serviceAuth(method.nsid), method, options);
+    return post(await auth.forRequest(method.nsid, repo), method, options);
   }
 
-  async function post(token: string, method: CgsMethod, options: CallOptions): Promise<CallBody> {
+  async function post(
+    { headers: credentials }: Credential,
+    method: CgsMethod,
+    options: CallOptions,
+  ): Promise<CallBody> {
     const client = new Client({
       // Looked up when the request is made, so a replaced global `fetch` takes effect.
       fetchHandler: (path, init) => {
         const headers = new Headers(init.headers);
-        headers.set("authorization", `Bearer ${token}`);
+        for (const [name, value] of Object.entries(credentials)) headers.set(name, value);
         return globalThis.fetch(`${cgs.url}${path}`, { ...init, headers });
       },
     });
@@ -216,20 +219,23 @@ export function cgsTarget(
     return (await client.xrpc(method as never, withRepo as never)).body as CallBody;
   }
 
-  async function serviceAuth(lxm: NsidString): Promise<string> {
-    try {
-      const { body } = await context.client.xrpc(getServiceAuth, {
-        params: { aud: `${cgs.did}#${SERVICE_ID}`, lxm },
-        service: null,
-        labelers: null,
-      });
-      return body.token;
-    } catch (error) {
-      throw new Error(
-        `${operation}: cannot get a service-auth token for ${lxm} from the account's PDS (${describeError(error)}), so nothing was sent to the Certified Group Service. With OAuth, the session needs the scope ${scopeFor(cgs.did, lxm)} (one such scope per CGS method: createRecord, putRecord, deleteRecord and uploadBlob).`,
-        { cause: error },
-      );
-    }
+  // Words a 401 or 403 the way the credential's kind needs; any other failure is returned as it is.
+  function explainRefusal(error: Error, purpose: RequestPurpose): Error {
+    const cause = error.cause as
+      | { status?: unknown; message?: unknown; error?: unknown }
+      | undefined;
+    const status = cause?.status;
+    if (status !== 401 && status !== 403) return error;
+    const message = auth.explainRefusal(operation, {
+      status,
+      cgsMessage: String(cause?.message),
+      repo,
+      purpose,
+    });
+    if (message === undefined) return error;
+    const attempted = error instanceof WriteRejectedError ? error.attempted : [];
+    const code = typeof cause?.error === "string" ? cause.error : undefined;
+    return new WriteRejectedError(message, attempted, { status, code }, { cause: error.cause });
   }
 
   async function submitSteps(plan: WritePlan): Promise<void> {
@@ -279,11 +285,11 @@ export function cgsTarget(
       const taken = await checkKeyFree(record);
       if (taken !== undefined) return taken;
     }
-    // Outside the classified request: no token means nothing was sent for this step.
+    // Outside the classified request: no credential means nothing was sent for this step.
     const method = step.kind === "create" ? createRecord : putRecord;
-    let token: string;
+    let credential: Credential;
     try {
-      token = await serviceAuth(method.nsid);
+      credential = await auth.forRequest(method.nsid, repo);
     } catch (error) {
       return error as Error;
     }
@@ -291,7 +297,7 @@ export function cgsTarget(
       await submitRequest(
         operation,
         request,
-        async () => [await send(token, method, step)],
+        async () => [await send(credential, method, step)],
         retrySafeOnCgs(plan),
       );
       return undefined;
@@ -299,7 +305,10 @@ export function cgsTarget(
       if (step.kind === "create" && error instanceof WriteOutcomeUnknownError) {
         return readBackCreate(record, error);
       }
-      return error as Error;
+      return explainRefusal(error as Error, {
+        action: step.kind,
+        collection: record.collection,
+      });
     }
   }
 
@@ -326,9 +335,9 @@ export function cgsTarget(
     });
   }
 
-  function send(token: string, method: CgsMethod, { record, swapRecord }: Step) {
+  function send(credential: Credential, method: CgsMethod, { record, swapRecord }: Step) {
     const body = { repo, collection: record.collection, rkey: record.rkey, record: record.value };
-    return post(token, method, {
+    return post(credential, method, {
       body: { ...body, ...(swapRecord === undefined ? {} : { swapRecord }) },
     });
   }
@@ -356,9 +365,9 @@ export function cgsTarget(
 
   async function deleteOne({ uri, cid }: DeleteTarget): Promise<void> {
     const parsed = parseRecordUri(uri, operation);
-    const token = await serviceAuth(deleteRecord.nsid);
+    const credential = await auth.forRequest(deleteRecord.nsid, repo);
     try {
-      await post(token, deleteRecord, {
+      await post(credential, deleteRecord, {
         body: {
           repo,
           collection: parsed.collection,
@@ -371,7 +380,7 @@ export function cgsTarget(
       if (failure instanceof WriteRejectedError && failure.status === 403) {
         if (await isGone(parsed.collection, parsed.rkey)) return;
       }
-      throw failure;
+      throw explainRefusal(failure, { action: "delete", collection: parsed.collection });
     }
   }
 

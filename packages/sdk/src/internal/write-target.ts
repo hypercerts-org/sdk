@@ -10,6 +10,10 @@ import {
 } from "@atproto/lex";
 import type { BlobData } from "../blob/upload-blob.js";
 import type { SDKContext } from "../context.js";
+
+/** A context with a client: the only kind that can write to an account's own repository. */
+export type SessionContext = SDKContext & { readonly client: Client };
+
 import {
   RecordAlreadyExistsError,
   WriteOutcomeUnknownError,
@@ -153,7 +157,7 @@ export const getLatestCommit = l.query(
  * so calling again after any outcome is safe. `attempted` of the errors is `[{ uri, cid }]` with a
  * CID and empty without one. Throws TypeError when `target.uri` is not a record URI.
  */
-export function pdsTarget(context: SDKContext, did: DidString, operation: string): WriteTarget {
+export function pdsTarget(context: SessionContext, did: DidString, operation: string): WriteTarget {
   return {
     did,
     atomic: true,
@@ -226,7 +230,7 @@ export async function recordExists(
 }
 
 async function submitApplyWrites(
-  context: SDKContext,
+  context: SessionContext,
   did: DidString,
   operation: string,
   plan: WritePlan,
@@ -270,7 +274,7 @@ async function submitApplyWrites(
 }
 
 async function submitGuardedUpdate(
-  context: SDKContext,
+  context: SessionContext,
   did: DidString,
   operation: string,
   plan: WritePlan,
@@ -298,7 +302,7 @@ async function submitGuardedUpdate(
 }
 
 async function submitCreateOnly(
-  context: SDKContext,
+  context: SessionContext,
   did: DidString,
   operation: string,
   plan: WritePlan,
@@ -340,7 +344,7 @@ async function submitCreateOnly(
 }
 
 async function deleteRecord(
-  context: SDKContext,
+  context: SessionContext,
   did: DidString,
   operation: string,
   target: DeleteTarget,

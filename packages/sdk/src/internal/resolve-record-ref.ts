@@ -113,7 +113,7 @@ export async function clientForRepo(
   did: DidString,
   pdsClients?: PdsClients,
 ): Promise<Client> {
-  if (context.client.did === did) return context.client;
+  if (context.client?.did === did) return context.client;
   let pending = pdsClients?.get(did);
   if (pending === undefined) {
     pending = resolvePds(context, did).then((pds) => new Client(pds));

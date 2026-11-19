@@ -20,8 +20,11 @@ import { createDefaultDidResolver } from "./internal/resolve-pds.js";
  * ```
  */
 export interface SDKContext {
-  /** The application's `@atproto/lex` client. Operations send all their requests through it. */
-  readonly client: Client;
+  /**
+   * The application's `@atproto/lex` client. Operations send all their requests through it.
+   * Absent only when `cgs.auth` is an API key: such a context has no account of its own.
+   */
+  readonly client?: Client | undefined;
   /**
    * Finds the DID document of an account other than the client's, to locate its PDS. The
    * resolver passed to {@link createSDKContext}, or the SDK's cached default.
@@ -47,7 +50,25 @@ export interface CgsConfig {
    * `did#service` reference as its `aud`, which is what an OAuth `rpc:` scope must name.
    */
   readonly did: DidString;
+  /** How requests to the service are authenticated. Default: `{ kind: "serviceAuth" }`. */
+  readonly auth?: CgsAuth | undefined;
 }
+
+/**
+ * How the SDK authenticates to the Certified Group Service.
+ *
+ * @remarks
+ * - `serviceAuth` (default): the signed-in account acts. For each request the SDK asks the client's
+ *   PDS for a single-use token.
+ * - `apiKey`: the key acts as the group member who created it, limited to the key's scopes and
+ *   that member's current role. Needs no client and no PDS round trip, but every write must pass
+ *   `{ repo: groupDid }`: a key belongs to one group and the context has no own repository.
+ *   Server-side only: a key is a long-lived secret, so store it like a password. The SDK never
+ *   logs it and never puts it in an error; messages name only its `cgsk_<ref>` part.
+ */
+export type CgsAuth =
+  | { readonly kind: "serviceAuth" }
+  | { readonly kind: "apiKey"; readonly key: string };
 
 /**
  * Resolves a DID to its DID document.
@@ -105,10 +126,25 @@ export interface CreateSDKContextOptions {
    * `rpc:app.certified.group.repo.createRecord?aud=did:web:cgs.example.com%23certified_group_service`,
    * and the same for `putRecord`, `deleteRecord` and `uploadBlob`. Repeating `lxm` in one scope
    * (`rpc?lxm=...&lxm=...&aud=...`) is equivalent. CGS accepts the token with or without the
-   * fragment in `aud`. API keys (`cgsk_...`) are not supported: the SDK always acts as the
-   * signed-in account.
+   * fragment in `aud`. To write with an API key instead, see {@link CgsAuth} and
+   * {@link ApiKeyContextOptions}.
    */
   cgs?: CgsConfig;
+}
+
+/**
+ * Options for a context that writes to a group with a Certified Group Service API key (see
+ * {@link CgsAuth}), with no client.
+ *
+ * @remarks
+ * `client` is optional: reads of the group's records go to its own PDS without authentication.
+ * If you pass one anyway, writes to the group still use the key, and writes without `{ repo }`
+ * still go to the client's own repository.
+ */
+export interface ApiKeyContextOptions {
+  client?: Client;
+  didResolver?: DidDocumentResolver;
+  cgs: CgsConfig & { readonly auth: { readonly kind: "apiKey"; readonly key: string } };
 }
 
 /**
@@ -133,7 +169,8 @@ export interface CreateSDKContextOptions {
  * @throws {@link TypeError} If `client` is missing or has no `xrpc()` method, for example a raw
  * OAuth session or an `@atproto/api` agent, or if `didResolver` is given without a `resolve()`
  * method, for example the OAuth client itself instead of `oauthClient.identityResolver`, or if
- * `cgs` is given without an http(s) `url` and a DID in `did`.
+ * `cgs` is given without an http(s) `url` and a DID in `did`, or with an API key that is malformed or
+ * used in a browser (`window` is defined), or if `client` is missing and `cgs.auth` is not an API key.
  *
  * @example
  * ```ts
@@ -158,13 +195,20 @@ export interface CreateSDKContextOptions {
  * createSDKContext({ client: session }); // TypeError: wrap it with `new Client(session)`
  * ```
  */
-export function createSDKContext(options: CreateSDKContextOptions): SDKContext {
+export function createSDKContext(
+  options: CreateSDKContextOptions | ApiKeyContextOptions,
+): SDKContext {
   const client: unknown = options?.client;
-  assertClient(client);
+  const cgs = options?.cgs === undefined ? undefined : checkedCgs(options.cgs);
+  // A client may be left out only by a context whose group writes use a key.
+  if (client !== undefined || cgs?.auth?.kind !== "apiKey") assertClient(client);
   const didResolver = options.didResolver ?? createDefaultDidResolver();
   if (!hasMethod(didResolver, "resolve")) throw notADidResolver(didResolver);
-  const cgs = options.cgs === undefined ? undefined : checkedCgs(options.cgs);
-  return Object.freeze({ client, didResolver, ...(cgs === undefined ? {} : { cgs }) });
+  return Object.freeze({
+    ...(client === undefined ? {} : { client }),
+    didResolver,
+    ...(cgs === undefined ? {} : { cgs }),
+  });
 }
 
 // Duck-typed instead of `instanceof Client`: an application can end up with more than one
@@ -206,7 +250,42 @@ function checkedCgs(value: unknown): CgsConfig {
       `createSDKContext: \`cgs.did\` must be the service's DID, for example "did:web:cgs.example.com", but received ${describeValue(did)}.`,
     );
   }
-  return Object.freeze({ url: parsed.href.replace(/\/$/, ""), did });
+  const auth = checkedAuth((value as { auth?: unknown }).auth);
+  return Object.freeze({
+    url: parsed.href.replace(/\/$/, ""),
+    did,
+    ...(auth === undefined ? {} : { auth }),
+  });
+}
+
+// `cgsk_<ref>.<secret>`. A malformed key is refused here, before any request, and the message never
+// repeats what was given: it may be a real secret with a typo.
+const API_KEY = /^cgsk_[^.\s]+\.\S+$/;
+
+function checkedAuth(value: unknown): CgsAuth | undefined {
+  if (value === undefined) return undefined;
+  const { kind, key } = (typeof value === "object" && value !== null ? value : {}) as Record<
+    string,
+    unknown
+  >;
+  if (kind === "serviceAuth") return Object.freeze({ kind });
+  if (kind !== "apiKey") {
+    throw new TypeError(
+      `createSDKContext: \`cgs.auth.kind\` must be "serviceAuth" or "apiKey", but received ${describeValue(kind)}.`,
+    );
+  }
+  // An API key is a long-lived secret, and a page that holds one hands it to every visitor.
+  if (typeof window !== "undefined") {
+    throw new TypeError(
+      "createSDKContext: an API key is a long-lived secret and must not be used in a browser, where anyone can read it. Use it only in server-side code. In the browser, sign in and pass `cgs: { url, did }` with a `client` instead.",
+    );
+  }
+  if (typeof key !== "string" || !API_KEY.test(key)) {
+    throw new TypeError(
+      `createSDKContext: \`cgs.auth.key\` must be a Certified Group Service API key of the form "cgsk_<ref>.<secret>", but received ${describeValue(key)}${typeof key === "string" ? ` of ${key.length} characters that does not have that form` : ""}. Use the \`key\` that keys.create returned; it is shown only once.`,
+    );
+  }
+  return Object.freeze({ kind, key });
 }
 
 function tryParseUrl(value: string): URL | undefined {
