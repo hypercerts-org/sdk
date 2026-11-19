@@ -65,7 +65,7 @@ Every operation that writes takes an optional last argument `{ repo }`. Leave it
 ```ts
 export const context = createSDKContext({
   client: new Client(session),
-  cgs: { url: "https://cgs.example.com", did: "did:web:cgs.example.com" },
+  cgs: { url: "https://cgs.example.com" },
 });
 
 await createProject(context, input, { repo: orgDid });
@@ -73,7 +73,7 @@ await createProject(context, input, { repo: orgDid });
 
 CGS takes one record per request, so a call that writes several records is not atomic: if it fails part-way it throws `PartialWriteError`, which lists what landed. Writes to an organization also lose the repository-wide `swapCommit` guard. The signed-in account must be a member of the group; CGS checks the role.
 
-The SDK asks your PDS for a service-auth token before each CGS request. With OAuth, add one scope per method to the session (a scope's `lxm` must be a full method name, and its `aud` needs the `#certified_group_service` fragment, written `%23`): `rpc:app.certified.group.repo.createRecord?aud=did:web:cgs.example.com%23certified_group_service`, and the same for `putRecord`, `deleteRecord` and `uploadBlob`. Set `cgs.did` to the DID without the fragment; the SDK adds it.
+The SDK asks your PDS for a service-auth token before each CGS request. With OAuth, add one scope per method to the session (a scope's `lxm` must be a full method name, and its `aud` needs the `#certified_group_service` fragment, written `%23`): `rpc:app.certified.group.repo.createRecord?aud=did:web:cgs.example.com%23certified_group_service`, and the same for `putRecord`, `deleteRecord` and `uploadBlob`. `cgs.did` defaults to `did:web:<CGS host>` (the host of `cgs.url`, without a port); pass it, without the fragment, only if the CGS operator set a custom `SERVICE_DID`. The SDK adds the fragment.
 
 ### With an API key (server only)
 
@@ -83,7 +83,6 @@ A backend with no signed-in user can write to a group with a CGS API key instead
 export const context = createSDKContext({
   cgs: {
     url: "https://cgs.example.com",
-    did: "did:web:cgs.example.com",
     auth: { kind: "apiKey", key: process.env.CGS_API_KEY! },
   },
 });

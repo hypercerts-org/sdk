@@ -7,6 +7,7 @@ export type {
   CgsConfig,
   CreateSDKContextOptions,
   DidDocumentResolver,
+  ResolvedCgsConfig,
   SDKContext,
 } from "./context.js";
 export { createSDKContext } from "./context.js";

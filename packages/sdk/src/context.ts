@@ -32,9 +32,9 @@ export interface SDKContext {
   readonly didResolver: DidDocumentResolver;
   /**
    * The Certified Group Service that organization writes go through, when the context was created
-   * with one. See {@link CgsConfig}.
+   * with one, with its `did` filled in. See {@link CgsConfig}.
    */
-  readonly cgs?: CgsConfig | undefined;
+  readonly cgs?: ResolvedCgsConfig | undefined;
 }
 
 /**
@@ -45,13 +45,20 @@ export interface CgsConfig {
   /** The service's base URL, for example `https://cgs.example.com`. Requests go to `<url>/xrpc/<method>`. */
   readonly url: string;
   /**
-   * The service's DID without a fragment, for example `did:web:cgs.example.com`. The SDK appends
-   * `#certified_group_service` itself: the token it asks the account's PDS for has that
-   * `did#service` reference as its `aud`, which is what an OAuth `rpc:` scope must name.
+   * The service's DID without a fragment. Default: `did:web:<hostname of url>`, the DID CGS uses
+   * unless its operator set a custom `SERVICE_DID`; a port in `url` is dropped, as CGS does. Pass
+   * it only for such a custom DID. The SDK appends `#certified_group_service` itself: the token
+   * it asks the account's PDS for has that `did#service` reference as its `aud`, which is what
+   * an OAuth `rpc:` scope must name.
    */
-  readonly did: DidString;
+  readonly did?: DidString | undefined;
   /** How requests to the service are authenticated. Default: `{ kind: "serviceAuth" }`. */
   readonly auth?: CgsAuth | undefined;
+}
+
+/** A {@link CgsConfig} as kept on {@link SDKContext.cgs}: `did` is always present. */
+export interface ResolvedCgsConfig extends Omit<CgsConfig, "did"> {
+  readonly did: DidString;
 }
 
 /**
@@ -128,7 +135,8 @@ export interface CreateSDKContextOptions {
    * `rpc:app.certified.group.repo.createRecord?aud=did:web:cgs.example.com%23certified_group_service`,
    * and the same for `putRecord`, `deleteRecord` and `uploadBlob`. Repeating `lxm` in one scope
    * (`rpc?lxm=...&lxm=...&aud=...`) is equivalent. CGS accepts the token with or without the
-   * fragment in `aud`. To write with an API key instead, see {@link CgsAuth} and
+   * fragment in `aud`. `cgs.did` defaults to `did:web:<hostname of cgs.url>`, so the scope names
+   * that host unless you set `cgs.did`. To write with an API key instead, see {@link CgsAuth} and
    * {@link ApiKeyContextOptions}.
    */
   cgs?: CgsConfig;
@@ -171,7 +179,7 @@ export interface ApiKeyContextOptions {
  * @throws {@link TypeError} If `client` is missing or has no `xrpc()` method, for example a raw
  * OAuth session or an `@atproto/api` agent, or if `didResolver` is given without a `resolve()`
  * method, for example the OAuth client itself instead of `oauthClient.identityResolver`, or if
- * `cgs` is given without an http(s) `url` and a DID in `did`, or with an API key that is malformed or
+ * `cgs` is given without an http(s) `url`, or with a `did` that is not a DID, or with an API key that is malformed or
  * used in a browser (`window` is defined), or if `client` is missing and `cgs.auth` is not an API key.
  *
  * @example
@@ -200,7 +208,6 @@ export interface ApiKeyContextOptions {
  * const context = createSDKContext({
  *   cgs: {
  *     url: "https://cgs.example.com",
- *     did: "did:web:cgs.example.com",
  *     // The `key` that `keys.create` returned, kept in the server's secrets.
  *     auth: { kind: "apiKey", key: process.env.CGS_API_KEY! },
  *   },
@@ -250,7 +257,7 @@ function assertClient(value: unknown): asserts value is Client {
 
 // A bad CGS URL or DID would only show up as a failed request after the first records were written,
 // so it is refused here.
-function checkedCgs(value: unknown): CgsConfig {
+function checkedCgs(value: unknown): ResolvedCgsConfig {
   const { url, did } = (typeof value === "object" && value !== null ? value : {}) as Record<
     string,
     unknown
@@ -268,15 +275,16 @@ function checkedCgs(value: unknown): CgsConfig {
       'createSDKContext: `cgs.url` must be a base URL without a query string, fragment or credentials, for example "https://cgs.example.com" or "https://example.com/cgs".',
     );
   }
-  if (typeof did !== "string" || !isDidString(did)) {
+  const serviceDid = did === undefined ? `did:web:${parsed.hostname}` : did;
+  if (typeof serviceDid !== "string" || !isDidString(serviceDid)) {
     throw new TypeError(
-      `createSDKContext: \`cgs.did\` must be the service's DID, for example "did:web:cgs.example.com", but received ${describeValue(did)}.`,
+      `createSDKContext: \`cgs.did\` must be the service's DID (leave it out to use did:web:<CGS host>), for example "did:web:cgs.example.com", but received ${describeValue(did)}.`,
     );
   }
   const auth =
     checkedAuth((value as { auth?: unknown }).auth) ??
     Object.freeze({ kind: "serviceAuth" as const });
-  return Object.freeze({ url: parsed.href.replace(/\/$/, ""), did, auth });
+  return Object.freeze({ url: parsed.href.replace(/\/$/, ""), did: serviceDid, auth });
 }
 
 // `cgsk_<ref>.<secret>`. A malformed key is refused here, before any request, and the message never
@@ -300,7 +308,7 @@ function checkedAuth(value: unknown): CgsAuth | undefined {
   // An API key is a long-lived secret, and a page that holds one hands it to every visitor.
   if (typeof window !== "undefined") {
     throw new TypeError(
-      "createSDKContext: an API key is a long-lived secret and must not be used in a browser, where anyone can read it. Use it only in server-side code. In the browser, sign in and pass `cgs: { url, did }` with a `client` instead.",
+      "createSDKContext: an API key is a long-lived secret and must not be used in a browser, where anyone can read it. Use it only in server-side code. In the browser, sign in and pass `cgs: { url }` with a `client` instead.",
     );
   }
   if (typeof key !== "string" || !API_KEY.test(key)) {

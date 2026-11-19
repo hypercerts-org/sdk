@@ -44,6 +44,21 @@ describe("createSDKContext", () => {
     expect(context.cgs?.url).toBe("https://example.test/cgs");
   });
 
+  it("defaults cgs.did to did:web:<hostname of cgs.url>, dropping a port", () => {
+    expect(createSDKContext({ client, cgs: { url: "https://cgs.example.test" } }).cgs?.did).toBe(
+      "did:web:cgs.example.test",
+    );
+    expect(createSDKContext({ client, cgs: { url: "http://localhost:3000/base/" } }).cgs?.did).toBe(
+      "did:web:localhost",
+    );
+  });
+
+  it("uses an explicit cgs.did over the default", () => {
+    const cgs = { url: "https://cgs.example.test", did: "did:web:custom.example" } as const;
+
+    expect(createSDKContext({ client, cgs }).cgs?.did).toBe("did:web:custom.example");
+  });
+
   it("has no cgs unless one is given", () => {
     expect(createSDKContext({ client }).cgs).toBeUndefined();
   });
@@ -52,7 +67,6 @@ describe("createSDKContext", () => {
     ["a URL that is not http(s)", { url: "ftp://cgs.test", did: "did:web:cgs.test" }, "cgs.url"],
     ["a URL that does not parse", { url: "cgs.test", did: "did:web:cgs.test" }, "cgs.url"],
     ["a handle as the DID", { url: "https://cgs.test", did: "cgs.test" }, "cgs.did"],
-    ["a missing DID", { url: "https://cgs.test" }, "cgs.did"],
     [
       "a DID with a service fragment",
       { url: "https://cgs.test", did: "did:web:cgs.test#certified_group_service" },

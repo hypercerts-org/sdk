@@ -12,7 +12,7 @@ import { createSDKContext } from "@hypercerts-org/sdk";
 
 export const context = createSDKContext({
   client: new Client(session),
-  cgs: { url: "https://cgs.example.com", did: "did:web:cgs.example.com" },
+  cgs: { url: "https://cgs.example.com" },
 });
 ```
 
@@ -25,7 +25,7 @@ rpc:app.certified.group.repo.deleteRecord?aud=did:web:cgs.example.com%23certifie
 rpc:app.certified.group.repo.uploadBlob?aud=did:web:cgs.example.com%23certified_group_service
 ```
 
-`cgs.did` stays the bare DID; the SDK appends the fragment. With a session, the SDK asks the account's PDS for a service-auth token before every CGS request, so a missing scope fails with a plain `Error` that names the scope.
+`cgs.did` is optional and defaults to `did:web:<CGS host>` (the host of `cgs.url`, no port). Pass it (bare DID; the SDK appends the fragment) only if the CGS operator set a custom `SERVICE_DID`; a `401` saying the audience does not match means it differs. With a session, the SDK asks the account's PDS for a service-auth token before every CGS request, so a missing scope fails with a plain `Error` that names the scope.
 
 ## With an API key (server only, no client)
 
@@ -35,7 +35,6 @@ A backend with no signed-in user uses a CGS API key. A group member mints it (`a
 const context = createSDKContext({
   cgs: {
     url: "https://cgs.example.com",
-    did: "did:web:cgs.example.com",
     auth: { kind: "apiKey", key: process.env.CGS_API_KEY! }, // "cgsk_<ref>.<secret>"
   },
 });

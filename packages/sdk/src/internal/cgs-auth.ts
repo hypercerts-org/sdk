@@ -2,7 +2,7 @@
 // `CgsRequestAuth` when it is built and never switches, so a key context never asks a PDS for a
 // token and a session context never sends a key.
 import { type Client, type DidString, l, type NsidString } from "@atproto/lex";
-import type { CgsConfig, SDKContext } from "../context.js";
+import type { ResolvedCgsConfig, SDKContext } from "../context.js";
 import { describeError } from "./describe.js";
 
 /**
@@ -47,7 +47,11 @@ export interface CgsRequestAuth {
  * A token from the signed-in account's own PDS (`getServiceAuth`, `aud` the service, `lxm` the
  * method), sent as `Authorization: Bearer`. Tokens are single-use, so one per request.
  */
-export function serviceAuth(client: Client, cgs: CgsConfig, operation: string): CgsRequestAuth {
+export function serviceAuth(
+  client: Client,
+  cgs: ResolvedCgsConfig,
+  operation: string,
+): CgsRequestAuth {
   return {
     async forRequest(lxm) {
       try {
@@ -64,7 +68,12 @@ export function serviceAuth(client: Client, cgs: CgsConfig, operation: string): 
         );
       }
     },
-    explainRefusal: () => undefined,
+    explainRefusal(operation, { status, cgsMessage }) {
+      if (status === 401 && /audience does not match/i.test(cgsMessage)) {
+        return `${operation}: the Certified Group Service did not accept the service-auth token (${cgsMessage}), so nothing was written. If this CGS uses a custom service DID, pass cgs.did.`;
+      }
+      return undefined;
+    },
   };
 }
 
@@ -107,7 +116,7 @@ export function apiKeyAuth(key: string): CgsRequestAuth {
  */
 export function cgsRequestAuth(
   context: SDKContext,
-  cgs: CgsConfig,
+  cgs: ResolvedCgsConfig,
   operation: string,
 ): CgsRequestAuth {
   if (cgs.auth?.kind === "apiKey") return apiKeyAuth(cgs.auth.key);

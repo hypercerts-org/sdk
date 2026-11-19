@@ -5,7 +5,7 @@ import {
   type RecordKeyString,
   type TypedBlobRef,
 } from "@atproto/lex";
-import type { CgsConfig, SDKContext } from "../context.js";
+import type { ResolvedCgsConfig, SDKContext } from "../context.js";
 import type { WriteOptions } from "../write-options.js";
 import { cgsTarget } from "./cgs-target.js";
 import { describeError, describeValue } from "./describe.js";
@@ -94,7 +94,7 @@ function assertRepoDid(operation: string, repo: unknown): asserts repo is DidStr
 // An API-key context writes only to a group, whatever else it holds: it never falls back to a PDS.
 function apiKeyTarget(
   context: SDKContext,
-  cgs: CgsConfig,
+  cgs: ResolvedCgsConfig,
   operation: string,
   repo: unknown,
 ): WriteTarget {

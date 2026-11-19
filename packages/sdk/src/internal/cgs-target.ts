@@ -24,7 +24,7 @@
 // - Reads (`readHead`, `recordExists`) go to the organization's own PDS, never through CGS.
 import { Client, type DidString, l } from "@atproto/lex";
 import type { BlobData } from "../blob/upload-blob.js";
-import type { CgsConfig, SDKContext } from "../context.js";
+import type { ResolvedCgsConfig, SDKContext } from "../context.js";
 import {
   PartialWriteError,
   RecordAlreadyExistsError,
@@ -161,7 +161,7 @@ interface Step {
  */
 export function cgsTarget(
   context: SDKContext,
-  cgs: CgsConfig,
+  cgs: ResolvedCgsConfig,
   repo: DidString,
   operation: string,
 ): WriteTarget {

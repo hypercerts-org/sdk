@@ -3,9 +3,9 @@ import { cidForLex } from "@atproto/lex-cbor";
 import type { AtprotoDid } from "@atproto-labs/did-resolver";
 import { vi } from "vitest";
 import {
-  type CgsConfig,
   createSDKContext,
   type DidDocumentResolver,
+  type ResolvedCgsConfig,
   type SDKContext,
 } from "../context.js";
 import { DID, json, type RecordedRequest } from "./fake-pds.js";
@@ -110,7 +110,7 @@ export function fakeCgs(options: FakeCgsOptions = {}) {
         }),
       ),
   });
-  const cgsConfig: CgsConfig = { url: CGS_URL, did: CGS_DID };
+  const cgsConfig: ResolvedCgsConfig = { url: CGS_URL, did: CGS_DID };
   const didResolver: DidDocumentResolver = {
     resolve: () =>
       Promise.resolve({
