@@ -64,7 +64,9 @@ export interface CgsConfig {
  *   that member's current role. Needs no client and no PDS round trip, but every write must pass
  *   `{ repo: groupDid }`: a key belongs to one group and the context has no own repository.
  *   Server-side only: a key is a long-lived secret, so store it like a password. The SDK never
- *   logs it and never puts it in an error; messages name only its `cgsk_<ref>` part.
+ *   logs it and never puts it in an error; messages name only its `cgsk_<ref>` part. The key is
+ *   not enumerable on the stored object, and `JSON.stringify` and `console.log` show it as
+ *   `cgsk_<ref>.***`, so a logged context does not leak it.
  */
 export type CgsAuth =
   | { readonly kind: "serviceAuth" }
@@ -200,7 +202,7 @@ export interface ApiKeyContextOptions {
  *     url: "https://cgs.example.com",
  *     did: "did:web:cgs.example.com",
  *     // The `key` that `keys.create` returned, kept in the server's secrets.
- *     auth: { kind: "apiKey", key: process.env.CGS_API_KEY },
+ *     auth: { kind: "apiKey", key: process.env.CGS_API_KEY! },
  *   },
  * });
  * await createRights(context, rights, { repo: groupDid }); // `rights`, `groupDid`: yours
@@ -271,12 +273,10 @@ function checkedCgs(value: unknown): CgsConfig {
       `createSDKContext: \`cgs.did\` must be the service's DID, for example "did:web:cgs.example.com", but received ${describeValue(did)}.`,
     );
   }
-  const auth = checkedAuth((value as { auth?: unknown }).auth);
-  return Object.freeze({
-    url: parsed.href.replace(/\/$/, ""),
-    did,
-    ...(auth === undefined ? {} : { auth }),
-  });
+  const auth =
+    checkedAuth((value as { auth?: unknown }).auth) ??
+    Object.freeze({ kind: "serviceAuth" as const });
+  return Object.freeze({ url: parsed.href.replace(/\/$/, ""), did, auth });
 }
 
 // `cgsk_<ref>.<secret>`. A malformed key is refused here, before any request, and the message never
@@ -308,7 +308,22 @@ function checkedAuth(value: unknown): CgsAuth | undefined {
       `createSDKContext: \`cgs.auth.key\` must be a Certified Group Service API key of the form "cgsk_<ref>.<secret>", but received ${describeValue(key)}${typeof key === "string" ? ` of ${key.length} characters that does not have that form` : ""}. Use the \`key\` that keys.create returned; it is shown only once.`,
     );
   }
-  return Object.freeze({ kind, key });
+  return redactedApiKeyAuth(key);
+}
+
+// The key stays readable as `auth.key` for the SDK, but it is not enumerable and the object
+// prints as `cgsk_<ref>.***` through `JSON.stringify` and Node's `util.inspect`, so logging a
+// context does not leak it. `Symbol.for` is how Node names its inspect hook; it needs no import.
+function redactedApiKeyAuth(key: string): CgsAuth {
+  const shown = { kind: "apiKey" as const, key: `${key.slice(0, key.indexOf("."))}.***` };
+  const auth = { kind: "apiKey" as const };
+  Object.defineProperty(auth, "key", { value: key, enumerable: false });
+  Object.defineProperty(auth, "toJSON", { value: () => shown, enumerable: false });
+  Object.defineProperty(auth, Symbol.for("nodejs.util.inspect.custom"), {
+    value: () => shown,
+    enumerable: false,
+  });
+  return Object.freeze(auth) as CgsAuth;
 }
 
 function tryParseUrl(value: string): URL | undefined {

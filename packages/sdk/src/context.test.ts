@@ -1,3 +1,6 @@
+// The SDK's own tsconfig has no Node types (`types: []`); only this test needs `util`.
+// @ts-expect-error TS2591: no @types/node in this package.
+import { inspect } from "node:util";
 import { Client } from "@atproto/lex";
 import { createDidResolver, type DidResolver, DidResolverCommon } from "@atproto-labs/did-resolver";
 import type { IdentityResolver } from "@atproto-labs/identity-resolver";
@@ -28,6 +31,7 @@ describe("createSDKContext", () => {
     expect(context.cgs).toEqual({
       url: "https://cgs.example.test",
       did: "did:web:cgs.example.test",
+      auth: { kind: "serviceAuth" },
     });
   });
 
@@ -145,12 +149,25 @@ describe("createSDKContext with a CGS API key", () => {
     const context = createSDKContext({ cgs: { ...cgs, auth: { kind: "apiKey", key } } });
 
     expect(context.client).toBeUndefined();
-    expect(context.cgs?.auth).toEqual({ kind: "apiKey", key });
+    expect(context.cgs?.auth).toMatchObject({ kind: "apiKey", key });
     expect(Object.isFrozen(context.cgs?.auth)).toBe(true);
   });
 
-  it("defaults to no auth entry, meaning service auth, and accepts it explicitly", () => {
-    expect(createSDKContext({ client, cgs }).cgs?.auth).toBeUndefined();
+  it("does not show the key through JSON.stringify or util.inspect", () => {
+    const context = createSDKContext({ cgs: { ...cgs, auth: { kind: "apiKey", key } } });
+
+    for (const text of [
+      JSON.stringify(context),
+      inspect(context, { depth: 10 }),
+      inspect(context.cgs?.auth),
+    ]) {
+      expect(text).not.toContain("s3cr3tValue");
+      expect(text).toContain("cgsk_ref123.***");
+    }
+  });
+
+  it("defaults to service auth and accepts it explicitly", () => {
+    expect(createSDKContext({ client, cgs }).cgs?.auth).toEqual({ kind: "serviceAuth" });
     expect(
       createSDKContext({ client, cgs: { ...cgs, auth: { kind: "serviceAuth" } } }).cgs?.auth,
     ).toEqual({ kind: "serviceAuth" });
