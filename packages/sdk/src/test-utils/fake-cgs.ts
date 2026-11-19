@@ -1,11 +1,4 @@
-import {
-  Client,
-  cidForRawBytes,
-  type DidString,
-  type LexMap,
-  lexParse,
-  lexStringify,
-} from "@atproto/lex";
+import { Client, cidForRawBytes, type LexMap, lexParse, lexStringify } from "@atproto/lex";
 import { cidForLex } from "@atproto/lex-cbor";
 import type { AtprotoDid } from "@atproto-labs/did-resolver";
 import { vi } from "vitest";
