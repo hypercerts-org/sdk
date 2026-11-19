@@ -118,6 +118,18 @@ const getServiceAuth = l.query(
   l.jsonPayload({ token: l.string() }),
 );
 
+/**
+ * Whether calling again after a failure cannot duplicate records. Only when every create has a
+ * fixed key: a create-only plan, or a plan the caller marked `retrySafe` without a
+ * `retrySafeReason`. A `retrySafeReason` means the plan is safe to repeat on the atomic PDS target
+ * only because the call reads before writing (`createOrganization` with new locations, whose keys
+ * are generated). Here the records are written one request at a time, so some may have landed
+ * before the failure and a repeat would create them again under new keys.
+ */
+function retrySafeOnCgs(plan: WritePlan): boolean {
+  return plan.createOnly || (plan.retrySafe === true && plan.retrySafeReason === undefined);
+}
+
 type CgsMethod = typeof createRecord | typeof putRecord | typeof deleteRecord | typeof uploadBlob;
 
 // The request options and answer of a CGS call, loosely typed: each method's own schema checks
@@ -146,6 +158,11 @@ interface Step {
  * - A create that ends without a usable answer (CGS answers a taken key with HTTP 502, the same as
  *   a server fault) is read back from the organization's PDS: the same CID means it was written, a
  *   different CID is RecordAlreadyExistsError, and no record is WriteOutcomeUnknownError.
+ * - A create-only plan (`plan.createOnly`) checks first, per create, that the key is free on the
+ *   organization's PDS, and throws RecordAlreadyExistsError if not: CGS has no `swapRecord: null`,
+ *   and without the check the read-back above could not tell a record that was already there from
+ *   one this call wrote. Two racing calls can still both pass it.
+ * - Advice to call again is given only when every create has a fixed key (see `retrySafeOnCgs`).
  * - `delete` sends `swapRecord` when `target.cid` is given. A member who deletes a record that is
  *   already gone gets HTTP 403 (CGS then checks admin rights), so on a 403 the record is read back
  *   and its absence counts as success.
@@ -253,6 +270,13 @@ export function cgsTarget(
           ? undefined
           : { uri: record.ref.uri, noun: step.noun ?? "record" },
     };
+    // A create-only plan skips the caller's check that its key is free (it relies on the PDS's
+    // `swapRecord: null`, which CGS cannot apply), so check here. Without it, a record that
+    // already exists identical to ours would be mistaken after an unknown outcome for our own write.
+    if (step.kind === "create" && plan.createOnly) {
+      const taken = await checkKeyFree(record);
+      if (taken !== undefined) return taken;
+    }
     // Outside the classified request: no token means nothing was sent for this step.
     const method = step.kind === "create" ? createRecord : putRecord;
     let token: string;
@@ -266,10 +290,8 @@ export function cgsTarget(
         operation,
         request,
         async () => [await send(token, method, step)],
-        // Create-only writes use a fixed key and createRecord never overwrites, so repeating is
-        // safe, the same as pdsTarget's create-only path.
-        plan.retrySafe ?? plan.createOnly,
-        plan.retrySafeReason,
+        retrySafeOnCgs(plan),
+        undefined,
       );
       return undefined;
     } catch (error) {
@@ -278,6 +300,29 @@ export function cgsTarget(
       }
       return error as Error;
     }
+  }
+
+  // Resolves to the error to report when the key is taken or cannot be checked, else undefined.
+  async function checkKeyFree({
+    collection,
+    rkey,
+    ref,
+  }: PreparedRecord): Promise<Error | undefined> {
+    let found: StrongRef | undefined;
+    try {
+      found = await target.recordExists(collection, rkey);
+    } catch (error) {
+      return new Error(
+        `${operation}: cannot check whether ${ref.uri} already exists (${describeError(error)}), so nothing was sent for it to ${CGS_SERVICE}.`,
+        { cause: error },
+      );
+    }
+    if (found === undefined) return undefined;
+    return toAlreadyExists(operation, ref.uri, {
+      attempted: [ref],
+      status: 400,
+      code: "RecordAlreadyExists",
+    });
   }
 
   function send(token: string, method: CgsMethod, { record, swapRecord }: Step) {
@@ -348,13 +393,13 @@ export function cgsTarget(
     const notAttempted = steps.slice(index + 1).map((step) => step.record.ref);
     // The failed step's own message advises for a single request ("nothing was written", "call
     // again"), which is wrong after a partial write, so only its reason is used.
-    const retry = plan.retrySafe ?? plan.createOnly;
+    const retry = retrySafeOnCgs(plan);
     return new PartialWriteError(
       `${operation}: ${landed.length} of ${steps.length} records were written to ${repo} before ${failed.uri} failed, and ${notAttempted.length} were not sent. ` +
         `Written: ${landed.map((ref) => ref.uri).join(", ")}. Cause: ${failureReason(failure)}. ` +
         "The written records are in the repository and stay there; the SDK does not roll back or retry. " +
         (retry
-          ? `Calling ${operation} again is safe: ${plan.retrySafeReason ?? "every record has a fixed key and is only created if absent, so the call creates what is missing or fails because a record exists"}. `
+          ? `Calling ${operation} again is safe: every record has a fixed key and is only created if absent, so the call creates what is missing or fails because a record exists. `
           : "Do not call again with the same input, which would create them a second time: keep them, or call again and pass the written records as { uri } where the input accepts existing records. ") +
         "`error.failure` has the full error.",
       { written: landed, failed, failure, notAttempted },

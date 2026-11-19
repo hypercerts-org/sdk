@@ -134,7 +134,7 @@ describe("cgsTarget.submit", () => {
     expect(cgs.requests).toHaveLength(2);
   });
 
-  it("says calling again is safe after a partial write of a retry-safe plan", async () => {
+  it("says calling again is safe after a partial write of a plan whose keys are all fixed", async () => {
     const cgs = fakeCgs({
       answer: (_request, index) =>
         index === 1 ? json(400, { error: "InvalidRequest", message: "bad record" }) : undefined,
@@ -146,14 +146,74 @@ describe("cgsTarget.submit", () => {
         updates: [],
         createOnly: false,
         retrySafe: true,
-        retrySafeReason: "the profile is reused",
       })
       .catch((e) => e);
 
     expect(error).toBeInstanceOf(PartialWriteError);
-    expect(error.message).toContain("again is safe: the profile is reused");
+    expect(error.message).toContain("again is safe: every record has a fixed key");
     expect(error.message).not.toContain("Do not call again");
     expect(error.message).not.toContain("nothing was written");
+  });
+
+  it("does not call a repeat safe when only a read-before-write makes it safe on the PDS", async () => {
+    const cgs = fakeCgs({
+      answer: (_request, index) =>
+        index === 1 ? json(400, { error: "InvalidRequest", message: "bad record" }) : undefined,
+    });
+
+    const error = await target(cgs)
+      .submit({
+        creates: [await rec("Location"), await rec("Org")],
+        updates: [],
+        createOnly: false,
+        retrySafe: true,
+        retrySafeReason: "the call reads the organization first",
+      })
+      .catch((e) => e);
+
+    expect(error).toBeInstanceOf(PartialWriteError);
+    expect(error.message).toContain("Do not call again");
+    expect(error.message).not.toContain("again is safe");
+  });
+
+  it("does not call a repeat safe when a service-auth failure follows a written record", async () => {
+    const cgs = fakeCgs({
+      refuseServiceAuth: (index) =>
+        index === 1 ? json(400, { error: "InvalidRequest", message: "no scope" }) : undefined,
+    });
+
+    const error = await target(cgs)
+      .submit({
+        creates: [await rec("Location"), await rec("Org")],
+        updates: [],
+        createOnly: false,
+        retrySafe: true,
+        retrySafeReason: "the call reads the organization first",
+      })
+      .catch((e) => e);
+
+    expect(error).toBeInstanceOf(PartialWriteError);
+    expect(error.message).toContain("Do not call again");
+  });
+
+  it("does not advise repeating an unknown outcome of a plan that is safe only on the PDS", async () => {
+    const cgs = fakeCgs({
+      answer: () => json(502, { error: "UpstreamFailure", message: "upstream request failed" }),
+    });
+
+    const error = await target(cgs)
+      .submit({
+        creates: [await rec("Location"), await rec("Org")],
+        updates: [],
+        createOnly: false,
+        retrySafe: true,
+        retrySafeReason: "the call reads the organization first",
+      })
+      .catch((e) => e);
+
+    expect(error).toBeInstanceOf(WriteOutcomeUnknownError);
+    expect(error.message).not.toContain("the call reads the organization first");
+    expect(error.message).not.toContain("is safe");
   });
 
   it("keeps 'already exists' in a partial write whose failed step hit a taken key", async () => {
@@ -305,6 +365,19 @@ describe("cgsTarget create read-back", () => {
     expect(error.attempted).toEqual([mine.ref]);
     // The existing record is untouched.
     expect(cgs.store.get(mine.ref.uri)?.cid).toBe(theirs.ref.cid);
+  });
+
+  it("refuses a create-only write whose key already holds an identical record, before sending", async () => {
+    const same = await rec("Same", "5555555555555");
+    const cgs = fakeCgs({ records: { [same.ref.uri]: same.value } });
+
+    const error = await target(cgs)
+      .submit({ creates: [same], updates: [], createOnly: true })
+      .catch((e) => e);
+
+    expect(error).toBeInstanceOf(RecordAlreadyExistsError);
+    expect(error.uri).toBe(same.ref.uri);
+    expect(cgs.requests).toHaveLength(0);
   });
 
   it("throws WriteOutcomeUnknownError when the record is absent", async () => {
