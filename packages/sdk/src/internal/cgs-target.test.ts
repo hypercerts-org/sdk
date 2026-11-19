@@ -168,6 +168,7 @@ describe("cgsTarget.submit", () => {
         createOnly: false,
         retrySafe: true,
         retrySafeReason: "the call reads the organization first",
+        retrySafeOnlyAtomically: true,
       })
       .catch((e) => e);
 
@@ -189,6 +190,7 @@ describe("cgsTarget.submit", () => {
         createOnly: false,
         retrySafe: true,
         retrySafeReason: "the call reads the organization first",
+        retrySafeOnlyAtomically: true,
       })
       .catch((e) => e);
 
@@ -208,6 +210,7 @@ describe("cgsTarget.submit", () => {
         createOnly: false,
         retrySafe: true,
         retrySafeReason: "the call reads the organization first",
+        retrySafeOnlyAtomically: true,
       })
       .catch((e) => e);
 

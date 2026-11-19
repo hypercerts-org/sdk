@@ -173,6 +173,53 @@ describe("writes with { repo: orgDid }", () => {
     expect(cgs.calls).toContain("org com.atproto.sync.getLatestCommit");
   });
 
+  it("createOrganization with only fixed keys says calling again is safe when the second write fails", async () => {
+    const cgs = fakeCgs({
+      answer: (_request, index) =>
+        index === 1 ? json(400, { error: "InvalidRequest", message: "bad record" }) : undefined,
+    });
+
+    const error = await createOrganization(
+      cgs.context,
+      { organization: { legalName: "Acme" }, profileIfMissing: { displayName: "Acme" } },
+      { repo },
+    ).catch((e) => e);
+
+    expect(error).toBeInstanceOf(PartialWriteError);
+    expect(error.message).toContain("again is safe: every record has a fixed key");
+    expect(error.message).not.toContain("Do not call again");
+  });
+
+  it("createOrganization with a new location says not to call again when a later write fails", async () => {
+    const cgs = fakeCgs({
+      answer: (request) =>
+        request.body?.collection === ORGANIZATION
+          ? json(400, { error: "InvalidRequest", message: "bad record" })
+          : undefined,
+    });
+
+    const error = await createOrganization(
+      cgs.context,
+      {
+        organization: {
+          location: {
+            lpVersion: "1.0",
+            srs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+            name: "HQ",
+            locationType: "coordinate-decimal",
+            location: { string: "27.47,90.17" },
+          },
+        },
+        profileIfMissing: { displayName: "Acme" },
+      },
+      { repo },
+    ).catch((e) => e);
+
+    expect(error).toBeInstanceOf(PartialWriteError);
+    expect(error.message).toContain("Do not call again");
+    expect(error.message).not.toContain("again is safe");
+  });
+
   it("createOrganization stops before writing when the org already has an organization", async () => {
     const cgs = fakeCgs({
       records: { [`at://${ORG}/${ORGANIZATION}/self`]: { $type: ORGANIZATION } },

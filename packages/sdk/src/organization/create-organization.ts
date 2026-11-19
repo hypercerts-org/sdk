@@ -171,11 +171,14 @@ const inputSchema = strictObject({
  * {@link OrganizationAlreadyExistsError} has the same `code` but is not retryable: rule out
  * `instanceof RecordAlreadyExistsError` first.
  * @throws {@link WriteOutcomeUnknownError} If there was no usable answer from the PDS. Calling again
- * is safe even though new locations get fresh record keys: the call reads the organization first,
- * so it either creates everything or throws {@link OrganizationAlreadyExistsError}, which then
- * means the first attempt succeeded and no second set of locations or profile is created. The new
- * records are the ones in `attempted` of the first error.
- * @throws {@link PartialWriteError} With `{ repo }` of an organization, if a write fails after at least one record of the call was written. Nothing is rolled back.
+ * is safe in your own repo even though new locations get fresh record keys: the write is one commit
+ * and the call reads the organization first, so it either creates everything or throws
+ * {@link OrganizationAlreadyExistsError}, which then means the first attempt succeeded and no second
+ * set of locations or profile is created. The new records are the ones in `attempted` of the first
+ * error. For organization writes through CGS the records are written one request at a time, so
+ * with new locations calling again can create a second set: check `attempted` first. With no new
+ * locations every key is fixed and calling again is safe.
+ * @throws {@link PartialWriteError} For organization writes through CGS, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *
@@ -290,11 +293,19 @@ export async function createOrganization(
 
   // The organization has a fixed key and was found absent above, so calling again after an unknown
   // outcome creates everything or finds the organization, and never makes a copy.
+  const records = [...created.values()];
+  // Only the profile and the organization have fixed keys; every other record is a new location.
+  const hasGeneratedKeys = records.some(
+    (record) =>
+      record.collection !== profile.main.$type && record.collection !== organization.main.$type,
+  );
   try {
-    await submitWrites(build, [...created.values()], {
+    await submitWrites(build, records, {
       swapCommit: start.head,
       retrySafe: true,
-      retrySafeReason: RETRY_SAFE_REASON,
+      ...(hasGeneratedKeys
+        ? { retrySafeReason: RETRY_SAFE_REASON, retrySafeOnlyAtomically: true }
+        : {}),
     });
   } catch (error) {
     throw await explainLostRace(build, error);

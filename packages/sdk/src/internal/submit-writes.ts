@@ -31,6 +31,11 @@ interface SubmitOptions {
    * without a final period. Absent: the message says every record has a fixed key.
    */
   readonly retrySafeReason?: string;
+  /**
+   * With `retrySafe`: the repeat is safe only because the write is one atomic commit (the plan has
+   * records with generated keys). A target that is not atomic then gives no safe-repeat advice.
+   */
+  readonly retrySafeOnlyAtomically?: boolean;
 }
 
 /**
@@ -76,6 +81,7 @@ export function submitWrites(
     swapCommit: options.swapCommit,
     retrySafe: options.retrySafe,
     retrySafeReason: options.retrySafeReason,
+    retrySafeOnlyAtomically: options.retrySafeOnlyAtomically,
   });
 }
 

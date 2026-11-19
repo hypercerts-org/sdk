@@ -78,7 +78,7 @@ export interface AddActivityToCollectionResult extends StrongRef {
  * items). Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write, including `"InvalidSwap"` (the
  * Collection, or for a new Activity the repository, changed since it was read). Nothing was changed.
- * @throws {@link PartialWriteError} With `{ repo }` of an organization, if a write fails after at least one record of the call was written. Nothing is rolled back.
+ * @throws {@link PartialWriteError} For organization writes through CGS, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
  * a retry can duplicate new records under new keys. For `activity: { uri }` only the Collection was written
  * (one `putRecord`): its stored CID is no proof either way. Compare it with the Collection entry of `attempted`:

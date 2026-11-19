@@ -120,14 +120,14 @@ const getServiceAuth = l.query(
 
 /**
  * Whether calling again after a failure cannot duplicate records. Only when every create has a
- * fixed key: a create-only plan, or a plan the caller marked `retrySafe` without a
- * `retrySafeReason`. A `retrySafeReason` means the plan is safe to repeat on the atomic PDS target
- * only because the call reads before writing (`createOrganization` with new locations, whose keys
- * are generated). Here the records are written one request at a time, so some may have landed
- * before the failure and a repeat would create them again under new keys.
+ * fixed key: a create-only plan, or a `retrySafe` plan not marked `retrySafeOnlyAtomically`. That
+ * mark means the plan is safe to repeat on the atomic PDS target only because the call reads before
+ * writing (`createOrganization` with new locations, whose keys are generated). Here the records are
+ * written one request at a time, so some may have landed before the failure and a repeat would
+ * create them again under new keys.
  */
 function retrySafeOnCgs(plan: WritePlan): boolean {
-  return plan.createOnly || (plan.retrySafe === true && plan.retrySafeReason === undefined);
+  return plan.createOnly || (plan.retrySafe === true && plan.retrySafeOnlyAtomically !== true);
 }
 
 type CgsMethod = typeof createRecord | typeof putRecord | typeof deleteRecord | typeof uploadBlob;

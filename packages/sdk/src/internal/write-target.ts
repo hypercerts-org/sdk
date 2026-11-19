@@ -60,6 +60,12 @@ export interface WritePlan {
    * in its outcome-unknown message, with `retrySafe`.
    */
   readonly retrySafeReason?: string | undefined;
+  /**
+   * With `retrySafe`: calling again is safe only because the plan is one atomic commit and the call
+   * reads before writing. A target that writes the records one request at a time must not call a
+   * repeat safe, because some records may have landed under generated keys.
+   */
+  readonly retrySafeOnlyAtomically?: boolean | undefined;
 }
 
 /** The record `WriteTarget.delete` removes, and the version it must still have, if known. */

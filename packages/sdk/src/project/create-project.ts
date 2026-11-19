@@ -33,7 +33,7 @@ const OPERATION = "createProject";
  * {@link CreateProjectResult}.
  * @throws {@link TypeError} If the input is not valid. Nothing was written.
  * @throws {@link WriteRejectedError} If the PDS rejected the write. Nothing was created.
- * @throws {@link PartialWriteError} With `{ repo }` of an organization, if a write fails after at least one record of the call was written. Nothing is rolled back.
+ * @throws {@link PartialWriteError} For organization writes through CGS, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteOutcomeUnknownError} If the PDS gave no usable answer. Not safe to call again:
  * a retry can duplicate records under new keys. `attempted` lists the new records, Project last.
  *

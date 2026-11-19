@@ -49,7 +49,7 @@ import {
  * {@link RecordAlreadyExistsError} from the retry only means one key is taken, and a retry that
  * races the first write can throw {@link WriteOutcomeUnknownError} again. Check each attempted URI
  * before treating the tags as created.
- * @throws {@link PartialWriteError} With `{ repo }` of an organization, if a write fails after at least one record of the call was written. Nothing is rolled back.
+ * @throws {@link PartialWriteError} For organization writes through CGS, if a write fails after at least one record of the call was written. Nothing is rolled back.
  * @throws {@link WriteResultMismatchError} If the PDS reported different URIs or CIDs than the SDK
  * computed.
  *

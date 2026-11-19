@@ -28,7 +28,7 @@ const definition = await createBadgeDefinition(context, {
 
 `awardBadge(context, { definition, subject, note?, url?, validFrom?, validUntil?, createdAt? })` creates an award in your repo and returns `{ uri, cid, definition }`: `uri` and `cid` are the award's, `definition` is the definition record with `created`.
 
-`definition` is either the fields of a **new** definition (created in the same commit) or `{ uri }` of an **existing** one (read, never rewritten):
+`definition` is either the fields of a **new** definition (created in the same commit in your own repo; for organization writes through CGS it is a separate request first) or `{ uri }` of an **existing** one (read, never rewritten):
 
 ```ts
 import { awardBadge } from "@hypercerts-org/sdk/badge";
@@ -53,7 +53,7 @@ await awardBadge(context, {
 - The award pins the definition by the CID it read. The repo written to (the signed-in account, or `{ repo }`, see [org-writes.md](org-writes.md)) must be in **that version's** `allowedIssuers` (omitted: anyone, `[]`: no one), otherwise `Error` and nothing is written or uploaded.
 - `validFrom` defaults to `createdAt` (which defaults to the time of the call). A `validUntil` earlier than `validFrom`, or than `createdAt` when `validFrom` is omitted, throws `TypeError`. Timestamps are stored as given. `validUntil` marks the award expired; it is not revocation.
 - Awarding does not accept the badge for the recipient; they use `respondToBadgeAward`.
-- In your own repo the new definition and the award are one `applyWrites` commit: both exist, or neither does. With `{ repo }` they are two requests, the definition first: if the award fails, the new definition stays in the organization's repo and the call throws `PartialWriteError` (see [org-writes.md](org-writes.md)).
+- In your own repo the new definition and the award are one `applyWrites` commit: both exist, or neither does. For organization writes through CGS they are two requests, the definition first: if the award fails, the new definition stays in the organization's repo and the call throws `PartialWriteError` (see [org-writes.md](org-writes.md)).
 - After `WriteOutcomeUnknownError`, `attempted` lists the new definition (if any) first, then the award. Calling again is not safe: it would create a second award.
 - Nothing is deduplicated: awarding the same badge to the same subject twice creates two awards.
 
