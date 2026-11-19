@@ -29,7 +29,7 @@ flowchart LR
   U --> W
   D --> W
   W --> T
-  T -->|"no { repo }, or your own DID"| P
+  T -->|"session, no { repo } or your own DID"| P
   T -->|"{ repo: org } + session"| SA
   SA -->|"Bearer token"| C
   T -->|"{ repo: org } + API key<br/>X-API-Key"| C
@@ -39,7 +39,7 @@ flowchart LR
 
 ## Which target
 
-The SDK picks the target before it validates the input, so a missing `{ repo }` or `cgs` fails first:
+The SDK picks the target before it validates the input, so a missing `{ repo }` or `cgs` fails first. Not shown: a client with no session throws `Error`, and a `repo` that is not a DID throws `TypeError`.
 
 ```mermaid
 flowchart TB
@@ -76,7 +76,7 @@ flowchart TB
 
 ## When a CGS write fails
 
-What the caller sees depends on the answer and on whether earlier records already landed:
+What the caller sees depends on the answer and on whether earlier records already landed. A failed service-auth token request also counts as a failed step:
 
 ```mermaid
 flowchart TB
@@ -86,6 +86,7 @@ flowchart TB
   K -->|"400 InvalidSwap<br/>on a checked update"| E1["WriteRejectedError<br/>(the record changed since it was read)"]
   K -->|"401 / 403"| E2["WriteRejectedError<br/>(API key: names it as cgsk_ref, never the secret)"]
   E1 & E2 --> Q{"did any earlier<br/>record already land?"}
+  RB -->|"error"| Q
   Q -->|no| T1["throw that error"]
   Q -->|yes| T2["PartialWriteError<br/>written · failed · notAttempted"]
 ```
