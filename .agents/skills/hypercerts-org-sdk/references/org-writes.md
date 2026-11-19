@@ -48,7 +48,7 @@ Records get URIs in the organization's repo. A `{ uri }` you reference can be an
 
 - **Not atomic.** One request per record, creates first (supporting records before the records that point at them), updates last. If a write fails after at least one record landed, the call throws `PartialWriteError`; if none landed it throws that write's own error (`WriteRejectedError`, `WriteOutcomeUnknownError`, ...).
 - **`swapCommit` is never sent.** `createOrganization` and a new Activity in `addActivityToCollection` / `addActivityToProject` lose that repository-wide guard. The Collection or Project update is still guarded by its own version (`swapRecord`), and `createOrganization` still reports a concurrent creation, because its keys are fixed.
-- **Taken keys** (a chosen key such as a vocabulary tag's) are detected by reading the record back from the organization's PDS, so they still throw `RecordAlreadyExistsError`.
+- **Taken keys** (a chosen key such as a vocabulary tag's) are detected by reading the organization's PDS before the write (and again after an unknown outcome), so they still throw `RecordAlreadyExistsError`. Two calls racing for the same key can both pass the check.
 - **Undo functions** (`unlike`, ...) take the organization's own record and are safe to repeat: a second delete that CGS refuses to a non-admin counts as done when the record is gone.
 - Blobs go to the organization's repo, so its records never point at blobs the repo does not have.
 - No API keys (`cgsk_...`): the SDK always acts as the signed-in account.
@@ -75,6 +75,6 @@ If `failure` is a `WriteOutcomeUnknownError` or `WriteResultMismatchError`, `fai
 
 ## Pitfalls
 
-- `{ repo }` with an org DID and no `cgs` on the context throws a `TypeError` before any request.
+- `{ repo }` with a DID other than the signed-in account's and no `cgs` on the context throws a `TypeError` before any request. (`{ repo }` with the account's own DID writes to its own repo and needs no `cgs`.)
 - Passing the org as the second argument (`createProject(context, { repo })`) is treated as input and throws a `TypeError`; `{ repo }` is always last.
 - A 20-record call is about 40 requests (a token and a write each), plus blobs. Expect it to be slower than your own repo.

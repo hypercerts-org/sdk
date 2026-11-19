@@ -53,7 +53,7 @@ await awardBadge(context, {
 - The award pins the definition by the CID it read. The repo written to (the signed-in account, or `{ repo }`, see [org-writes.md](org-writes.md)) must be in **that version's** `allowedIssuers` (omitted: anyone, `[]`: no one), otherwise `Error` and nothing is written or uploaded.
 - `validFrom` defaults to `createdAt` (which defaults to the time of the call). A `validUntil` earlier than `validFrom`, or than `createdAt` when `validFrom` is omitted, throws `TypeError`. Timestamps are stored as given. `validUntil` marks the award expired; it is not revocation.
 - Awarding does not accept the badge for the recipient; they use `respondToBadgeAward`.
-- The new definition and the award are one `applyWrites` commit: both exist afterwards, or neither does (with `{ repo }`, one request each, the definition first).
+- In your own repo the new definition and the award are one `applyWrites` commit: both exist, or neither does. With `{ repo }` they are two requests, the definition first: if the award fails, the new definition stays in the organization's repo and the call throws `PartialWriteError` (see [org-writes.md](org-writes.md)).
 - After `WriteOutcomeUnknownError`, `attempted` lists the new definition (if any) first, then the award. Calling again is not safe: it would create a second award.
 - Nothing is deduplicated: awarding the same badge to the same subject twice creates two awards.
 

@@ -2,7 +2,7 @@
 
 Read [../SKILL.md](../SKILL.md) first for setup, blob uploads and error handling. Every example assumes `context` from `createSDKContext`.
 
-`createOrganization(context, { organization, profileIfMissing? })` creates the signed-in account's organization record (`app.certified.actor.organization`, key `self`) and, if the account has no profile yet, its profile (`app.certified.actor.profile`, see [profile.md](profile.md)), together with any new locations (see [location.md](location.md)), in one `applyWrites` commit (with `{ repo }`, see [org-writes.md](org-writes.md): one request per record instead). It creates records in the account you are signed in as, or `{ repo }`; it does not create accounts or register groups.
+`createOrganization(context, { organization, profileIfMissing? })` creates the signed-in account's organization record (`app.certified.actor.organization`, key `self`) and, if the account has no profile yet, its profile (`app.certified.actor.profile`, see [profile.md](profile.md)), together with any new locations (see [location.md](location.md)), in one `applyWrites` commit (with `{ repo }`, see [org-writes.md](org-writes.md): one request per record instead, not atomic). It creates records in the account you are signed in as, or `{ repo }`; it does not create accounts or register groups.
 
 ```ts
 import { createOrganization } from "@hypercerts-org/sdk/organization";
@@ -75,7 +75,9 @@ The write is conditional on the account not having changed since the profile and
 
 ## After `WriteOutcomeUnknownError`
 
-`attempted` lists the profile (if it would be created), the new locations and, last, the organization. Calling `createOrganization` again is safe even though new locations get fresh record keys: it reads the organization first, so it either creates everything or throws `OrganizationAlreadyExistsError`, which means the first attempt succeeded (no second set of locations or profile). The new records are those of the first error's `attempted`.
+`attempted` lists the profile (if it would be created), the new locations and, last, the organization. In your own repo, calling `createOrganization` again is safe even though new locations get fresh record keys: the write is one commit and the call reads the organization first, so it either creates everything or throws `OrganizationAlreadyExistsError`, which means the first attempt succeeded (no second set of locations or profile). The new records are those of the first error's `attempted`.
+
+With `{ repo }` this does not hold: the records are written one request at a time, so a new location may exist while the organization does not, and calling again with inline locations creates another one. Check `attempted` with `com.atproto.repo.getRecord` first and pass the locations that exist as `{ uri }`. A `PartialWriteError` says the same.
 
 ## Uploads are outside the commit
 

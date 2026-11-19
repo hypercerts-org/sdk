@@ -145,7 +145,7 @@ Every `WriteError` has `attempted`: the URI and CID of every record in the reque
 | `RecordAlreadyExistsError` | A key you chose is taken (a `WriteRejectedError`). `uri` names the record. Nothing written.    | Use it as `{ uri }`, or choose another key.   |
 | `WriteOutcomeUnknownError` | Network error, timeout or 5xx. The records may exist. `attempted` lists every URI (empty for an undo without `cid`; the message names the URI). | Check `attempted` before retrying. Which operations are safe to repeat: see [Pitfalls](#pitfalls). |
 | `WriteResultMismatchError` | Created, but the PDS reported other URIs/CIDs (`reported` vs `attempted`).                     | Do not retry. Log it and inspect the records. |
-| `PartialWriteError`        | Only with `{ repo: orgDid }`: a write failed after at least one record landed. `written`, `failed`, `failure`, `notAttempted`. | Keep what landed, or call again passing `written` as `{ uri }`. See [references/org-writes.md](references/org-writes.md). |
+| `PartialWriteError`        | Only with `{ repo: orgDid }`: a write failed after at least one record landed. `written`, `failed`, `failure`, `notAttempted`. | Keep what landed, or call again passing `written` as `{ uri }` (check `failure.attempted` first if `failure` is a `WriteOutcomeUnknownError`: that record may exist too). See [references/org-writes.md](references/org-writes.md). |
 
 ```ts
 import { Client } from "@atproto/lex";
@@ -217,7 +217,7 @@ try {
 - A work-scope tag URI is not a vocabulary tag URI: each field accepts one collection, and a `{ uri }` of another throws a `TypeError`.
 - One write holds at most 200 records on the reference PDS. A larger call throws a `TypeError` before anything is written; the SDK does not split it. Create some records first and pass their URIs.
 - The SDK reads a record you reference only to pin its CID in a strong reference (`{ uri }` inputs, the `subject` of `like` and `repost`, `via`); a record it cannot read stops the call. A plain DID or URI (`followAccount`'s `subject.did`, `followEntity`'s `subject.uri`) is stored as given and never looked up, so a mistyped one is stored too. Check it yourself if that matters.
-- `{ repo }` goes in the **last** argument of every write function (`createProject(context, input, { repo: orgDid })`; for `uploadBlob` it is inside the options). A DID only, never a handle. Without `cgs` on the context it throws a `TypeError` before any request. Details and what is lost on an organization: [references/org-writes.md](references/org-writes.md).
+- `{ repo }` goes in the **last** argument of every write function (`createProject(context, input, { repo: orgDid })`; for `uploadBlob` it is inside the options). A DID only, never a handle. A DID other than the signed-in account's, without `cgs` on the context, throws a `TypeError` before any request. Details and what is lost on an organization: [references/org-writes.md](references/org-writes.md).
 - Do not call operations a subpath does not export, even if a TSDoc example mentions them.
 
 ## Verify

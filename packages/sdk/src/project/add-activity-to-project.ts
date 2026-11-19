@@ -42,7 +42,10 @@ export type AddActivityToProjectResult = AddActivityToCollectionResult;
  * `swapCommit` that guards the account's own repository when a new Activity is created is not
  * available through the Certified Group Service and is not sent: another write to the organization
  * that does not touch the Project is not detected. If the update fails after the Activity was created,
- * {@link PartialWriteError} says so; pass the new Activity as `{ uri }` to try again. Replacing a
+ * {@link PartialWriteError} says so; pass the new Activity as `{ uri }` to try again, but only when
+ * the Project update was rejected. When its `failure` is a {@link WriteOutcomeUnknownError}, the
+ * update may have landed: read the Project first, because adding the Activity again appends a
+ * second item (items are not deduplicated). Replacing a
  * Project that another member created needs the admin role.
  *
  * @param context - The shared context from {@link createSDKContext}, with an authenticated client.
