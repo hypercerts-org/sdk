@@ -53,7 +53,7 @@ pnpm test:e2e
 
 ### Without the relay (rootless Docker, no root)
 
-If you cannot bind port 443 or edit `/etc/hosts`, run the tests inside a container on the sandbox's own Docker network instead. [`scripts/e2e-docker.sh`](../scripts/e2e-docker.sh) does that, with your Node and this repository mounted, and passes the same variables (the passwords by name, not on the command line). Pass Vitest arguments after the checkout to select files:
+If you cannot bind port 443 or edit `/etc/hosts`, run the tests inside a container (Linux hosts only: the script mounts your own Node binary into a Linux container, so it does not work with Docker Desktop on macOS or Windows) on the sandbox's own Docker network instead. [`scripts/e2e-docker.sh`](../scripts/e2e-docker.sh) does that, with your Node and this repository mounted, and passes the same variables (the passwords by name, not on the command line). Pass Vitest arguments after the checkout to select files:
 
 ```sh
 scripts/e2e-docker.sh ../atmosphereinabox            # everything
