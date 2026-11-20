@@ -44,6 +44,7 @@ await createProject(context, input, { repo: groupDid });
 
 Scopes the key needs: `repo:<collection>?action=create|update|delete` per record type the call writes (`repo:org.hypercerts.claim.activity?action=create`, several actions with `&action=`), and `blob:<mime>` for uploads (`blob:image/*`). Group admin and key creation are not available to a key.
 
+- `cgs.url` must be `https:` with a key (`TypeError` otherwise); plain `http:` works only for `localhost`, `127.0.0.1` and `[::1]`, for local development.
 - The key is a secret: never in a browser (`createSDKContext` throws a `TypeError`), never logged. Errors name only `cgsk_<ref>`.
 - Without `{ repo }` the call throws a `TypeError` before any request, even if you also passed a `client`: a key context never writes to a PDS.
 - No token is asked for from a PDS, so one request per CGS call.

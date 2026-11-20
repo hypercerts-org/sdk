@@ -196,13 +196,17 @@ describe("a CGS refusal of an API key", () => {
   });
 
   it("never puts the secret in a message or a cause, whatever CGS answers", async () => {
-    for (const cgs of [
-      refuse(401, "AuthenticationRequired", "Invalid API key"),
-      refuse(403, "Forbidden", "API key scopes do not permit 'createRecord'"),
-      refuse(500, "InternalServerError", "boom"),
-    ]) {
+    for (const [status, name, message] of [
+      [401, "AuthenticationRequired", "Invalid API key"],
+      [403, "Forbidden", "API key scopes do not permit 'createRecord'"],
+      [500, "InternalServerError", "boom"],
+    ] as const) {
+      // `refuse` installs the global fetch stub, so each iteration needs its own.
+      const cgs = refuse(status, name, message);
       const error = await createRights(cgs.context, rights, { repo }).catch((e) => e);
+      if (status !== 500) expect(error.status).toBe(status);
       const upload = await uploadBlob(cgs.context, png(), { repo }).catch((e) => e);
+      if (status !== 500) expect(upload.status).toBe(status);
       for (const caught of [error, upload]) {
         expect(caught).toBeInstanceOf(Error);
         for (const message of allMessages(caught)) expect(message).not.toContain(SECRET);

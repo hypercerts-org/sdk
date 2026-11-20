@@ -211,6 +211,43 @@ describe("createSDKContext with a CGS API key", () => {
     expect(attempt).not.toThrow(new RegExp(bad.replace(".", "\\.")));
   });
 
+  it("refuses a key for a plain-http URL before any request, without repeating the key", () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const attempt = () =>
+      createSDKContext({
+        cgs: { url: "http://cgs.example.com", auth: { kind: "apiKey", key } },
+      });
+
+    expect(attempt).toThrow(TypeError);
+    expect(attempt).toThrow(/must use https/);
+    expect(attempt).not.toThrow(/s3cr3tValue/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each(["http://localhost:8080", "http://127.0.0.1:8080", "http://[::1]:8080"])(
+    "accepts a key for the loopback URL %s",
+    (url) => {
+      expect(
+        createSDKContext({ cgs: { url, did: cgs.did, auth: { kind: "apiKey", key } } }).cgs?.url,
+      ).toBe(url);
+    },
+  );
+
+  it("does not accept a lookalike of a loopback host", () => {
+    expect(() =>
+      createSDKContext({
+        cgs: { url: "http://localhost.evil.example", auth: { kind: "apiKey", key } },
+      }),
+    ).toThrow(/must use https/);
+  });
+
+  it("still accepts plain http for service auth, which sends no long-lived secret", () => {
+    expect(createSDKContext({ client, cgs: { url: "http://cgs.test" } }).cgs?.url).toBe(
+      "http://cgs.test",
+    );
+  });
+
   it("refuses a key in a browser", () => {
     vi.stubGlobal("window", {});
 

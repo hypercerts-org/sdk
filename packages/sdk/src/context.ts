@@ -148,8 +148,9 @@ export interface CreateSDKContextOptions {
  *
  * @remarks
  * `client` is optional: reads of the group's records go to its own PDS without authentication.
- * If you pass one anyway, writes to the group still use the key, and writes without `{ repo }`
- * still go to the client's own repository.
+ * If you pass one anyway, writes to the group still use the key, and every write still needs
+ * `{ repo: groupDid }`: a context with a key never writes to the client's own repository. For
+ * personal writes, use a separate context without `cgs.auth` (or with `serviceAuth`).
  */
 export interface ApiKeyContextOptions {
   client?: Client;
@@ -179,8 +180,9 @@ export interface ApiKeyContextOptions {
  * @throws {@link TypeError} If `client` is missing or has no `xrpc()` method, for example a raw
  * OAuth session or an `@atproto/api` agent, or if `didResolver` is given without a `resolve()`
  * method, for example the OAuth client itself instead of `oauthClient.identityResolver`, or if
- * `cgs` is given without an http(s) `url`, or with a `did` that is not a DID, or with an API key that is malformed or
- * used in a browser (`window` is defined), or if `client` is missing and `cgs.auth` is not an API key.
+ * `cgs` is given without an http(s) `url`, or with a `did` that is not a DID, or with an API key
+ * that is malformed, used in a browser (`window` is defined), or sent to a `cgs.url` that is not
+ * `https:` (plain `http:` is accepted only for `localhost`, `127.0.0.1` and `[::1]`), or if `client` is missing and `cgs.auth` is not an API key.
  *
  * @example
  * ```ts
@@ -284,8 +286,21 @@ function checkedCgs(value: unknown): ResolvedCgsConfig {
   const auth =
     checkedAuth((value as { auth?: unknown }).auth) ??
     Object.freeze({ kind: "serviceAuth" as const });
+  // The key travels in the `x-api-key` header of every request; over plain HTTP anyone on the
+  // path could read it. Loopback is the one dev exception: that traffic never leaves the machine.
+  if (
+    auth.kind === "apiKey" &&
+    parsed.protocol !== "https:" &&
+    !LOOPBACK_HOSTS.has(parsed.hostname)
+  ) {
+    throw new TypeError(
+      `createSDKContext: \`cgs.url\` must use https when \`cgs.auth\` is an API key, because the key is sent in a header of every request, but its scheme is ${parsed.protocol.slice(0, -1)}. Use an https URL. Plain http is accepted only for localhost, 127.0.0.1 and [::1].`,
+    );
+  }
   return Object.freeze({ url: parsed.href.replace(/\/$/, ""), did: serviceDid, auth });
 }
+
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 // `cgsk_<ref>.<secret>`. A malformed key is refused here, before any request, and the message never
 // repeats what was given: it may be a real secret with a typo. Keys are base64url, so anything
