@@ -60,7 +60,7 @@ scripts/e2e-docker.sh ../atmosphereinabox            # everything
 scripts/e2e-docker.sh ../atmosphereinabox org-writes # one file
 ```
 
-With rootless Docker, AiaB's `seed` step also fails to read its private state (`EACCES` on `/state/manifest.json`), because the runner service is generated with your UID, which rootless Docker maps to another host UID. Change that one `user: 1000:1000` line of the generated `compose.yaml` in your own copy of the AiaB checkout to `user: 0:0` (container root is your user there) before `deno task sandbox seed`. Do not loosen the permissions of `state/`. This is not needed on the CI runner or with rootful Docker.
+With rootless Docker, AiaB's `seed` step also fails to read its private state (`EACCES` on `/state/manifest.json`), because the runner service is generated with your UID, which rootless Docker maps to another host UID. Change the runner's `user: <your UID>:<your GID>` line (for example `user: 1000:1000`) of the generated `compose.yaml` in your own copy of the AiaB checkout to `user: 0:0` (container root is your user there) before `deno task sandbox seed`. Do not loosen the permissions of `state/`. This is not needed on the CI runner or with rootful Docker.
 
 ## Things to know
 
