@@ -39,7 +39,7 @@ flowchart LR
 
 ## Which target
 
-The SDK picks the target before it validates the input, so a missing `{ repo }` or `cgs` fails first. Not shown: a client with no session throws `Error`, and a `repo` that is not a DID throws `TypeError`.
+The SDK picks the target before it validates the input, so a setup error fails first: an API-key context without `{ repo }`, or an organization `repo` without `cgs`. With a signed-in session, no `{ repo }` simply writes to your own PDS. Not shown: a client with no session throws `Error`, and a `repo` that is not a DID throws `TypeError`.
 
 ```mermaid
 flowchart TB
