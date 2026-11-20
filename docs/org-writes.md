@@ -65,7 +65,7 @@ flowchart TB
   PS -->|create-only| P1["putRecord, only if absent"]
   PS -->|one checked update| P2["putRecord + swapRecord"]
   PS -->|anything else| P3["applyWrites - all or nothing"]
-  T -->|cgsTarget| L["for each record, in order<br/>creates, then updates"]
+  T -->|cgsTarget| L["for each record, in order<br/>creates, then updates<br/>(create-only: first check the key is free)"]
   L --> SIGN{"how to sign?"}
   SIGN -->|service auth| S1["ask own PDS for a one-call token"]
   SIGN -->|API key| S2["X-API-Key header"]
