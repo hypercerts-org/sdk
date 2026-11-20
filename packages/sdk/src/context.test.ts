@@ -1,7 +1,10 @@
+// The SDK's own tsconfig has no Node types (`types: []`); only this test needs `util`.
+// @ts-expect-error TS2591: no @types/node in this package.
+import { inspect } from "node:util";
 import { Client } from "@atproto/lex";
 import { createDidResolver, type DidResolver, DidResolverCommon } from "@atproto-labs/did-resolver";
 import type { IdentityResolver } from "@atproto-labs/identity-resolver";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSDKContext } from "./context.js";
 
 const client = new Client({ service: "https://pds.example.test" });
@@ -28,6 +31,7 @@ describe("createSDKContext", () => {
     expect(context.cgs).toEqual({
       url: "https://cgs.example.test",
       did: "did:web:cgs.example.test",
+      auth: { kind: "serviceAuth" },
     });
   });
 
@@ -40,6 +44,21 @@ describe("createSDKContext", () => {
     expect(context.cgs?.url).toBe("https://example.test/cgs");
   });
 
+  it("defaults cgs.did to did:web:<hostname of cgs.url>, dropping a port", () => {
+    expect(createSDKContext({ client, cgs: { url: "https://cgs.example.test" } }).cgs?.did).toBe(
+      "did:web:cgs.example.test",
+    );
+    expect(createSDKContext({ client, cgs: { url: "http://localhost:3000/base/" } }).cgs?.did).toBe(
+      "did:web:localhost",
+    );
+  });
+
+  it("uses an explicit cgs.did over the default", () => {
+    const cgs = { url: "https://cgs.example.test", did: "did:web:custom.example" } as const;
+
+    expect(createSDKContext({ client, cgs }).cgs?.did).toBe("did:web:custom.example");
+  });
+
   it("has no cgs unless one is given", () => {
     expect(createSDKContext({ client }).cgs).toBeUndefined();
   });
@@ -48,7 +67,6 @@ describe("createSDKContext", () => {
     ["a URL that is not http(s)", { url: "ftp://cgs.test", did: "did:web:cgs.test" }, "cgs.url"],
     ["a URL that does not parse", { url: "cgs.test", did: "did:web:cgs.test" }, "cgs.url"],
     ["a handle as the DID", { url: "https://cgs.test", did: "cgs.test" }, "cgs.did"],
-    ["a missing DID", { url: "https://cgs.test" }, "cgs.did"],
     [
       "a DID with a service fragment",
       { url: "https://cgs.test", did: "did:web:cgs.test#certified_group_service" },
@@ -132,4 +150,109 @@ describe("createSDKContext", () => {
       expect(create).toThrow(/oauthClient\.identityResolver/);
     },
   );
+});
+
+describe("createSDKContext with a CGS API key", () => {
+  const cgs = { url: "https://cgs.test", did: "did:web:cgs.test" } as const;
+  const key = "cgsk_ref123.s3cr3tValue";
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("needs no client and keeps the key frozen on cgs.auth", () => {
+    const context = createSDKContext({ cgs: { ...cgs, auth: { kind: "apiKey", key } } });
+
+    expect(context.client).toBeUndefined();
+    expect(context.cgs?.auth).toMatchObject({ kind: "apiKey", key });
+    expect(Object.isFrozen(context.cgs?.auth)).toBe(true);
+  });
+
+  it("does not show the key through JSON.stringify or util.inspect", () => {
+    const context = createSDKContext({ cgs: { ...cgs, auth: { kind: "apiKey", key } } });
+
+    for (const text of [
+      JSON.stringify(context),
+      inspect(context, { depth: 10 }),
+      inspect(context.cgs?.auth),
+    ]) {
+      expect(text).not.toContain("s3cr3tValue");
+      expect(text).toContain("cgsk_ref123.***");
+    }
+  });
+
+  it("defaults to service auth and accepts it explicitly", () => {
+    expect(createSDKContext({ client, cgs }).cgs?.auth).toEqual({ kind: "serviceAuth" });
+    expect(
+      createSDKContext({ client, cgs: { ...cgs, auth: { kind: "serviceAuth" } } }).cgs?.auth,
+    ).toEqual({ kind: "serviceAuth" });
+  });
+
+  it("still needs a client when the auth is not a key", () => {
+    // @ts-expect-error `client` is optional only with an API key.
+    expect(() => createSDKContext({ cgs })).toThrow(/client/);
+    // @ts-expect-error Same with explicit service auth.
+    expect(() => createSDKContext({ cgs: { ...cgs, auth: { kind: "serviceAuth" } } })).toThrow(
+      /client/,
+    );
+  });
+
+  it.each([
+    ["no prefix", "ref123.secret"],
+    ["no dot", "cgsk_ref123secret"],
+    ["no secret", "cgsk_ref123."],
+    ["no ref", "cgsk_.secret"],
+    ["whitespace", "cgsk_ref123.sec ret"],
+    ["a non-ASCII character", "cgsk_ref123.s3cr€tValue"],
+  ])("rejects a key with %s without repeating it", (_name, bad) => {
+    const attempt = () => createSDKContext({ cgs: { ...cgs, auth: { kind: "apiKey", key: bad } } });
+
+    expect(attempt).toThrow(TypeError);
+    expect(attempt).toThrow(/cgsk_<ref>\.<secret>/);
+    expect(attempt).not.toThrow(new RegExp(bad.replace(".", "\\.")));
+  });
+
+  it("refuses a key for a plain-http URL before any request, without repeating the key", () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const attempt = () =>
+      createSDKContext({
+        cgs: { url: "http://cgs.example.com", auth: { kind: "apiKey", key } },
+      });
+
+    expect(attempt).toThrow(TypeError);
+    expect(attempt).toThrow(/must use https/);
+    expect(attempt).not.toThrow(/s3cr3tValue/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each(["http://localhost:8080", "http://127.0.0.1:8080", "http://[::1]:8080"])(
+    "accepts a key for the loopback URL %s",
+    (url) => {
+      expect(
+        createSDKContext({ cgs: { url, did: cgs.did, auth: { kind: "apiKey", key } } }).cgs?.url,
+      ).toBe(url);
+    },
+  );
+
+  it("does not accept a lookalike of a loopback host", () => {
+    expect(() =>
+      createSDKContext({
+        cgs: { url: "http://localhost.evil.example", auth: { kind: "apiKey", key } },
+      }),
+    ).toThrow(/must use https/);
+  });
+
+  it("still accepts plain http for service auth, which sends no long-lived secret", () => {
+    expect(createSDKContext({ client, cgs: { url: "http://cgs.test" } }).cgs?.url).toBe(
+      "http://cgs.test",
+    );
+  });
+
+  it("refuses a key in a browser", () => {
+    vi.stubGlobal("window", {});
+
+    expect(() => createSDKContext({ cgs: { ...cgs, auth: { kind: "apiKey", key } } })).toThrow(
+      /must not be used in a browser/,
+    );
+  });
 });

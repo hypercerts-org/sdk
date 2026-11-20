@@ -40,7 +40,7 @@ import { createSDKContext } from "@hypercerts-org/sdk";
 export const context = createSDKContext({ client: new Client(session) });
 ```
 
-Make a new context when the signed-in account changes. Records are written to the account behind `client`, unless a call passes `{ repo: orgDid }` as its last argument to write to an organization through the Certified Group Service. That needs `cgs: { url, did }` in `createSDKContext`; see [references/org-writes.md](references/org-writes.md).
+Make a new context when the signed-in account changes. Records are written to the account behind `client`, unless a call passes `{ repo: orgDid }` as its last argument to write to an organization through the Certified Group Service. That needs `cgs: { url }` (plus `did` only for a CGS with a custom service DID) in `createSDKContext`; a server with no signed-in user can use a CGS API key instead (`cgs.auth`, no `client`). See [references/org-writes.md](references/org-writes.md).
 
 To read another account's record (a `{ uri }` that is not in your repo), the SDK looks up that account's DID document to find its PDS. By default it uses its own resolver and keeps each document in memory for up to an hour per context. If the app has an `@atproto/oauth-client` (or `@atproto/oauth-client-node`) client, pass its resolver to reuse the cache it already has:
 
@@ -57,7 +57,7 @@ export const context = createSDKContext({
 
 | Import from                    | Exports                                                                                                                                                                                                |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@hypercerts-org/sdk`          | `createSDKContext`, `SDKContext`, `CgsConfig`, `WriteOptions`, `DidDocumentResolver`                                                                                                                    |
+| `@hypercerts-org/sdk`          | `createSDKContext`, `SDKContext`, `CgsConfig`, `CgsAuth`, `ApiKeyContextOptions`, `WriteOptions`, `DidDocumentResolver`                                                                                                                 |
 | `@hypercerts-org/sdk/activity` | `createActivity`, `createRights`, `createContribution`, `createContributorInformation`, `WriteError`, `WriteRejectedError`, `WriteOutcomeUnknownError`, `WriteResultMismatchError`, input/result types |
 | `@hypercerts-org/sdk/actor`    | `createProfile`, `ProfileAlreadyExistsError`, `RecordAlreadyExistsError`, the same `Write*` errors, `ProfileInput`                                                                                     |
 | `@hypercerts-org/sdk/location` | `createLocation`, the same `Write*` errors, `LocationInput`, `LocationValue`                                                                                                                           |

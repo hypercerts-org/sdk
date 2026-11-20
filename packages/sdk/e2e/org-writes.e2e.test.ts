@@ -1,8 +1,9 @@
 import type { DidString } from "@atproto/lex";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createActivity, createRights } from "../src/activity/index.js";
+import { uploadBlob } from "../src/blob/index.js";
 import { addActivityToCollection, createCollection } from "../src/collection/index.js";
-import { createSDKContext } from "../src/index.js";
+import { createSDKContext, type SDKContext } from "../src/index.js";
 import {
   addActivityToProject,
   createProject,
@@ -11,15 +12,19 @@ import {
   WriteRejectedError,
 } from "../src/project/index.js";
 import { readE2eEnv } from "./env.js";
-import { coordinates, rights, unique } from "./fixtures.js";
+import { coordinates, png, rights, unique } from "./fixtures.js";
 import {
   addMember,
+  apiKeyContext,
   CGS_SERVICE_ID,
   type CgsRequest,
   callCgs,
   claimsOf,
+  createApiKey,
+  type MintedKey,
   mustCallCgs,
   registerGroup,
+  revokeApiKey,
   setRole,
   watchCgs,
 } from "./group.js";
@@ -355,5 +360,136 @@ describe("{ repo: ownDid }", () => {
     expect(requests).toEqual([]);
     expect(ref.uri).toMatch(new RegExp(`^at://${member.did}/${collections.rights}/`));
     await expectStored(member.client, ref);
+  });
+});
+
+describe("with a CGS API key and no client", () => {
+  // The key acts as `member`, the group member who minted it, with only the scopes it was given.
+  // The unit tests (src/api-key.test.ts) cover every other refusal and the wording of each.
+  const scope = (collection: string, ...actions: string[]) =>
+    `repo:${collection}?${actions.map((action) => `action=${action}`).join("&")}`;
+
+  async function keyedGroup(...scopes: string[]) {
+    const groupDid = await newGroup();
+    const minted = await createApiKey(member, groupDid, scopes);
+    return { groupDid, minted, context: apiKeyContext(minted.key) };
+  }
+
+  // What the call threw, which must be a refusal by CGS with `status` that never repeats the secret.
+  async function expectRefused(call: Promise<unknown>, status: number, { key }: MintedKey) {
+    const error = await call.catch((e: unknown) => e);
+    const refusal = error instanceof PartialWriteError ? error.failure : error;
+    expect(refusal).toBeInstanceOf(WriteRejectedError);
+    expect(refusal).toMatchObject({ status });
+    const secret = key.slice(key.indexOf(".") + 1);
+    for (const top of [error, refusal]) {
+      for (let e = top; e instanceof Error; e = e.cause) expect(e.message).not.toContain(secret);
+    }
+    return error;
+  }
+
+  // An owner's Collection and an Activity, for a key to try to change the Collection.
+  async function ownersCollection(groupDid: DidString) {
+    const activity = await createActivity(owner.context, activityInput(), { repo: groupDid });
+    const collection = await createCollection(
+      owner.context,
+      { title: unique("E2E collection") },
+      { repo: groupDid },
+    );
+    return (context: SDKContext) =>
+      addActivityToCollection(
+        context,
+        { collection: { uri: collection.uri }, activity: { uri: activity.uri } },
+        { repo: groupDid },
+      );
+  }
+
+  it("writes records to the group with the key alone: no token is asked for, the member's own repo is untouched", async () => {
+    const { groupDid, context } = await keyedGroup(
+      scope(collections.activity, "create"),
+      scope(collections.rights, "create"),
+      "blob:image/png",
+    );
+    const own = await snapshotCounts(member.client);
+    const requests = watchCgs();
+
+    const result = await createActivity(
+      context,
+      { ...activityInput(), rights, image: png() },
+      { repo: groupDid },
+    );
+
+    expect(requests.map((r) => r.nsid.split(".").pop())).toEqual([
+      "uploadBlob",
+      "createRecord",
+      "createRecord",
+    ]);
+    expect(requests.every((r) => r.apiKey.startsWith("cgsk_") && r.token === "")).toBe(true);
+    expect(result.uri).toMatch(new RegExp(`^at://${groupDid}/${collections.activity}/`));
+    await expectStored(member.client, result);
+    expect(await snapshotCounts(member.client)).toEqual(own);
+  });
+
+  it("is refused with 401 once the key is revoked", async () => {
+    const { groupDid, minted, context } = await keyedGroup(scope(collections.rights, "create"));
+    await createRights(context, rights, { repo: groupDid });
+    await revokeApiKey(member, groupDid, minted.keyRef);
+
+    const error = await expectRefused(
+      createRights(context, rights, { repo: groupDid }),
+      401,
+      minted,
+    );
+
+    expect((error as Error).message).toContain(minted.keyRef);
+  });
+
+  it("is refused with 403 naming the missing scope when the key may create but not update", async () => {
+    const { groupDid, minted, context } = await keyedGroup(scope(collections.collection, "create"));
+    const addToCollection = await ownersCollection(groupDid);
+
+    const error = await expectRefused(addToCollection(context), 403, minted);
+
+    expect((error as Error).message).toContain(scope(collections.collection, "update"));
+    expect((error as Error).message).toContain(minted.keyRef);
+  });
+
+  it("is refused with 403 for the member's current role once the member who made the key is demoted", async () => {
+    const groupDid = await newGroup();
+    await setRole(owner, groupDid, member, "admin");
+    const minted = await createApiKey(member, groupDid, [
+      scope(collections.collection, "create", "update"),
+    ]);
+    const addToCollection = await ownersCollection(groupDid);
+    // As an admin the key may replace the owner's Collection; as a member it may not.
+    await setRole(owner, groupDid, member, "member");
+
+    const error = await expectRefused(addToCollection(apiKeyContext(minted.key)), 403, minted);
+
+    expect((error as Error).message).toContain("current role");
+  });
+
+  it("refuses an upload without a blob scope, naming blob:<mime>", async () => {
+    const { groupDid, minted, context } = await keyedGroup(scope(collections.rights, "create"));
+
+    const error = await expectRefused(uploadBlob(context, png(), { repo: groupDid }), 403, minted);
+
+    expect((error as Error).message).toContain("blob:image/png");
+  });
+
+  it("reports PartialWriteError with what landed when a later record is outside the key's scopes", async () => {
+    const { groupDid, minted, context } = await keyedGroup(scope(collections.rights, "create"));
+
+    const error = await expectRefused(
+      createActivity(context, { ...activityInput(), rights }, { repo: groupDid }),
+      403,
+      minted,
+    );
+
+    expect(error).toBeInstanceOf(PartialWriteError);
+    const partial = error as PartialWriteError;
+    expect(partial.written).toHaveLength(1);
+    await expectStored(member.client, defined(partial.written[0]));
+    await expectMissing(member.client, partial.failed.uri);
   });
 });

@@ -1,7 +1,13 @@
 import { Client, cidForRawBytes, type LexMap, lexParse, lexStringify } from "@atproto/lex";
 import { cidForLex } from "@atproto/lex-cbor";
+import type { AtprotoDid } from "@atproto-labs/did-resolver";
 import { vi } from "vitest";
-import { type CgsConfig, createSDKContext, type SDKContext } from "../context.js";
+import {
+  createSDKContext,
+  type DidDocumentResolver,
+  type ResolvedCgsConfig,
+  type SDKContext,
+} from "../context.js";
 import { DID, json, type RecordedRequest } from "./fake-pds.js";
 import { HEAD } from "./fake-repo.js";
 
@@ -43,6 +49,11 @@ export interface FakeCgsOptions {
   answer?: (request: CgsRequest, index: number) => Response | undefined;
   /** Makes the account's PDS refuse `getServiceAuth` when this returns a response; `index` counts token requests from 0. */
   refuseServiceAuth?: (index: number) => Response | undefined;
+  /**
+   * The context authenticates with this API key and has no client: every request must carry it as
+   * `X-API-Key` and no `Authorization`, and the account's PDS is never asked for a token.
+   */
+  apiKey?: string;
   /** The caller is a member, not an admin: deleting a record that has no author row answers 403, as CGS does. */
   memberDeletes?: boolean;
 }
@@ -53,7 +64,7 @@ export interface FakeCgsOptions {
  * `vi.unstubAllGlobals()` after each test.
  *
  * Like the real service it checks that every request carries a token for its own method and
- * audience that was not used before, requires `repo` on the querystring of an upload, stores what
+ * audience that was not used before, requires `repo` on the querystring of every request, stores what
  * is written so later reads see it, enforces `swapRecord` as the PDS does, and answers `createRecord`
  * at a taken key with HTTP 502, the way CGS turns the PDS's 500.
  */
@@ -99,20 +110,23 @@ export function fakeCgs(options: FakeCgsOptions = {}) {
         }),
       ),
   });
-  const cgsConfig: CgsConfig = { url: CGS_URL, did: CGS_DID };
-  const context: SDKContext = createSDKContext({
-    client,
-    cgs: cgsConfig,
-    didResolver: {
-      resolve: () =>
-        Promise.resolve({
-          id: ORG,
-          service: [
-            { id: "#atproto_pds", type: "AtprotoPersonalDataServer", serviceEndpoint: ORG_PDS },
-          ],
-        }),
-    },
-  });
+  const cgsConfig: ResolvedCgsConfig = { url: CGS_URL, did: CGS_DID };
+  const didResolver: DidDocumentResolver = {
+    resolve: () =>
+      Promise.resolve({
+        id: ORG as AtprotoDid,
+        service: [
+          { id: "#atproto_pds", type: "AtprotoPersonalDataServer", serviceEndpoint: ORG_PDS },
+        ],
+      }),
+  };
+  const context: SDKContext =
+    options.apiKey === undefined
+      ? createSDKContext({ client, cgs: cgsConfig, didResolver })
+      : createSDKContext({
+          cgs: { ...cgsConfig, auth: { kind: "apiKey", key: options.apiKey } },
+          didResolver,
+        });
 
   vi.stubGlobal("fetch", async (input: Request | string | URL, init?: RequestInit) => {
     await Promise.all(seed);
@@ -142,6 +156,11 @@ export function fakeCgs(options: FakeCgsOptions = {}) {
   }
 
   function checkToken({ method, headers }: CgsRequest): Response | undefined {
+    if (options.apiKey !== undefined) {
+      return headers.get("x-api-key") === options.apiKey && !headers.has("authorization")
+        ? undefined
+        : json(401, { error: "AuthRequired", message: "Invalid API key" });
+    }
     const bearer = headers.get("authorization")?.replace(/^Bearer /, "");
     const token = bearer === undefined ? undefined : (JSON.parse(atob(bearer)) as IssuedToken);
     if (token?.aud !== CGS_AUD || token.lxm !== method) {
@@ -153,10 +172,10 @@ export function fakeCgs(options: FakeCgsOptions = {}) {
   }
 
   async function handle({ method, params, body, bytes, headers }: CgsRequest): Promise<Response> {
+    if (params.repo !== ORG) {
+      return json(400, { error: "InvalidRequest", message: "repo is required" });
+    }
     if (method.endsWith("uploadBlob")) {
-      if (params.repo !== ORG) {
-        return json(400, { error: "InvalidRequest", message: "repo is required" });
-      }
       return json(200, {
         blob: {
           $type: "blob",

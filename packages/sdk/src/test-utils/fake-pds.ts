@@ -1,5 +1,6 @@
 import { Client, type ClientOptions } from "@atproto/lex";
-import { createSDKContext, type SDKContext } from "../context.js";
+import { createSDKContext } from "../context.js";
+import { hasClient, type SessionContext } from "../internal/write-target.js";
 
 export const DID = "did:plc:testowner123";
 // CIDv1 (raw, sha-256) of the bytes "hello".
@@ -20,7 +21,7 @@ export function fakePds(
   respond: (request: RecordedRequest) => Response | Promise<Response>,
   clientOptions: ClientOptions = {},
 ): {
-  context: SDKContext;
+  context: SessionContext;
   requests: RecordedRequest[];
 } {
   const requests: RecordedRequest[] = [];
@@ -43,7 +44,9 @@ export function fakePds(
     },
     clientOptions,
   );
-  return { context: createSDKContext({ client }), requests };
+  const context = createSDKContext({ client });
+  if (!hasClient(context)) throw new Error("fakePds: the context has no client");
+  return { context, requests };
 }
 
 export function json(status: number, body: unknown): Response {

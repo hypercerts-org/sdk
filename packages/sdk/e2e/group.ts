@@ -1,5 +1,6 @@
 import { type DidString, l } from "@atproto/lex";
 import { vi } from "vitest";
+import { createSDKContext, type SDKContext } from "../src/index.js";
 import { readE2eEnv } from "./env.js";
 import type { Account } from "./session.js";
 
@@ -110,12 +111,53 @@ export async function setRole(
   });
 }
 
+/** An API key CGS minted: the secret `key` (shown once) and its non-secret `keyRef`. */
+export interface MintedKey {
+  key: string;
+  keyRef: string;
+}
+
+/**
+ * Mints an API key for the group as `creator`, a member, with `scopes` (such as
+ * `repo:<collection>?action=create` or `blob:image/*`). Like `callCgs`, this is what an application
+ * does with `app.certified.group.keys.create`; the SDK has no wrapper for it. CGS refuses to mint a
+ * key with a key, so it goes over service auth.
+ */
+export async function createApiKey(
+  creator: Account,
+  groupDid: DidString,
+  scopes: readonly string[],
+): Promise<MintedKey> {
+  return mustCallCgs<MintedKey>(creator, "app.certified.group.keys.create", {
+    repo: groupDid,
+    name: `sdk-e2e-${Date.now()}`,
+    scopes,
+  });
+}
+
+/** Revokes a key as `actor` (its creator, or the group's owner). The key is refused on its next use. */
+export async function revokeApiKey(
+  actor: Account,
+  groupDid: DidString,
+  keyRef: string,
+): Promise<void> {
+  await mustCallCgs(actor, "app.certified.group.keys.delete", { repo: groupDid, keyRef });
+}
+
+/** A context with nothing but the group key: no client, no account. */
+export function apiKeyContext(key: string): SDKContext {
+  const { cgs } = readE2eEnv();
+  return createSDKContext({ cgs: { url: cgs.url, did: cgs.did, auth: { kind: "apiKey", key } } });
+}
+
 /** A request the SDK sent to CGS, as the tests saw it. */
 export interface CgsRequest {
   nsid: string;
   /** The service-auth token, the claims of which tests check. */
   token: string;
   body: Record<string, unknown>;
+  /** The `X-API-Key` header, empty when the SDK authenticated with a service-auth token. */
+  apiKey: string;
 }
 
 /**
@@ -137,6 +179,7 @@ export function watchCgs(before?: (request: CgsRequest) => Promise<void> | void)
     const seenRequest: CgsRequest = {
       nsid: new URL(request.url).pathname.replace("/xrpc/", ""),
       token: request.headers.get("authorization")?.replace("Bearer ", "") ?? "",
+      apiKey: request.headers.get("x-api-key") ?? "",
       body: text.startsWith("{") ? (JSON.parse(text) as Record<string, unknown>) : {},
     };
     seen.push(seenRequest);

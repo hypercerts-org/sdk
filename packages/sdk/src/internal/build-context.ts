@@ -5,13 +5,13 @@ import {
   type RecordKeyString,
   type TypedBlobRef,
 } from "@atproto/lex";
-import type { SDKContext } from "../context.js";
+import type { ResolvedCgsConfig, SDKContext } from "../context.js";
 import type { WriteOptions } from "../write-options.js";
 import { cgsTarget } from "./cgs-target.js";
 import { describeError, describeValue } from "./describe.js";
 import { type PreparedRecord, prepareRecord } from "./prepare-record.js";
 import { assertRecordUriOfType, parseRecordUri } from "./resolve-record-ref.js";
-import { pdsTarget, type WriteTarget } from "./write-target.js";
+import { hasClient, pdsTarget, type WriteTarget } from "./write-target.js";
 
 /**
  * What every step of one creation call shares: the client's repo, the timestamp used as the
@@ -37,21 +37,17 @@ export interface BuildContext {
  * `options.repo` absent or the client's own DID: the target is the account's own repo. Any other
  * DID: the target is that repo through the Certified Group Service.
  *
- * Throws Error when the client has no DID, TypeError when `options.repo` is not a DID or names
- * another repo and the context has no `cgs`.
+ * With an API-key `cgs` context no client is needed, and `options.repo` is required.
+ *
+ * Throws Error when the client has no DID, TypeError when `options.repo` is not a DID, names
+ * another repo and the context has no `cgs`, or is missing with an API-key context.
  */
 export function createBuildContext(
   context: SDKContext,
   operation: string,
   options?: WriteOptions,
 ): BuildContext {
-  const did = context.client.did;
-  if (did === undefined) {
-    throw new Error(
-      `${operation}: the client is not authenticated, so there is no repository to write to. Sign in first, then create the context with \`createSDKContext({ client: new Client(session) })\`.`,
-    );
-  }
-  const target = selectTarget(context, operation, did, options);
+  const target = selectTarget(context, operation, options);
   return {
     context,
     did: target.did,
@@ -65,22 +61,50 @@ export function createBuildContext(
 function selectTarget(
   context: SDKContext,
   operation: string,
-  own: DidString,
   options: WriteOptions | undefined,
 ): WriteTarget {
   const repo: unknown = options?.repo;
-  if (repo === undefined || repo === own) return pdsTarget(context, own, operation);
-  if (typeof repo !== "string" || !isDidString(repo)) {
-    throw new TypeError(
-      `${operation}: \`repo\` must be the DID of a repository, for example "did:plc:abc123", but received ${describeValue(repo)}. Handles are not accepted. Nothing was sent.`,
+  if (context.cgs?.auth?.kind === "apiKey")
+    return apiKeyTarget(context, context.cgs, operation, repo);
+  if (!hasClient(context) || context.client.did === undefined) {
+    throw new Error(
+      `${operation}: the client is not authenticated, so there is no repository to write to. Sign in first, then create the context with \`createSDKContext({ client: new Client(session) })\`.`,
     );
   }
+  const own = context.client.did;
+  if (repo === undefined || repo === own) {
+    return pdsTarget(context, own, operation);
+  }
+  assertRepoDid(operation, repo);
   if (context.cgs === undefined) {
     throw new TypeError(
       `${operation}: \`repo\` is ${repo}, which is not the signed-in account (${own}), so the write goes through the Certified Group Service, but the context has no \`cgs\`. Create it with \`createSDKContext({ client, cgs: { url, did } })\`. Nothing was sent.`,
     );
   }
   return cgsTarget(context, context.cgs, repo, operation);
+}
+
+function assertRepoDid(operation: string, repo: unknown): asserts repo is DidString {
+  if (typeof repo === "string" && isDidString(repo)) return;
+  throw new TypeError(
+    `${operation}: \`repo\` must be the DID of a repository, for example "did:plc:abc123", but received ${describeValue(repo)}. Handles are not accepted. Nothing was sent.`,
+  );
+}
+
+// An API-key context writes only to a group, whatever else it holds: it never falls back to a PDS.
+function apiKeyTarget(
+  context: SDKContext,
+  cgs: ResolvedCgsConfig,
+  operation: string,
+  repo: unknown,
+): WriteTarget {
+  if (repo === undefined) {
+    throw new TypeError(
+      `${operation}: this context uses a Certified Group Service API key, which writes only to a group. Pass \`{ repo: groupDid }\`. Nothing was sent.`,
+    );
+  }
+  assertRepoDid(operation, repo);
+  return cgsTarget(context, cgs, repo, operation);
 }
 
 /**
@@ -124,7 +148,7 @@ export function parseInput<T>(
  * signed-in account" for the client's own repo, the organization repo when `{ repo }` chose it.
  */
 export function describeWrittenRepo(build: BuildContext): string {
-  return build.did === build.context.client.did
+  return build.did === build.context.client?.did
     ? `the signed-in account (${build.did})`
     : `the organization repo ${build.did} (written via { repo })`;
 }

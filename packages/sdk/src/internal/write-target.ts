@@ -16,10 +16,18 @@ import {
   WriteRejectedError,
   WriteResultMismatchError,
 } from "../errors.js";
-import { describeError, isRecordNotFound } from "./describe.js";
+import { describeError, isRecordNotFound, property } from "./describe.js";
 import type { PreparedRecord } from "./prepare-record.js";
 import { parseRecordUri, type StrongRef } from "./resolve-record-ref.js";
 import { uploadVia } from "./upload-via.js";
+
+/** A context with a client: the only kind that can write to an account's own repository. */
+export type SessionContext = SDKContext & { readonly client: Client };
+
+/** Narrows `context` to one that has a client. */
+export function hasClient(context: SDKContext): context is SessionContext {
+  return context.client !== undefined;
+}
 
 /** An existing record to replace with a new full value. */
 export interface PlannedUpdate {
@@ -153,7 +161,7 @@ export const getLatestCommit = l.query(
  * so calling again after any outcome is safe. `attempted` of the errors is `[{ uri, cid }]` with a
  * CID and empty without one. Throws TypeError when `target.uri` is not a record URI.
  */
-export function pdsTarget(context: SDKContext, did: DidString, operation: string): WriteTarget {
+export function pdsTarget(context: SessionContext, did: DidString, operation: string): WriteTarget {
   return {
     did,
     atomic: true,
@@ -226,7 +234,7 @@ export async function recordExists(
 }
 
 async function submitApplyWrites(
-  context: SDKContext,
+  context: SessionContext,
   did: DidString,
   operation: string,
   plan: WritePlan,
@@ -270,7 +278,7 @@ async function submitApplyWrites(
 }
 
 async function submitGuardedUpdate(
-  context: SDKContext,
+  context: SessionContext,
   did: DidString,
   operation: string,
   plan: WritePlan,
@@ -298,7 +306,7 @@ async function submitGuardedUpdate(
 }
 
 async function submitCreateOnly(
-  context: SDKContext,
+  context: SessionContext,
   did: DidString,
   operation: string,
   plan: WritePlan,
@@ -340,7 +348,7 @@ async function submitCreateOnly(
 }
 
 async function deleteRecord(
-  context: SDKContext,
+  context: SessionContext,
   did: DidString,
   operation: string,
   target: DeleteTarget,
@@ -560,14 +568,6 @@ function repositoryChanged(operation: string, reason: string, request: WriteRequ
     `${operation}: the repository changed since it was read (HTTP 400: ${reason}), most likely because another write to this account landed in between. ` +
     `Nothing was written: ${describeEffects(request, NOT_WRITTEN)}. The SDK neither retries nor merges. Nothing needs cleaning up. Call again to read the repository afresh and try once more.`
   );
-}
-
-// Duck-typed rather than `instanceof XrpcResponseError`: see `assertClient` in context.ts. Only
-// that class has a numeric `status`; an unreadable 2xx response (XrpcInvalidResponseError) does not.
-function property(error: unknown, name: "status" | "error"): unknown {
-  return typeof error === "object" && error !== null
-    ? (error as Record<string, unknown>)[name]
-    : undefined;
 }
 
 // `results` is optional in the response schema. A PDS that omits it is trusted; one that returns

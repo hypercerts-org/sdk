@@ -20,8 +20,11 @@ import { createDefaultDidResolver } from "./internal/resolve-pds.js";
  * ```
  */
 export interface SDKContext {
-  /** The application's `@atproto/lex` client. Operations send all their requests through it. */
-  readonly client: Client;
+  /**
+   * The application's `@atproto/lex` client. Operations send all their requests through it.
+   * Absent only when `cgs.auth` is an API key: such a context has no account of its own.
+   */
+  readonly client?: Client | undefined;
   /**
    * Finds the DID document of an account other than the client's, to locate its PDS. The
    * resolver passed to {@link createSDKContext}, or the SDK's cached default.
@@ -29,9 +32,9 @@ export interface SDKContext {
   readonly didResolver: DidDocumentResolver;
   /**
    * The Certified Group Service that organization writes go through, when the context was created
-   * with one. See {@link CgsConfig}.
+   * with one, with its `did` filled in. See {@link CgsConfig}.
    */
-  readonly cgs?: CgsConfig | undefined;
+  readonly cgs?: ResolvedCgsConfig | undefined;
 }
 
 /**
@@ -42,12 +45,39 @@ export interface CgsConfig {
   /** The service's base URL, for example `https://cgs.example.com`. Requests go to `<url>/xrpc/<method>`. */
   readonly url: string;
   /**
-   * The service's DID without a fragment, for example `did:web:cgs.example.com`. The SDK appends
-   * `#certified_group_service` itself: the token it asks the account's PDS for has that
-   * `did#service` reference as its `aud`, which is what an OAuth `rpc:` scope must name.
+   * The service's DID without a fragment. Default: `did:web:<hostname of url>`, the DID CGS uses
+   * unless its operator set a custom `SERVICE_DID`; a port in `url` is dropped, as CGS does. Pass
+   * it only for such a custom DID. The SDK appends `#certified_group_service` itself: the token
+   * it asks the account's PDS for has that `did#service` reference as its `aud`, which is what
+   * an OAuth `rpc:` scope must name.
    */
+  readonly did?: DidString | undefined;
+  /** How requests to the service are authenticated. Default: `{ kind: "serviceAuth" }`. */
+  readonly auth?: CgsAuth | undefined;
+}
+
+/** A {@link CgsConfig} as kept on {@link SDKContext.cgs}: `did` is always present. */
+export interface ResolvedCgsConfig extends Omit<CgsConfig, "did"> {
   readonly did: DidString;
 }
+
+/**
+ * How the SDK authenticates to the Certified Group Service.
+ *
+ * @remarks
+ * - `serviceAuth` (default): the signed-in account acts. For each request the SDK asks the client's
+ *   PDS for a single-use token.
+ * - `apiKey`: the key acts as the group member who created it, limited to the key's scopes and
+ *   that member's current role. Needs no client and no PDS round trip, but every write must pass
+ *   `{ repo: groupDid }`: a key belongs to one group and the context has no own repository.
+ *   Server-side only: a key is a long-lived secret, so store it like a password. The SDK never
+ *   logs it and never puts it in an error; messages name only its `cgsk_<ref>` part. The key is
+ *   not enumerable on the stored object, and `JSON.stringify` and `console.log` show it as
+ *   `cgsk_<ref>.***`, so a logged context does not leak it.
+ */
+export type CgsAuth =
+  | { readonly kind: "serviceAuth" }
+  | { readonly kind: "apiKey"; readonly key: string };
 
 /**
  * Resolves a DID to its DID document.
@@ -105,10 +135,27 @@ export interface CreateSDKContextOptions {
    * `rpc:app.certified.group.repo.createRecord?aud=did:web:cgs.example.com%23certified_group_service`,
    * and the same for `putRecord`, `deleteRecord` and `uploadBlob`. Repeating `lxm` in one scope
    * (`rpc?lxm=...&lxm=...&aud=...`) is equivalent. CGS accepts the token with or without the
-   * fragment in `aud`. API keys (`cgsk_...`) are not supported: the SDK always acts as the
-   * signed-in account.
+   * fragment in `aud`. `cgs.did` defaults to `did:web:<hostname of cgs.url>`, so the scope names
+   * that host unless you set `cgs.did`. To write with an API key instead, see {@link CgsAuth} and
+   * {@link ApiKeyContextOptions}.
    */
   cgs?: CgsConfig;
+}
+
+/**
+ * Options for a context that writes to a group with a Certified Group Service API key (see
+ * {@link CgsAuth}), with no client.
+ *
+ * @remarks
+ * `client` is optional: reads of the group's records go to its own PDS without authentication.
+ * If you pass one anyway, writes to the group still use the key, and every write still needs
+ * `{ repo: groupDid }`: a context with a key never writes to the client's own repository. For
+ * personal writes, use a separate context without `cgs.auth` (or with `serviceAuth`).
+ */
+export interface ApiKeyContextOptions {
+  client?: Client;
+  didResolver?: DidDocumentResolver;
+  cgs: CgsConfig & { readonly auth: { readonly kind: "apiKey"; readonly key: string } };
 }
 
 /**
@@ -133,7 +180,9 @@ export interface CreateSDKContextOptions {
  * @throws {@link TypeError} If `client` is missing or has no `xrpc()` method, for example a raw
  * OAuth session or an `@atproto/api` agent, or if `didResolver` is given without a `resolve()`
  * method, for example the OAuth client itself instead of `oauthClient.identityResolver`, or if
- * `cgs` is given without an http(s) `url` and a DID in `did`.
+ * `cgs` is given without an http(s) `url`, or with a `did` that is not a DID, or with an API key
+ * that is malformed, used in a browser (`window` is defined), or sent to a `cgs.url` that is not
+ * `https:` (plain `http:` is accepted only for `localhost`, `127.0.0.1` and `[::1]`), or if `client` is missing and `cgs.auth` is not an API key.
  *
  * @example
  * ```ts
@@ -153,18 +202,45 @@ export interface CreateSDKContextOptions {
  * });
  * ```
  *
+ * @example Writing to a group with a Certified Group Service API key, server-side, with no client
+ * ```ts
+ * import { createSDKContext } from "@hypercerts-org/sdk";
+ * import { createRights } from "@hypercerts-org/sdk/activity";
+ *
+ * const context = createSDKContext({
+ *   cgs: {
+ *     url: "https://cgs.example.com",
+ *     // The `key` that `keys.create` returned, kept in the server's secrets.
+ *     auth: { kind: "apiKey", key: process.env.CGS_API_KEY! },
+ *   },
+ * });
+ * await createRights(context, rights, { repo: groupDid }); // `rights`, `groupDid`: yours
+ * ```
+ *
+ * @example Forgetting `{ repo }` with an API key throws
+ * ```ts
+ * await createRights(context, rights); // TypeError: pass `{ repo: groupDid }`; nothing was sent
+ * ```
+ *
  * @example Passing the session directly throws
  * ```ts
  * createSDKContext({ client: session }); // TypeError: wrap it with `new Client(session)`
  * ```
  */
-export function createSDKContext(options: CreateSDKContextOptions): SDKContext {
+export function createSDKContext(
+  options: CreateSDKContextOptions | ApiKeyContextOptions,
+): SDKContext {
   const client: unknown = options?.client;
-  assertClient(client);
+  const cgs = options?.cgs === undefined ? undefined : checkedCgs(options.cgs);
+  // A client may be left out only by a context whose group writes use a key.
+  if (client !== undefined || cgs?.auth?.kind !== "apiKey") assertClient(client);
   const didResolver = options.didResolver ?? createDefaultDidResolver();
   if (!hasMethod(didResolver, "resolve")) throw notADidResolver(didResolver);
-  const cgs = options.cgs === undefined ? undefined : checkedCgs(options.cgs);
-  return Object.freeze({ client, didResolver, ...(cgs === undefined ? {} : { cgs }) });
+  return Object.freeze({
+    ...(client === undefined ? {} : { client }),
+    didResolver,
+    ...(cgs === undefined ? {} : { cgs }),
+  });
 }
 
 // Duck-typed instead of `instanceof Client`: an application can end up with more than one
@@ -183,7 +259,7 @@ function assertClient(value: unknown): asserts value is Client {
 
 // A bad CGS URL or DID would only show up as a failed request after the first records were written,
 // so it is refused here.
-function checkedCgs(value: unknown): CgsConfig {
+function checkedCgs(value: unknown): ResolvedCgsConfig {
   const { url, did } = (typeof value === "object" && value !== null ? value : {}) as Record<
     string,
     unknown
@@ -201,12 +277,78 @@ function checkedCgs(value: unknown): CgsConfig {
       'createSDKContext: `cgs.url` must be a base URL without a query string, fragment or credentials, for example "https://cgs.example.com" or "https://example.com/cgs".',
     );
   }
-  if (typeof did !== "string" || !isDidString(did)) {
+  const serviceDid = did === undefined ? `did:web:${parsed.hostname}` : did;
+  if (typeof serviceDid !== "string" || !isDidString(serviceDid)) {
     throw new TypeError(
-      `createSDKContext: \`cgs.did\` must be the service's DID, for example "did:web:cgs.example.com", but received ${describeValue(did)}.`,
+      `createSDKContext: \`cgs.did\` must be the service's DID (leave it out to use did:web:<CGS host>), for example "did:web:cgs.example.com", but received ${describeValue(did)}.`,
     );
   }
-  return Object.freeze({ url: parsed.href.replace(/\/$/, ""), did });
+  const auth =
+    checkedAuth((value as { auth?: unknown }).auth) ??
+    Object.freeze({ kind: "serviceAuth" as const });
+  // The key travels in the `x-api-key` header of every request; over plain HTTP anyone on the
+  // path could read it. Loopback is the one dev exception: that traffic never leaves the machine.
+  if (
+    auth.kind === "apiKey" &&
+    parsed.protocol !== "https:" &&
+    !LOOPBACK_HOSTS.has(parsed.hostname)
+  ) {
+    throw new TypeError(
+      `createSDKContext: \`cgs.url\` must use https when \`cgs.auth\` is an API key, because the key is sent in a header of every request, but its scheme is ${parsed.protocol.slice(0, -1)}. Use an https URL. Plain http is accepted only for localhost, 127.0.0.1 and [::1].`,
+    );
+  }
+  return Object.freeze({ url: parsed.href.replace(/\/$/, ""), did: serviceDid, auth });
+}
+
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+// `cgsk_<ref>.<secret>`. A malformed key is refused here, before any request, and the message never
+// repeats what was given: it may be a real secret with a typo. Keys are base64url, so anything
+// else is refused here: a character outside ASCII would make `Headers.set` throw a message that
+// quotes it, which would put part of the secret in an error.
+const API_KEY = /^cgsk_[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+
+function checkedAuth(value: unknown): CgsAuth | undefined {
+  if (value === undefined) return undefined;
+  const { kind, key } = (typeof value === "object" && value !== null ? value : {}) as Record<
+    string,
+    unknown
+  >;
+  if (kind === "serviceAuth") return Object.freeze({ kind });
+  if (kind !== "apiKey") {
+    throw new TypeError(
+      `createSDKContext: \`cgs.auth.kind\` must be "serviceAuth" or "apiKey", but received ${describeValue(kind)}.`,
+    );
+  }
+  // An API key is a long-lived secret, and a page that holds one hands it to every visitor.
+  if (typeof window !== "undefined") {
+    throw new TypeError(
+      "createSDKContext: an API key is a long-lived secret and must not be used in a browser, where anyone can read it. Use it only in server-side code. In the browser, sign in and pass `cgs: { url }` with a `client` instead.",
+    );
+  }
+  if (typeof key !== "string" || !API_KEY.test(key)) {
+    const malformed =
+      typeof key === "string" ? ` of ${key.length} characters that does not have that form` : "";
+    throw new TypeError(
+      `createSDKContext: \`cgs.auth.key\` must be a Certified Group Service API key of the form "cgsk_<ref>.<secret>", but received ${describeValue(key)}${malformed}. Use the \`key\` that keys.create returned; it is shown only once.`,
+    );
+  }
+  return redactedApiKeyAuth(key);
+}
+
+// The key stays readable as `auth.key` for the SDK, but it is not enumerable and the object
+// prints as `cgsk_<ref>.***` through `JSON.stringify` and Node's `util.inspect`, so logging a
+// context does not leak it. `Symbol.for` is how Node names its inspect hook; it needs no import.
+function redactedApiKeyAuth(key: string): CgsAuth {
+  const shown = { kind: "apiKey" as const, key: `${key.slice(0, key.indexOf("."))}.***` };
+  const auth = { kind: "apiKey" as const };
+  Object.defineProperty(auth, "key", { value: key, enumerable: false });
+  Object.defineProperty(auth, "toJSON", { value: () => shown, enumerable: false });
+  Object.defineProperty(auth, Symbol.for("nodejs.util.inspect.custom"), {
+    value: () => shown,
+    enumerable: false,
+  });
+  return Object.freeze(auth) as CgsAuth;
 }
 
 function tryParseUrl(value: string): URL | undefined {
