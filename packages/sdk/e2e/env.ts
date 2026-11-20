@@ -1,3 +1,5 @@
+import type { CgsConfig } from "../src/index.js";
+
 /** Environment variables the end-to-end tests read. Documented in docs/e2e-testing.md. */
 export const E2E_VARIABLES = [
   "SDK_E2E_PDS_URL",
@@ -6,6 +8,8 @@ export const E2E_VARIABLES = [
   "SDK_E2E_USER1_PASSWORD",
   "SDK_E2E_USER2",
   "SDK_E2E_USER2_PASSWORD",
+  "SDK_E2E_CGS_URL",
+  "SDK_E2E_CGS_DID",
 ] as const;
 
 export interface Credentials {
@@ -21,6 +25,8 @@ export interface E2eEnv {
   plcUrl: string;
   user1: Credentials;
   user2: Credentials;
+  /** Where the sandbox's Certified Group Service (CGS) is: the origin and the `did:web` DID. */
+  cgs: CgsConfig;
 }
 
 /**
@@ -34,8 +40,8 @@ export function readE2eEnv(env: NodeJS.ProcessEnv = process.env): E2eEnv {
   if (missing.length > 0) {
     const list = missing.map((name) => `  ${name}`).join("\n");
     throw new Error(
-      `The end-to-end tests need a running PDS and two accounts, but these environment variables are not set:\n${list}\n` +
-        "docs/e2e-testing.md shows how to start Atmosphere in a Box and set them. " +
+      `The end-to-end tests need a running PDS, two accounts and a Certified Group Service, but these environment variables are not set:\n${list}\n` +
+        "docs/e2e-testing.md shows how to start Atmosphere in a Box with the CGS and set them. " +
         "If the PDS uses the sandbox's private CA, also set NODE_EXTRA_CA_CERTS to its root certificate.",
     );
   }
@@ -45,5 +51,6 @@ export function readE2eEnv(env: NodeJS.ProcessEnv = process.env): E2eEnv {
     plcUrl: value("SDK_E2E_PLC_URL"),
     user1: { identifier: value("SDK_E2E_USER1"), password: value("SDK_E2E_USER1_PASSWORD") },
     user2: { identifier: value("SDK_E2E_USER2"), password: value("SDK_E2E_USER2_PASSWORD") },
+    cgs: { url: value("SDK_E2E_CGS_URL"), did: value("SDK_E2E_CGS_DID") as CgsConfig["did"] },
   };
 }

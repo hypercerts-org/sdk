@@ -1,5 +1,6 @@
 // Prints the environment variables the end-to-end tests need (see docs/e2e-testing.md), read
-// from the state of a created and seeded Atmosphere in a Box sandbox.
+// from the state of a created and seeded Atmosphere in a Box sandbox that has the Certified Group
+// Service (scripts/e2e-cgs/install.mjs).
 //
 //   eval "$(node scripts/e2e-env.mjs ../atmosphereinabox)"   exports them into the current shell
 //   node scripts/e2e-env.mjs "$AIAB_DIR" --github-env "$GITHUB_ENV"
@@ -29,6 +30,15 @@ if (!user1 || !user2) {
   );
 }
 
+// The `cgs` application (scripts/e2e-cgs/install.mjs) serves the Certified Group Service at the
+// route host `cgs`, and its did:web DID is that host name.
+if (!manifest.applications?.includes("cgs") || !manifest.domain) {
+  fail(
+    "the sandbox has no Certified Group Service. Install it with scripts/e2e-cgs/install.mjs and create the sandbox with `--app cgs`; see docs/e2e-testing.md.",
+  );
+}
+const cgsHost = `cgs.${manifest.domain}`;
+
 const variables = {
   SDK_E2E_PDS_URL: pds.url,
   SDK_E2E_PLC_URL: manifest.plc,
@@ -36,6 +46,8 @@ const variables = {
   SDK_E2E_USER1_PASSWORD: passwordOf(user1.handle),
   SDK_E2E_USER2: user2.handle,
   SDK_E2E_USER2_PASSWORD: passwordOf(user2.handle),
+  SDK_E2E_CGS_URL: `https://${cgsHost}`,
+  SDK_E2E_CGS_DID: `did:web:${cgsHost}`,
   // Node trusts the sandbox's CA for this process only; nothing is installed system-wide.
   NODE_EXTRA_CA_CERTS: join(state, "ca", "root.crt"),
 };
