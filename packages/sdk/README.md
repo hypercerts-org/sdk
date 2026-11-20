@@ -92,4 +92,6 @@ await createProject(context, input, { repo: groupDid });
 
 A key is a long-lived secret: store it like a password. `createSDKContext` refuses it in a browser, and the SDK never puts it in an error message. A key needs a scope per collection and action (`repo:<collection>?action=create`, `update`, `delete`) and one per blob type (`blob:image/*`); a request outside them throws `WriteRejectedError` with status 403 that names the missing scope or the role that does not allow the write.
 
+For diagrams of where a write goes and how it fails, see [docs/org-writes.md](https://github.com/hypercerts-org/sdk/blob/main/docs/org-writes.md).
+
 See the TSDoc on `createSDKContext` (shown in your editor) for the full contract.
