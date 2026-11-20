@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "cgs",
+  "services": [
+    {
+      "service": "cgs",
+      "environment": [
+        { "name": "SERVICE_URL", "source": { "kind": "route-url", "route": "cgs" } },
+        { "name": "GROUP_PDS_URL", "source": { "kind": "pds-url", "pds": "pds1" } },
+        { "name": "PLC_URL", "source": { "kind": "plc-url" } },
+        { "name": "ENCRYPTION_KEY", "source": { "kind": "secret", "secret": "encryption-key" } }
+      ]
+    }
+  ],
+  "routes": [{ "id": "cgs", "service": "cgs", "host": "cgs", "port": 3000 }],
+  "secrets": [{ "id": "encryption-key", "bytes": 32 }]
+}

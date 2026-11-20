@@ -27,6 +27,15 @@ async function preflight(): Promise<void> {
       if (!response.ok) throw new Error(`the PDS answered HTTP ${response.status}`);
     },
   );
+  await check(
+    `reach the Certified Group Service at SDK_E2E_CGS_URL (${env.cgs.url}) and see its DID ${env.cgs.did}. Was the sandbox created with the cgs application (scripts/e2e-cgs/install.mjs, \`--app cgs\`) and does this machine resolve its hostname?`,
+    async () => {
+      const response = await fetch(new URL("/.well-known/did.json", env.cgs.url));
+      if (!response.ok) throw new Error(`the service answered HTTP ${response.status}`);
+      const { id } = (await response.json()) as { id?: string };
+      if (id !== env.cgs.did) throw new Error(`its DID document is for ${id}, not ${env.cgs.did}`);
+    },
+  );
   for (const [user, credentials] of [
     ["SDK_E2E_USER1", env.user1],
     ["SDK_E2E_USER2", env.user2],

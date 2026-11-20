@@ -1,5 +1,5 @@
 import { Client, type DidString, l } from "@atproto/lex";
-import { createSDKContext, type SDKContext } from "../src/index.js";
+import { type CgsConfig, createSDKContext, type SDKContext } from "../src/index.js";
 import { type Credentials, readE2eEnv } from "./env.js";
 
 // `com.atproto.server.createSession` is not among the lexicons bundled with `Client`.
@@ -28,12 +28,15 @@ export interface Account {
  * make the PDS see something the SDK would never send. It may be asynchronous, so a test can also
  * do something else (such as write a record with another client) at that moment.
  *
+ * `cgs`, when given, is put in the account's context so the SDK can write to organizations.
+ *
  * @throws {@link Error} If the PDS cannot be reached or refuses the credentials.
  */
 export async function login(
   pdsUrl: string,
   credentials: Credentials,
   rewrite: RewriteRequest = (_, init) => init,
+  cgs?: CgsConfig,
 ): Promise<Account> {
   const { body } = await new Client({ service: pdsUrl }).xrpc(createSession, {
     body: credentials,
@@ -46,7 +49,7 @@ export async function login(
       return fetch(new URL(path, pdsUrl), await rewrite(path, { ...init, headers }));
     },
   });
-  return { did: body.did, client, context: createSDKContext({ client }) };
+  return { did: body.did, client, context: createSDKContext({ client, ...(cgs && { cgs }) }) };
 }
 
 /** Changes the request to `path` before it is sent. */
@@ -58,5 +61,5 @@ export type RewriteRequest = (
 /** Signs in as one of the two accounts named by the environment. */
 export function loginAs(user: "user1" | "user2", rewrite?: RewriteRequest): Promise<Account> {
   const env = readE2eEnv();
-  return login(env.pdsUrl, env[user], rewrite);
+  return login(env.pdsUrl, env[user], rewrite, env.cgs);
 }

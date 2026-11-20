@@ -1,8 +1,8 @@
 name: E2E
 
-# Runs the SDK against a real PDS in an Atmosphere in a Box (AiaB) sandbox. It pulls several
-# container images and takes minutes, so it does not run on pushes to main: it runs on pull
-# requests and by hand.
+# Runs the SDK against a real PDS and a real Certified Group Service (CGS) in an Atmosphere in a
+# Box (AiaB) sandbox. It pulls several container images, builds CGS and takes minutes, so it does
+# not run on pushes to main: it runs on pull requests and by hand.
 # See docs/e2e-testing.md.
 on:
   workflow_dispatch:
@@ -17,6 +17,9 @@ env:
   # not on GitHub, so it is cloned below instead of checked out with actions/checkout. To update
   # it, change the SHA here and run this workflow by hand. docs/e2e-testing.md points here.
   AIAB_SHA: c91a650ca1b8e5cc0e8b4653ad05d5b4fbf298e3
+  # The full commit of https://github.com/hypercerts-org/certified-group-service (its main) that is
+  # built into the sandbox. To update it, change the SHA here and run this workflow by hand.
+  CGS_SHA: da036cfddc9b6c504ca3f3eb60a59aeb59b76d85
 
 jobs:
   e2e:
@@ -48,17 +51,28 @@ jobs:
           test "$(git -C "$RUNNER_TEMP/atmosphereinabox" rev-parse HEAD)" = "$AIAB_SHA"
           echo "AIAB_DIR=$RUNNER_TEMP/atmosphereinabox" >> "$GITHUB_ENV"
 
-      - name: Create the sandbox with one PDS and two accounts
+      - name: Check out the Certified Group Service
+        run: |
+          git clone --quiet https://github.com/hypercerts-org/certified-group-service.git "$RUNNER_TEMP/certified-group-service"
+          git -C "$RUNNER_TEMP/certified-group-service" checkout --quiet --detach "$CGS_SHA"
+          test "$(git -C "$RUNNER_TEMP/certified-group-service" rev-parse HEAD)" = "$CGS_SHA"
+          echo "CGS_DIR=$RUNNER_TEMP/certified-group-service" >> "$GITHUB_ENV"
+
+      # Adds CGS to the AiaB checkout as the application `cgs`, built from the checkout above.
+      - name: Add the Certified Group Service to Atmosphere in a Box
+        run: node scripts/e2e-cgs/install.mjs "$AIAB_DIR" "$CGS_DIR"
+
+      - name: Create the sandbox with one PDS, two accounts and the CGS
         working-directory: ${{ env.AIAB_DIR }}
         run: |
           deno task install
-          deno task sandbox create --pds 1 --users-per-pds 2 --project sdk-e2e --subnet auto
+          deno task sandbox create --pds 1 --users-per-pds 2 --project sdk-e2e --subnet auto --app cgs
           deno task sandbox check
           deno task sandbox up --build
           deno task sandbox seed
 
-      # The sandbox publishes no ports. Its loopback relay and hosts entries make the PDS and PLC
-      # directory reachable from the runner by their sandbox hostnames.
+      # The sandbox publishes no ports. Its loopback relay and hosts entries make the PDS, PLC
+      # directory and CGS reachable from the runner by their sandbox hostnames.
       - name: Make the sandbox reachable from the runner
         working-directory: ${{ env.AIAB_DIR }}
         run: |
@@ -75,7 +89,9 @@ jobs:
       - name: Show the sandbox's containers
         if: ${{ failure() }}
         working-directory: ${{ env.AIAB_DIR }}
-        run: deno task sandbox ps
+        run: |
+          deno task sandbox ps
+          docker compose --project-name sdk-e2e logs --no-color --tail=100 cgs || true
 
       - name: Remove the sandbox
         if: ${{ always() && env.AIAB_DIR != '' }}
