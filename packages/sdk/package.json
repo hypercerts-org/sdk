@@ -89,11 +89,11 @@
   },
   "devDependencies": {
     "@atproto-labs/identity-resolver": "0.4.13",
-    "@atproto/lex": "0.4.4",
+    "@atproto/lex": "0.4.8",
     "@hypercerts-org/lexicon": "2.1.0"
   },
   "dependencies": {
-    "@atproto-labs/did-resolver": "0.3.11",
-    "@atproto/lex-cbor": "0.1.7"
+    "@atproto-labs/did-resolver": "0.3.13",
+    "@atproto/lex-cbor": "0.1.10"
   }
 }
